@@ -19,11 +19,17 @@ const AvisosCarousel = () => {
     fetchAvisos();
   }, []);
 
+  const handleNext = () => {
+    setCurrentIndex((prev) => (prev + 1) % avisos.length);
+  };
+
+  const handlePrev = () => {
+    setCurrentIndex((prev) => (prev - 1 + avisos.length) % avisos.length);
+  };
+
   useEffect(() => {
     if (avisos.length <= 1) return;
-    const interval = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % avisos.length);
-    }, 8000); // 8 segundos na landing page
+    const interval = setInterval(handleNext, 8000); // 8 segundos na landing page
     return () => clearInterval(interval);
   }, [avisos.length]);
 
@@ -63,22 +69,41 @@ const AvisosCarousel = () => {
         ))}
         
         {avisos.length > 1 && (
-          <div style={{ position: 'absolute', bottom: '15px', width: '100%', display: 'flex', justifyContent: 'center', gap: '8px', zIndex: 10 }}>
-            {avisos.map((_, index) => (
-              <div
-                key={index}
-                onClick={() => setCurrentIndex(index)}
-                style={{
-                  width: '10px',
-                  height: '10px',
-                  borderRadius: '50%',
-                  backgroundColor: index === currentIndex ? '#dc2743' : 'rgba(255,255,255,0.4)',
-                  transition: 'background-color 0.3s ease',
-                  cursor: 'pointer'
-                }}
-              />
-            ))}
-          </div>
+          <>
+            <button 
+              onClick={handlePrev}
+              style={{ position: 'absolute', top: '50%', left: '15px', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: '45px', height: '45px', cursor: 'pointer', zIndex: 10, fontSize: '1.2rem', display: 'flex', justifyContent: 'center', alignItems: 'center', transition: 'background 0.3s' }}
+              onMouseOver={(e) => e.target.style.background = 'rgba(220, 39, 67, 0.8)'}
+              onMouseOut={(e) => e.target.style.background = 'rgba(0,0,0,0.6)'}
+            >
+              ❮
+            </button>
+            <button 
+              onClick={handleNext}
+              style={{ position: 'absolute', top: '50%', right: '15px', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: '45px', height: '45px', cursor: 'pointer', zIndex: 10, fontSize: '1.2rem', display: 'flex', justifyContent: 'center', alignItems: 'center', transition: 'background 0.3s' }}
+              onMouseOver={(e) => e.target.style.background = 'rgba(220, 39, 67, 0.8)'}
+              onMouseOut={(e) => e.target.style.background = 'rgba(0,0,0,0.6)'}
+            >
+              ❯
+            </button>
+
+            <div style={{ position: 'absolute', bottom: '15px', width: '100%', display: 'flex', justifyContent: 'center', gap: '8px', zIndex: 10 }}>
+              {avisos.map((_, index) => (
+                <div
+                  key={index}
+                  onClick={() => setCurrentIndex(index)}
+                  style={{
+                    width: '10px',
+                    height: '10px',
+                    borderRadius: '50%',
+                    backgroundColor: index === currentIndex ? '#dc2743' : 'rgba(255,255,255,0.4)',
+                    transition: 'background-color 0.3s ease',
+                    cursor: 'pointer'
+                  }}
+                />
+              ))}
+            </div>
+          </>
         )}
       </div>
     </section>
