@@ -14,14 +14,14 @@ const AboutUs = () => {
           </p>
           
           <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <a href="https://www.instagram.com/kadosh.center/" target="_blank" rel="noreferrer" className="btn" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)' }}>
-              <span>📸 Instagram</span>
+            <a href="https://www.instagram.com/kadosh.center/" target="_blank" rel="noreferrer" className="btn" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(220, 39, 67, 0.1)', border: '1px solid #dc2743', color: '#dc2743' }}>
+              📸 Instagram
             </a>
-            <a href="https://www.tiktok.com/@kadosh.center" target="_blank" rel="noreferrer" className="btn" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#000000', border: '1px solid #333' }}>
-              <span>🎵 TikTok</span>
+            <a href="https://www.tiktok.com/@kadosh.center" target="_blank" rel="noreferrer" className="btn" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(220, 39, 67, 0.1)', border: '1px solid #dc2743', color: '#dc2743' }}>
+              🎵 TikTok
             </a>
-            <a href="https://maps.app.goo.gl/T932qmLaYpZyMWqe7" target="_blank" rel="noreferrer" className="btn" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#1a73e8' }}>
-              <span>📍 Nossa Localização</span>
+            <a href="https://maps.app.goo.gl/T932qmLaYpZyMWqe7" target="_blank" rel="noreferrer" className="btn" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(220, 39, 67, 0.1)', border: '1px solid #dc2743', color: '#dc2743' }}>
+              📍 Nossa Localização
             </a>
           </div>
         </div>
