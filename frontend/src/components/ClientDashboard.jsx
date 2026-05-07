@@ -279,6 +279,9 @@ const ClientDashboard = () => {
             <p style={{ color: '#aaa', margin: '5px 0 0 0' }}>Bem-vindo à sua área exclusiva Kadosh Auto Center</p>
           </div>
           <div style={{ display: 'flex', gap: '10px' }}>
+            {cliente?.is_admin && (
+              <Link to="/admin" className="btn" style={{ background: '#dc2743', color: '#fff', fontSize: '0.85rem' }}>Painel Admin 👑</Link>
+            )}
             <Link to="/" className="btn" style={{ background: '#333', fontSize: '0.85rem' }}>Voltar ao Site</Link>
             <button onClick={handleLogout} className="btn" style={{ background: 'transparent', border: '1px solid #dc2743', color: '#dc2743', fontSize: '0.85rem' }}>Sair</button>
           </div>
