@@ -122,6 +122,18 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleDeleteAtendimento = async (id) => {
+    if (!window.confirm('Tem certeza que deseja apagar este orçamento permanentemente?')) return;
+    try {
+      const { error } = await supabase.from('orcamentos').delete().eq('id', id);
+      if (error) throw error;
+      fetchAtendimentos();
+    } catch (error) {
+      console.error('Erro ao deletar', error);
+      alert('Erro ao apagar orçamento.');
+    }
+  };
+
   if (checkingSession) {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: '#0a0505', color: '#fff', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
@@ -363,9 +375,14 @@ const AdminDashboard = () => {
                         </select>
                       </td>
                       <td style={{ padding: '15px' }}>
-                        <button onClick={() => setSelectedClientForPDF(item)} style={{ background: '#dc2743', color: '#fff', border: 'none', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
-                          Gerar PDF
-                        </button>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button onClick={() => setSelectedClientForPDF(item)} style={{ background: '#dc2743', color: '#fff', border: 'none', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
+                            Gerar PDF
+                          </button>
+                          <button onClick={() => handleDeleteAtendimento(item.id)} style={{ background: 'transparent', color: '#f87171', border: '1px solid #f87171', padding: '8px', borderRadius: '6px', cursor: 'pointer' }} title="Apagar orçamento">
+                            🗑️
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )
