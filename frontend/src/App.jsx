@@ -12,6 +12,7 @@ import ForgotPassword from './components/Auth/ForgotPassword'
 import ResetPassword from './components/Auth/ResetPassword'
 import ClientDashboard from './components/ClientDashboard'
 import TvDashboard from './components/TvDashboard'
+import AvisosCarousel from './components/AvisosCarousel'
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
       <Route path="/" element={
         <>
           <Hero />
+          <AvisosCarousel />
           <Services />
           <Gallery />
           <BudgetForm />
