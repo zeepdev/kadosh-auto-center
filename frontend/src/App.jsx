@@ -11,6 +11,7 @@ import Cadastro from './components/Auth/Cadastro'
 import ForgotPassword from './components/Auth/ForgotPassword'
 import ResetPassword from './components/Auth/ResetPassword'
 import ClientDashboard from './components/ClientDashboard'
+import TvDashboard from './components/TvDashboard'
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
         </>
       } />
       <Route path="/admin" element={<AdminDashboard />} />
+      <Route path="/tv" element={<TvDashboard />} />
       <Route path="/login" element={<Login />} />
       <Route path="/cadastro" element={<Cadastro />} />
       <Route path="/esqueci-senha" element={<ForgotPassword />} />

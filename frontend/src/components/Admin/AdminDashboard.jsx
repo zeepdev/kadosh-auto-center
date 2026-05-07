@@ -16,6 +16,10 @@ const AdminDashboard = () => {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
 
+  // Avisos da TV
+  const [avisos, setAvisos] = useState([]);
+  const [uploadingAviso, setUploadingAviso] = useState(false);
+
   const [historyFilter, setHistoryFilter] = useState(null);
   const [priorityFilter, setPriorityFilter] = useState(null);
   const [selectedClientForPDF, setSelectedClientForPDF] = useState(null);
@@ -100,9 +104,19 @@ const AdminDashboard = () => {
     }
   };
 
+  const fetchAvisos = async () => {
+    try {
+      const { data, error } = await supabase.from('avisos').select('*').order('created_at', { ascending: false });
+      if (!error && data) setAvisos(data);
+    } catch (err) {
+      console.error('Erro ao carregar avisos', err);
+    }
+  };
+
   useEffect(() => {
     if (isAuthenticated) {
       fetchAtendimentos();
+      fetchAvisos();
     }
   }, [isAuthenticated]);
 
@@ -131,6 +145,56 @@ const AdminDashboard = () => {
     } catch (error) {
       console.error('Erro ao deletar', error);
       alert('Erro ao apagar orçamento.');
+    }
+  };
+
+  const handleUploadAviso = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadingAviso(true);
+    try {
+      const fileName = `${Date.now()}_${file.name}`;
+      
+      // Upload para o Storage
+      const { error: uploadError } = await supabase.storage
+        .from('avisos')
+        .upload(fileName, file, { cacheControl: '3600', upsert: false });
+
+      if (uploadError) throw uploadError;
+
+      // Pegar URL pública
+      const { data: publicUrlData } = supabase.storage.from('avisos').getPublicUrl(fileName);
+
+      // Salvar na tabela
+      const { error: dbError } = await supabase.from('avisos').insert([{
+        url: publicUrlData.publicUrl,
+        nome_arquivo: fileName
+      }]);
+
+      if (dbError) throw dbError;
+
+      fetchAvisos();
+    } catch (err) {
+      console.error('Erro no upload do aviso:', err);
+      alert('Erro ao fazer upload da imagem: ' + err.message);
+    } finally {
+      setUploadingAviso(false);
+      e.target.value = ''; // reseta o input
+    }
+  };
+
+  const handleDeleteAviso = async (aviso) => {
+    if (!window.confirm('Deseja excluir este aviso da TV?')) return;
+    try {
+      // Deletar do Storage
+      await supabase.storage.from('avisos').remove([aviso.nome_arquivo]);
+      // Deletar da Tabela
+      await supabase.from('avisos').delete().eq('id', aviso.id);
+      
+      fetchAvisos();
+    } catch (err) {
+      console.error('Erro ao deletar aviso:', err);
     }
   };
 
@@ -249,6 +313,49 @@ const AdminDashboard = () => {
           <div className="glass" style={{ padding: '20px', textAlign: 'center', borderBottom: '3px solid #4ade80' }}>
             <h3 style={{ margin: 0, fontSize: '2rem', color: '#4ade80' }}>{finalizados}</h3>
             <p style={{ margin: '5px 0 0 0', color: '#aaa' }}>Finalizados</p>
+          </div>
+        </div>
+
+        {/* Gerenciador da TV */}
+        <div className="glass" style={{ padding: '20px', marginBottom: '30px', borderLeft: '4px solid #1a73e8' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px', marginBottom: '20px' }}>
+            <div>
+              <h3 style={{ margin: 0, color: '#1a73e8' }}>📺 Avisos da TV (Digital Signage)</h3>
+              <p style={{ color: '#aaa', margin: '5px 0 0 0', fontSize: '0.9rem' }}>
+                Imagens em 1920x1080 (HD) que aparecem na tela da recepção. <Link to="/tv" target="_blank" style={{ color: '#1a73e8' }}>Abrir TV</Link>
+              </p>
+            </div>
+            <div>
+              <input 
+                type="file" 
+                accept="image/png, image/jpeg, image/jpg" 
+                id="upload-aviso" 
+                style={{ display: 'none' }} 
+                onChange={handleUploadAviso} 
+                disabled={uploadingAviso}
+              />
+              <label htmlFor="upload-aviso" className="btn" style={{ background: '#1a73e8', color: '#fff', cursor: 'pointer', padding: '10px 20px', display: 'inline-block' }}>
+                {uploadingAviso ? 'Enviando...' : '+ Enviar Nova Imagem'}
+              </label>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '15px', overflowX: 'auto', paddingBottom: '10px' }}>
+            {avisos.length === 0 ? (
+              <p style={{ color: '#aaa' }}>Nenhuma imagem cadastrada para a TV.</p>
+            ) : (
+              avisos.map(aviso => (
+                <div key={aviso.id} style={{ minWidth: '200px', width: '200px', backgroundColor: '#111', borderRadius: '8px', overflow: 'hidden', position: 'relative' }}>
+                  <img src={aviso.url} alt="Aviso" style={{ width: '100%', height: '112px', objectFit: 'cover' }} />
+                  <button 
+                    onClick={() => handleDeleteAviso(aviso)}
+                    style={{ position: 'absolute', top: '5px', right: '5px', background: 'rgba(220, 39, 67, 0.9)', color: '#fff', border: 'none', borderRadius: '4px', padding: '5px 8px', cursor: 'pointer', fontSize: '0.8rem' }}
+                  >
+                    Excluir
+                  </button>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
