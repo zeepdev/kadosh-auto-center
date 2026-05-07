@@ -16,7 +16,7 @@ const Gallery = () => {
         {[1, 2, 3, 4].map((num) => (
           <div key={num} style={{ overflow: 'hidden', borderRadius: '16px', boxShadow: '0 10px 20px rgba(0,0,0,0.5)', aspectRatio: '4/5', border: '1px solid rgba(255,255,255,0.05)' }}>
             <img 
-              src={`/foto${num}.jpg`} 
+              src={`/foto${num}.jpeg`} 
               alt={`Estrutura Kadosh ${num}`} 
               style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.4s ease' }} 
               onMouseOver={e => e.currentTarget.style.transform = 'scale(1.05)'} 
