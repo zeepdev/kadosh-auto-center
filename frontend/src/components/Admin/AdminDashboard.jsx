@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PDFGenerator from './PDFGenerator';
+import UpdatePhotoModal from './UpdatePhotoModal';
+import ViewVehicleModal from './ViewVehicleModal';
 import { supabase } from '../../lib/supabase';
 import { calcularPrioridade, PRIORIDADES } from '../../lib/prioridade';
 
@@ -23,6 +25,8 @@ const AdminDashboard = () => {
   const [historyFilter, setHistoryFilter] = useState(null);
   const [priorityFilter, setPriorityFilter] = useState(null);
   const [selectedClientForPDF, setSelectedClientForPDF] = useState(null);
+  const [selectedForUpdate, setSelectedForUpdate] = useState(null);
+  const [selectedPlacaForView, setSelectedPlacaForView] = useState(null);
 
   // Ao montar, verifica se já existe sessão Supabase válida e se o usuário é admin.
   useEffect(() => {
@@ -460,9 +464,14 @@ const AdminDashboard = () => {
                       <td style={{ padding: '15px' }}>
                         {item.placa} <br/>
                         {item.placa && (
-                          <button onClick={() => setHistoryFilter(item.placa)} style={{ background: 'transparent', border: 'none', color: '#1a73e8', textDecoration: 'underline', cursor: 'pointer', fontSize: '0.8rem', padding: 0 }}>
-                            Ver Histórico
-                          </button>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '5px' }}>
+                            <button onClick={() => setHistoryFilter(item.placa)} style={{ background: 'transparent', border: 'none', color: '#1a73e8', textDecoration: 'underline', cursor: 'pointer', fontSize: '0.8rem', padding: 0, textAlign: 'left' }}>
+                              Ver Histórico
+                            </button>
+                            <button onClick={() => setSelectedPlacaForView(item.placa)} style={{ background: 'transparent', border: 'none', color: '#f59e0b', textDecoration: 'underline', cursor: 'pointer', fontSize: '0.8rem', padding: 0, textAlign: 'left', fontWeight: 'bold' }}>
+                              🔍 Consultar Veículo
+                            </button>
+                          </div>
                         )}
                       </td>
                       <td style={{ padding: '15px' }}>{item.servicoDesejado}</td>
@@ -483,6 +492,9 @@ const AdminDashboard = () => {
                       </td>
                       <td style={{ padding: '15px' }}>
                         <div style={{ display: 'flex', gap: '8px' }}>
+                          <button onClick={() => setSelectedForUpdate(item)} style={{ background: '#3b82f6', color: '#fff', border: 'none', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }} title="Atualizar status com foto">
+                            Atualizar 📸
+                          </button>
                           <button onClick={() => setSelectedClientForPDF(item)} style={{ background: '#dc2743', color: '#fff', border: 'none', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
                             Gerar PDF
                           </button>
@@ -504,6 +516,24 @@ const AdminDashboard = () => {
         <PDFGenerator 
           initialData={selectedClientForPDF} 
           onClose={() => setSelectedClientForPDF(null)} 
+        />
+      )}
+
+      {selectedForUpdate && (
+        <UpdatePhotoModal 
+          atendimento={selectedForUpdate}
+          onClose={() => setSelectedForUpdate(null)}
+          onSuccess={() => {
+            setSelectedForUpdate(null);
+            alert('Atualização salva e cliente notificado!');
+          }}
+        />
+      )}
+
+      {selectedPlacaForView && (
+        <ViewVehicleModal 
+          placa={selectedPlacaForView}
+          onClose={() => setSelectedPlacaForView(null)}
         />
       )}
     </div>

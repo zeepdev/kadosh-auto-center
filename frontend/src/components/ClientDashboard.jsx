@@ -10,6 +10,7 @@ const ClientDashboard = () => {
   const [cliente, setCliente] = useState(null);
   const [veiculos, setVeiculos] = useState([]);
   const [orcamentos, setOrcamentos] = useState([]);
+  const [atualizacoes, setAtualizacoes] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Estado para adicionar novo veículo
@@ -188,6 +189,18 @@ const ClientDashboard = () => {
         });
 
       setOrcamentos(merged);
+
+      // Buscar atualizações (fotos) dos orçamentos encontrados
+      const orcamentoIds = merged.map(o => o.id);
+      if (orcamentoIds.length > 0) {
+        const { data: attData } = await supabase
+          .from('atualizacoes_servico')
+          .select('*')
+          .in('orcamento_id', orcamentoIds)
+          .order('created_at', { ascending: false });
+        if (attData) setAtualizacoes(attData);
+      }
+
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
     } finally {
@@ -592,6 +605,42 @@ const ClientDashboard = () => {
             )}
           </div>
         </div>
+
+        {/* Linha do Tempo (Atualizações com Fotos) */}
+        {atualizacoes.length > 0 && (
+          <div style={{ marginTop: '40px' }}>
+            <h3 style={{ marginBottom: '20px', color: '#dc2743' }}>📸 Acompanhamento em Tempo Real</h3>
+            <p style={{ color: '#aaa', marginBottom: '20px' }}>Acompanhe o andamento do seu veículo na nossa oficina.</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {atualizacoes.map(att => {
+                const orcamento = orcamentos.find(o => o.id === att.orcamento_id);
+                return (
+                  <div key={att.id} className="glass" style={{ padding: '20px', borderLeft: '4px solid #dc2743', display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+                    {att.foto_url && (
+                      <div style={{ flex: '1 1 200px', maxWidth: '300px' }}>
+                        <a href={att.foto_url} target="_blank" rel="noreferrer">
+                          <img src={att.foto_url} alt="Atualização" style={{ width: '100%', borderRadius: '8px', objectFit: 'cover', border: '1px solid #333' }} />
+                        </a>
+                      </div>
+                    )}
+                    <div style={{ flex: '2 1 300px' }}>
+                      <p style={{ color: '#aaa', fontSize: '0.85rem', marginBottom: '5px' }}>
+                        {new Date(att.created_at).toLocaleString('pt-BR')} 
+                        {orcamento && ` • Veículo: ${orcamento.placa}`}
+                      </p>
+                      <h4 style={{ margin: '0 0 10px 0', color: '#fff', fontSize: '1.1rem' }}>
+                        {orcamento ? orcamento.servicoDesejado : 'Atualização de Serviço'}
+                      </h4>
+                      <p style={{ color: '#ddd', fontStyle: 'italic', background: '#111', padding: '15px', borderRadius: '8px', borderLeft: '2px solid #333' }}>
+                        "{att.descricao}"
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
       </div>
     </div>
