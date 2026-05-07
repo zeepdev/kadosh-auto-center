@@ -2,6 +2,10 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import { createRequire } from 'module';
+import { Resend } from 'resend';
+
+// Configuração do Resend
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // sinesp-api é CommonJS
 const require = createRequire(import.meta.url);
@@ -163,6 +167,55 @@ app.get('/api/placa/:placa', async (req, res) => {
       error: 'Não foi possível consultar a placa no momento. Preencha os dados manualmente.',
       detalhes: error.message
     });
+  }
+});
+
+// Endpoint de envio de e-mails (Atualização de Serviço)
+app.post('/api/send-update-email', async (req, res) => {
+  const { clientEmail, clientName, carInfo, descricao, fotoUrl } = req.body;
+
+  if (!clientEmail) {
+    return res.status(400).json({ success: false, error: 'E-mail do cliente não fornecido' });
+  }
+
+  try {
+    const data = await resend.emails.send({
+      from: 'Kadosh Auto Center <onboarding@resend.dev>',
+      to: [clientEmail],
+      subject: `Atualização do seu ${carInfo} - Kadosh Auto Center`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #0a0505; color: #fff; padding: 30px; border-radius: 8px;">
+          <h2 style="color: #dc2743; text-align: center; text-transform: uppercase;">KADOSH AUTO CENTER</h2>
+          <p style="font-size: 16px;">Olá, <strong>${clientName || 'Cliente'}</strong>!</p>
+          <p style="font-size: 16px;">O nosso mecânico acabou de registrar uma nova atualização sobre o seu veículo <strong>${carInfo}</strong>:</p>
+          
+          <div style="background-color: #111; padding: 20px; border-left: 4px solid #dc2743; margin: 25px 0; border-radius: 4px;">
+            <p style="font-size: 16px; margin: 0; color: #ddd; font-style: italic;">"${descricao}"</p>
+          </div>
+
+          ${fotoUrl ? `
+            <div style="text-align: center; margin: 25px 0;">
+              <img src="${fotoUrl}" alt="Foto da Atualização" style="max-width: 100%; border-radius: 8px; border: 1px solid #333;" />
+            </div>
+          ` : ''}
+
+          <p style="text-align: center; margin-top: 40px;">
+            <a href="https://kadosh-auto-center.vercel.app/login" style="background-color: #dc2743; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+              Acompanhar no Painel
+            </a>
+          </p>
+          <p style="text-align: center; font-size: 12px; color: #666; margin-top: 50px;">
+            Equipe Kadosh Auto Center<br/>Goiânia, GO
+          </p>
+        </div>
+      `
+    });
+
+    console.log(`📧 E-mail de atualização enviado para ${clientEmail}`);
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('❌ Erro ao enviar e-mail:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
