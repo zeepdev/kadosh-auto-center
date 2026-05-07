@@ -42,7 +42,6 @@ const AvisosCarousel = () => {
         maxWidth: '1100px', 
         margin: '0 auto', 
         aspectRatio: '16/9', 
-        maxHeight: '500px',
         position: 'relative', 
         overflow: 'hidden', 
         borderRadius: '16px',
