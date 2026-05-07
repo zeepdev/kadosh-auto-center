@@ -7,9 +7,10 @@
 ## Estado real vs. protocolo (atualizado em 2026-05-07)
 
 O projeto evoluiu além da arquitetura A.N.T (3-camadas) descrita em `gemini.md`:
-- **Supabase** absorveu as responsabilidades da Camada 3 (Tools): auth, persistência, queries. Não há mais Google Sheets nem SQLite.
-- A pasta `oficina-kadosh/tools/` contém código **legado** (SQLite + Google Sheets em `tools/server.js`) que **não está mais em uso**. Pode ser removida em uma limpeza futura.
-- O servidor ativo é `oficina-kadosh/frontend/server.js` (Express, consulta de placa em cascata).
+- **Supabase** absorveu as responsabilidades da Camada 3 (Tools): auth, persistência, queries, storage (bucket `avisos`) e envios de e-mails customizados via SMTP (Resend).
+- O backend de consulta de placa está rodando no **Render.com**.
+- O frontend está em produção na **Vercel** (`https://kadosh-auto-center.vercel.app/`).
+- O servidor local ativo é `oficina-kadosh/frontend/server.js` (Express, consulta de placa em cascata).
 
 ---
 
@@ -112,15 +113,21 @@ Cada chamada tem timeout de 10s; cascata acumula erros para diagnóstico.
 
 ---
 
+## Histórico Recente de Entregas (Fase G - Implantação e Extras)
+
+1. **Deploy Completo**: Frontend hospedado na Vercel com roteamento SPA configurado (`vercel.json`). API de consulta de placas rodando no Render.
+2. **Sistema de "Esqueci Minha Senha"**: Fluxo finalizado com telas `/esqueci-senha` e `/reset-password`.
+3. **E-mails Profissionais**: Supabase configurado com servidor SMTP do **Resend** (`onboarding@resend.dev`) disparando templates em HTML customizados (com logo e identidade visual Kadosh).
+4. **Painel de TV (Digital Signage)**: Criada rota `/tv` em tela cheia para a recepção da oficina e carrossel na página inicial.
+   - Banco de dados: bucket público `avisos` no Supabase Storage + tabela `avisos` para listagem.
+   - Upload de artes feito diretamente pelo `/admin` de forma segura (RLS ativado para `storage.objects`).
+5. **Correções Rápidas**: Link do TikTok arrumado (`@kadosh.auto.center`), botões com design "premium glass" vermelho, e botão de "Excluir Orçamento" inserido no painel de admin.
+
 ## Bugs/melhorias pendentes (priorizados, atualizados 2026-05-07)
 
-1. **Conta admin atual sem CPF preenchido** — criada antes do trigger `handle_new_user`. Recovery preencheu com strings vazias. Para consertar: editar a row direto pelo Supabase Table Editor preenchendo o CPF.
-2. **API Placas** (apiplacas.com.br) — integrar quando token for liberado + reduzir timeouts.
-3. **`Gallery.jsx`** — define array `images` que não é usado (renderiza só widget Elfsight). Limpar.
-4. **Pasta `oficina-kadosh/tools/`** — código legado (SQLite + Sheets), não usado. Remover inteira.
-5. **`AboutUs.jsx:20`** — link do TikTok aponta para `tiktok.com` genérico (sem URL real do perfil).
-6. **Email confirmation** — quando reativar, customizar template + configurar SMTP próprio.
-7. **Implantação (Fase G)** — projeto roda só local. Falta deploy.
+1. **Conta admin atual sem CPF preenchido** — criada antes do trigger `handle_new_user`.
+2. **API Placas** (apiplacas.com.br) — no backend do Render, a cascata SINESP -> API Placas já está implementada e funcional. Pode haver necessidade de reduzir o timeout se o SINESP estiver demorando demais.
+3. **Limpeza de código** — A pasta `oficina-kadosh/tools/` (SQLite antigo) e as referências ao array de imagens estáticas em `Gallery.jsx` podem ser apagadas para limpar o repositório.
 
 ## Validações já implementadas
 
