@@ -8,6 +8,8 @@ import BudgetForm from './components/BudgetForm'
 import AdminDashboard from './components/Admin/AdminDashboard'
 import Login from './components/Auth/Login'
 import Cadastro from './components/Auth/Cadastro'
+import ForgotPassword from './components/Auth/ForgotPassword'
+import ResetPassword from './components/Auth/ResetPassword'
 import ClientDashboard from './components/ClientDashboard'
 
 function App() {
@@ -25,6 +27,8 @@ function App() {
       <Route path="/admin" element={<AdminDashboard />} />
       <Route path="/login" element={<Login />} />
       <Route path="/cadastro" element={<Cadastro />} />
+      <Route path="/esqueci-senha" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/cliente" element={<ClientDashboard />} />
     </Routes>
   )

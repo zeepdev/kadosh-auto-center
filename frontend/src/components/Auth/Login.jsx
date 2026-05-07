@@ -52,9 +52,13 @@ const Login = () => {
           <input type="email" required value={email} onChange={e => setEmail(e.target.value)} />
         </div>
         
-        <div className="form-group" style={{ marginBottom: '20px' }}>
+        <div className="form-group" style={{ marginBottom: '10px' }}>
           <label>Senha</label>
           <input type="password" required value={senha} onChange={e => setSenha(e.target.value)} />
+        </div>
+        
+        <div style={{ textAlign: 'right', marginBottom: '20px' }}>
+          <Link to="/esqueci-senha" style={{ color: '#aaa', fontSize: '0.9rem', textDecoration: 'none' }}>Esqueci minha senha</Link>
         </div>
 
         {errorMessage && <div style={{ color: '#f87171', marginBottom: '20px', fontWeight: 'bold' }}>⚠️ {errorMessage}</div>}
