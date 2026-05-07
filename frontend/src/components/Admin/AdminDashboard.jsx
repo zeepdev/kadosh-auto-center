@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import PDFGenerator from './PDFGenerator';
 import UpdatePhotoModal from './UpdatePhotoModal';
 import ViewVehicleModal from './ViewVehicleModal';
+import InvoiceModal from './InvoiceModal';
 import { supabase } from '../../lib/supabase';
 import { calcularPrioridade, PRIORIDADES } from '../../lib/prioridade';
 
@@ -27,6 +28,7 @@ const AdminDashboard = () => {
   const [selectedClientForPDF, setSelectedClientForPDF] = useState(null);
   const [selectedForUpdate, setSelectedForUpdate] = useState(null);
   const [selectedPlacaForView, setSelectedPlacaForView] = useState(null);
+  const [selectedForInvoice, setSelectedForInvoice] = useState(null);
 
   // Ao montar, verifica se já existe sessão Supabase válida e se o usuário é admin.
   useEffect(() => {
@@ -491,12 +493,15 @@ const AdminDashboard = () => {
                         </select>
                       </td>
                       <td style={{ padding: '15px' }}>
-                        <div style={{ display: 'flex', gap: '8px' }}>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                           <button onClick={() => setSelectedForUpdate(item)} style={{ background: '#3b82f6', color: '#fff', border: 'none', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }} title="Atualizar status com foto">
                             Atualizar 📸
                           </button>
                           <button onClick={() => setSelectedClientForPDF(item)} style={{ background: '#dc2743', color: '#fff', border: 'none', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
                             Gerar PDF
+                          </button>
+                          <button onClick={() => setSelectedForInvoice(item)} style={{ background: '#10b981', color: '#fff', border: 'none', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }} title="Emitir Nota Fiscal">
+                            🧾 Emitir NF
                           </button>
                           <button onClick={() => handleDeleteAtendimento(item.id)} style={{ background: 'transparent', color: '#f87171', border: '1px solid #f87171', padding: '8px', borderRadius: '6px', cursor: 'pointer' }} title="Apagar orçamento">
                             🗑️
@@ -534,6 +539,17 @@ const AdminDashboard = () => {
         <ViewVehicleModal 
           placa={selectedPlacaForView}
           onClose={() => setSelectedPlacaForView(null)}
+        />
+      )}
+
+      {selectedForInvoice && (
+        <InvoiceModal 
+          atendimento={selectedForInvoice}
+          onClose={() => setSelectedForInvoice(null)}
+          onSuccess={() => {
+            setSelectedForInvoice(null);
+            alert('Nota Fiscal processada com sucesso e enviada ao e-mail do cliente!');
+          }}
         />
       )}
     </div>
