@@ -28,6 +28,11 @@ app.use(express.json());
 
 const API_PLACAS_TOKEN = process.env.API_PLACAS_TOKEN || '';
 
+// ======================================================
+// CACHE DE CONSULTAS (sem expiração — persiste enquanto o servidor rodar)
+// ======================================================
+const cacheConsultas = new Map();
+
 // --- PROVEDOR 1: SINESP (via sinesp-api) ---
 async function consultarSINESP(placa) {
   console.log('[SINESP] Tentando consulta...');
@@ -216,13 +221,26 @@ app.get('/api/placa/:placa', async (req, res) => {
     return res.status(400).json({ success: false, error: 'Placa inválida. Deve ter 7 caracteres.' });
   }
 
-  console.log(`\n🔍 Consultando placa: ${placaLimpa}`);
+  // Verificar cache antes de chamar a API
+  if (cacheConsultas.has(placaLimpa)) {
+    const cached = cacheConsultas.get(placaLimpa);
+    console.log(`\n💾 Cache HIT: ${placaLimpa} (salvo em ${cached._cachedAt}) — API não consumida`);
+    return res.json({ success: true, data: cached });
+  }
+
+  console.log(`\n🔍 Consultando placa: ${placaLimpa} (cache MISS — chamando API)`);
   console.log('─'.repeat(40));
 
   try {
     const resultado = await consultarPlacaComFallback(placaLimpa);
     console.log(`✅ Resultado obtido via: ${resultado.fonte}`);
     console.log('─'.repeat(40));
+
+    // Salvar no cache
+    resultado._cachedAt = new Date().toLocaleString('pt-BR');
+    cacheConsultas.set(placaLimpa, resultado);
+    console.log(`💾 Placa ${placaLimpa} salva no cache (total: ${cacheConsultas.size} placas)`);
+
     res.json({ success: true, data: resultado });
   } catch (error) {
     console.error('❌ Todas as consultas falharam');
@@ -359,7 +377,11 @@ app.get('/api/status', (req, res) => {
   res.json({
     sinesp: '✅ Configurado (sempre disponível)',
     apiPlacas: API_PLACAS_TOKEN ? '✅ Token configurado' : '⚠️ Token não configurado',
-    ordem: '1) SINESP → 2) API Placas'
+    ordem: '1) SINESP → 2) API Placas',
+    cache: {
+      placas_em_cache: cacheConsultas.size,
+      placas: [...cacheConsultas.keys()]
+    }
   });
 });
 
