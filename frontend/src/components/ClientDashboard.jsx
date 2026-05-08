@@ -80,6 +80,22 @@ const ClientDashboard = () => {
       if (error) throw error;
 
       setSolicitarStatus('success');
+
+      // Notificar administradores via e-mail
+      fetch('/api/send-budget-notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nome: cliente?.nome || '',
+          email: user.email,
+          whatsapp: cliente?.whatsapp || '',
+          placa: novoServico.placa,
+          servicoDesejado: novoServico.servicoDesejado,
+          descricao: novoServico.descricao,
+          dataAgendamento
+        })
+      }).catch(err => console.error("Erro ao notificar admin:", err));
+
       setNovoServico({ placa: '', servicoDesejado: 'Revisão Geral', descricao: '', dataReserva: '', horaReserva: '' });
       await fetchDados(user.id);
       setTimeout(() => {

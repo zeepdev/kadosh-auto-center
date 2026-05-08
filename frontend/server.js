@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import { createRequire } from 'module';
 import { Resend } from 'resend';
+import { createClient } from '@supabase/supabase-js';
 
 // Configuração do Resend
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -10,6 +11,11 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 // sinesp-api é CommonJS
 const require = createRequire(import.meta.url);
 const sinespApi = require('sinesp-api');
+
+// Configuração do Supabase (para buscar e-mails de admins)
+const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 const app = express();
 app.use(cors());
@@ -215,6 +221,80 @@ app.post('/api/send-update-email', async (req, res) => {
     res.json({ success: true, data });
   } catch (error) {
     console.error('❌ Erro ao enviar e-mail:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Endpoint de notificação para administradores (Novo Orçamento)
+app.post('/api/send-budget-notification', async (req, res) => {
+  const { nome, email, telefone, whatsapp, placa, servicoDesejado, descricao, dataAgendamento } = req.body;
+
+  try {
+    console.log('🔍 Buscando administradores para notificação...');
+    
+    // 1. Buscar todos os administradores na tabela clientes
+    const { data: admins, error: adminError } = await supabase
+      .from('clientes')
+      .select('email, nome')
+      .eq('is_admin', true);
+
+    if (adminError) throw adminError;
+
+    // E-mails padrão caso a busca falhe ou não encontre ninguém (fallback de segurança)
+    let adminEmails = admins?.map(a => a.email).filter(e => !!e) || [];
+    
+    if (adminEmails.length === 0) {
+      console.log('⚠️ Nenhum admin encontrado no banco, usando e-mail padrão.');
+      adminEmails = ['kadoshautocenter7@gmail.com'];
+    }
+
+    console.log(`📧 Enviando notificação para: ${adminEmails.join(', ')}`);
+
+    // 2. Enviar o e-mail via Resend
+    const data = await resend.emails.send({
+      from: 'Kadosh Auto Center <onboarding@resend.dev>',
+      to: adminEmails,
+      subject: `🆕 Novo Orçamento: ${nome} - ${placa}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #0a0505; color: #fff; padding: 30px; border-radius: 8px; border: 1px solid #333;">
+          <h2 style="color: #dc2743; text-align: center; text-transform: uppercase; margin-bottom: 30px;">Novo Orçamento Recebido</h2>
+          
+          <div style="background-color: #111; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+            <h3 style="color: #dc2743; margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 10px;">Dados do Cliente</h3>
+            <p><strong>Nome:</strong> ${nome}</p>
+            <p><strong>E-mail:</strong> ${email || 'Não informado'}</p>
+            <p><strong>Telefone:</strong> ${telefone || 'Não informado'}</p>
+            <p><strong>WhatsApp:</strong> ${whatsapp || 'Não informado'}</p>
+          </div>
+
+          <div style="background-color: #111; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+            <h3 style="color: #dc2743; margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 10px;">Veículo e Serviço</h3>
+            <p><strong>Placa:</strong> <span style="background: #dc2743; color: #fff; padding: 2px 8px; border-radius: 4px; font-weight: bold;">${placa}</span></p>
+            <p><strong>Serviço:</strong> ${servicoDesejado}</p>
+            <p><strong>Agendamento:</strong> ${dataAgendamento || 'Não solicitado'}</p>
+          </div>
+
+          <div style="background-color: #111; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+            <h3 style="color: #dc2743; margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 10px;">Descrição do Problema</h3>
+            <p style="font-style: italic; color: #ddd;">"${descricao}"</p>
+          </div>
+
+          <p style="text-align: center; margin-top: 40px;">
+            <a href="https://kadosh-auto-center.vercel.app/admin" style="background-color: #dc2743; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+              Ver no Painel Administrativo
+            </a>
+          </p>
+          
+          <p style="text-align: center; font-size: 12px; color: #666; margin-top: 50px;">
+            Sistema de Notificações Kadosh Auto Center
+          </p>
+        </div>
+      `
+    });
+
+    res.json({ success: true, recipients: adminEmails, data });
+  } catch (error) {
+    console.error('❌ Erro ao notificar admins:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

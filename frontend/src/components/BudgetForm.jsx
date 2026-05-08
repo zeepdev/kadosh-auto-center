@@ -106,6 +106,17 @@ const BudgetForm = () => {
       
       if (!error) {
         setStatus('success');
+        
+        // Notificar administradores via e-mail (não bloqueia o sucesso do usuário)
+        fetch('/api/send-budget-notification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...dbData,
+            dataAgendamento: dataAgendamentoFinal
+          })
+        }).catch(err => console.error("Erro ao notificar admin:", err));
+
         setFormData({
           nome: '', email: '', telefone: '', whatsapp: '', cep: '', placa: '',
           servicoDesejado: 'Revisão', descricao: '', avaliacaoSite: '5',
