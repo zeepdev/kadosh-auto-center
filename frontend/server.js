@@ -232,21 +232,17 @@ app.post('/api/send-budget-notification', async (req, res) => {
   try {
     console.log('🔍 Buscando administradores para notificação...');
     
-    // 1. Buscar todos os administradores na tabela clientes
-    const { data: admins, error: adminError } = await supabase
-      .from('clientes')
-      .select('email, nome')
-      .eq('is_admin', true);
+    // Resend no plano gratuito só permite envio para o dono da conta.
+    // Quando verificar um domínio próprio, descomentar o bloco dinâmico abaixo.
+    // const { data: admins, error: adminError } = await supabase
+    //   .from('clientes')
+    //   .select('email, nome')
+    //   .eq('is_admin', true);
+    // if (adminError) throw adminError;
+    // let adminEmails = admins?.map(a => a.email).filter(e => !!e) || [];
 
-    if (adminError) throw adminError;
-
-    // E-mails padrão caso a busca falhe ou não encontre ninguém (fallback de segurança)
-    let adminEmails = admins?.map(a => a.email).filter(e => !!e) || [];
-    
-    if (adminEmails.length === 0) {
-      console.log('⚠️ Nenhum admin encontrado no banco, usando e-mail padrão.');
-      adminEmails = ['kadoshautocenter7@gmail.com'];
-    }
+    // Por enquanto, envia apenas para o e-mail do dono da conta Resend
+    let adminEmails = ['isaqueduarte07@gmail.com'];
 
     console.log(`📧 Enviando notificação para: ${adminEmails.join(', ')}`);
 
