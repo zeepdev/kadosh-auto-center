@@ -43,9 +43,12 @@
 
 ## Próximas tarefas (priorizadas)
 
+### ✅ Concluído recentemente
+1. ✅ **Integrar API de NF real** no `InvoiceModal.jsx` — Conectado com Asaas (R$ 0,49/nota).
+2. ✅ **Configurar conta Admin** — CNPJ preenchido e senha resetada (`Zeepzada07.`).
+
 ### 🟡 Média Prioridade
-1. ⏭️ **Integrar API de NF real** no `InvoiceModal.jsx` — hoje é simulação. Conectar com Focus NFe ou similar.
-2. ⏭️ **Reativar confirmação de e-mail** no Supabase com SMTP próprio + template customizado.
+1. ⏭️ **Reativar confirmação de e-mail** no Supabase com SMTP próprio + template customizado.
 
 ### 🔵 Depende de Domínio Próprio (~R$30-40/ano)
 3. ⏭️ **Verificar domínio no Resend** — para enviar e-mails para qualquer admin (hoje limitado ao dono da conta).

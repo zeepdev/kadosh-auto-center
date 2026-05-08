@@ -362,3 +362,22 @@ Botão fica `disabled` se o cliente não tem nenhum veículo cadastrado, com tex
 - Campo `cpf` do admin (`kadoshautocenter7@gmail.com`) atualizado com CNPJ `61.004.527/0001-89` via API admin.
 - Senha da conta admin resetada via Supabase Admin API.
 - Pendências de prioridade baixa (TikTok, pasta tools/) verificadas como já resolvidas.
+
+### 2026-05-08 — Integração Real com Asaas (NFS-e)
+
+**Contexto**: Substituição da simulação de nota fiscal por uma integração real com a API do Asaas para emissão de Notas Fiscais de Serviço.
+
+**Mudanças**:
+- **Backend (`server.js`)**:
+  - Adicionado helper `asaasRequest` para chamadas autenticadas.
+  - Implementada lógica `getOrCreateAsaasCustomer` para evitar duplicidade de clientes no Asaas.
+  - Criado endpoint `POST /api/invoice/emit` para agendamento de notas.
+  - Criado endpoint `GET /api/invoice/:id/status` para consulta de PDF/XML.
+- **Frontend (`InvoiceModal.jsx`)**:
+  - Substituída a simulação `setTimeout` por chamadas reais ao backend.
+  - Adicionado formulário completo com Nome, CPF/CNPJ, E-mail, Valor e Descrição.
+  - Implementada tela de sucesso com ID da nota e badge de status (Agendada, Autorizada, etc.).
+  - Adicionado tratamento de erros específicos da API do Asaas.
+- **Configuração**:
+  - Adicionadas variáveis `ASAAS_API_KEY` e `ASAAS_ENV` ao `.env`.
+  - Sistema preparado para alternar entre Sandbox e Produção apenas via variável de ambiente.

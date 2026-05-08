@@ -25,6 +25,7 @@
 | **Backend/DB** | Supabase | Auth, Postgres, Storage (bucket `fotos_servico`), RLS |
 | **Servidor Node** | Express 5 | Proxy para APIs de placa + endpoints de e-mail (porta `:3001` local) |
 | **E-mails** | Resend | Notificações de orçamento (→ admin) e atualizações de serviço (→ cliente) |
+| **Notas Fiscais** | Asaas | Emissão de NFS-e (R$ 0,49/nota) via API REST |
 | **PDF** | @react-pdf/renderer | Geração de orçamentos profissionais em PDF |
 | **Deploy** | Vercel (frontend) + Render (backend) | `vercel.json` faz rewrite `/api/*` → Render |
 
@@ -97,8 +98,8 @@ oficina-kadosh/
                 ├── AdminDashboard.jsx  ← Painel admin (lista de orçamentos, filtros, prioridade, ações)
                 ├── PDFGenerator.jsx    ← Gerador de PDF profissional (auto-fill via cliente_id)
                 ├── UpdatePhotoModal.jsx← Upload de foto + notificação por e-mail ao cliente
-                ├── InvoiceModal.jsx    ← Modal de emissão de NF (NFS-e / NF-e) — SIMULADO, aguarda API
-                └── ViewVehicleModal.jsx← Consulta visual de veículo por placa (API real integrada)
+                ├── InvoiceModal.jsx    ← Modal de emissão de NFS-e (Integrado com Asaas)
+                └── ViewVehicleModal.jsx ← Detalhes técnicos completos do veículo via API Placas (API real integrada)
 ```
 
 ---
@@ -129,6 +130,32 @@ Habilitado e com policies completas nas 3 tabelas principais:
 - `frontend/src/lib/cpf.js` — algoritmo dos dígitos verificadores (mod 11).
 - Bloqueia CPFs com todos os dígitos iguais (ex: `111.111.111-11`).
 - Integrado no `Cadastro.jsx` — aborta signup se CPF inválido.
+
+---
+
+## 🔑 Contas Administrativas
+
+- **E-mail:** `kadoshautocenter7@gmail.com`
+- **Senha Atual:** `Zeepzada07.`
+- **Permissão:** `is_admin = true` na tabela `clientes`.
+- **CNPJ da Oficina:** `61.004.527/0001-89` (cadastrado no campo `cpf` da conta admin).
+
+---
+
+## 🧾 Integração de Notas Fiscais (Asaas)
+
+O sistema está integrado com a API do **Asaas** para emissão de Notas Fiscais de Serviço (NFS-e).
+
+### Funcionamento:
+1. O backend (`server.js`) possui endpoints para cadastrar clientes no Asaas e agendar a emissão.
+2. O ambiente é controlado pela variável `ASAAS_ENV` (`sandbox` ou `production`).
+3. **Sandbox:** Utiliza a URL `api-sandbox.asaas.com`. Notas não têm valor fiscal.
+4. **Custo:** R$ 0,49 por nota emitida (sem mensalidade).
+
+### Próximos Passos (Produção):
+- Alterar `ASAAS_ENV=production`.
+- Inserir a `ASAAS_API_KEY` de produção.
+- Configurar as informações fiscais da empresa no painel do Asaas (Certificado Digital, Série, etc).
 
 ---
 
@@ -253,11 +280,13 @@ VITE_API_URL=                          # Vazio em dev (usa proxy Vite), URL do R
 RESEND_API_KEY=re_...                  # Chave da API Resend para envio de e-mails
 SUPABASE_SERVICE_ROLE_KEY=eyJ...       # Service role key (bypassa RLS, usado para buscar admins)
 API_PLACAS_TOKEN=                      # Token da apiplacas.com.br (opcional, fallback)
+ASAAS_API_KEY=                         # Chave da API do Asaas
+ASAAS_ENV=sandbox                      # 'sandbox' ou 'production'
 ```
 
 ### Render (variáveis de ambiente no dashboard)
 ```
-RESEND_API_KEY, SUPABASE_SERVICE_ROLE_KEY, VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
+RESEND_API_KEY, SUPABASE_SERVICE_ROLE_KEY, VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, ASAAS_API_KEY, ASAAS_ENV
 ```
 
 ---
@@ -297,9 +326,7 @@ RESEND_API_KEY, SUPABASE_SERVICE_ROLE_KEY, VITE_SUPABASE_URL, VITE_SUPABASE_ANON
 - E-mail automático enviado ao cliente via Resend com a foto embedded e link para o painel.
 
 ### 6. Emissão de Nota Fiscal (`InvoiceModal.jsx`)
-- **Status: SIMULADO** — UI completa com seleção de tipo (NFS-e, NF-e, ambas), valores, CPF/CNPJ do tomador.
-- Auto-fill do CPF se o orçamento tiver `cliente_id`.
-- Aguarda integração com API de NF real (Focus NFe, Asaas, etc).
+- Integração funcional com Asaas para emissão de NFS-e.
 
 ### 7. Modo TV (`/tv`)
 - Carrossel fullscreen para exibição na TV da oficina.
@@ -316,13 +343,10 @@ RESEND_API_KEY, SUPABASE_SERVICE_ROLE_KEY, VITE_SUPABASE_URL, VITE_SUPABASE_ANON
 ## 📋 Pendências & TODO
 
 ### 🔴 Prioridade Alta
-1. ~~**Preencher CPF/CNPJ do admin** (`kadoshautocenter7@gmail.com`)~~ — ✅ CONCLUÍDO. Preenchido com CNPJ `61.004.527/0001-89`.
-2. **Verificar domínio no Resend** — para poder enviar e-mails para qualquer admin (hoje limitado ao dono da conta).
+1. **Verificar domínio no Resend** — para poder enviar e-mails para qualquer admin (hoje limitado ao dono da conta).
 
 ### 🟡 Prioridade Média
-3. ~~**Integrar API Placas real no `ViewVehicleModal.jsx`**~~ — ✅ CONCLUÍDO. Agora chama `/api/placa/:placa` via `consultarPlaca()`.
-4. **Integrar API de NF real no `InvoiceModal.jsx`** — hoje é simulação com `setTimeout`. Conectar com Focus NFe ou similar.
-5. **Reativar confirmação de e-mail** no Supabase com SMTP próprio (Resend ou SendGrid) + template customizado.
+2. **Reativar confirmação de e-mail** no Supabase com SMTP próprio (Resend ou SendGrid) + template customizado.
 
 ### 🟢 Prioridade Baixa / Cleanup
 6. ~~**Corrigir link do TikTok** em `AboutUs.jsx`~~ — ✅ CONCLUÍDO. Já aponta para `@kadosh.auto.center`.
