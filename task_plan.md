@@ -1,39 +1,52 @@
 # 📋 Task Plan
 
-## Fases V.L.A.E.G — estado real (atualizado 2026-05-07)
+## Fases V.L.A.E.G — estado real (atualizado 2026-05-08)
 
 - [x] **Fase 1: V - Visão**: Site institucional + sistema de gestão (cliente + admin) para Kadosh Auto Center.
 - [x] **Fase 2: L - Link**: Supabase conecta tudo (auth, clientes, veiculos, orcamentos). Backend de placa via Express com fallback em cascata.
-- [~] **Fase 3: A - Arquitetura**: Não seguiu A.N.T estrita — Supabase substituiu camada Tools. Pasta `tools/` é legado.
+- [x] **Fase 3: A - Arquitetura**: Supabase substituiu camada Tools. Pasta `tools/` removida.
 - [x] **Fase 4: E - Estilo**: Tema dark com vermelho `#dc2743`, glassmorphism, fontes legíveis.
-- [ ] **Fase 5: G - Gatilho**: Implantação ainda não realizada (rodando local).
+- [x] **Fase 5: G - Gatilho**: Deploy realizado — Frontend no Vercel + Backend no Render.
 
 ---
 
-## Tarefas concluídas (2026-05-03 a 2026-05-07)
+## Tarefas concluídas (2026-05-03 a 2026-05-08)
 
 1. ✅ **Cascata de APIs de placa**: dotenv carregando, npm script, mensagens de erro úteis.
 2. ✅ **Vincular `cliente_id` ao orçamento**: coluna FK em `orcamentos`, BudgetForm anexa cliente_id se logado, ClientDashboard filtra com regra OU.
-3. ✅ **PDF profissional**: config centralizada em `oficina.js` (CNPJ, endereço, contatos), header completo, auto-fill CPF/veículo via `cliente_id`, bloco "Serviço Solicitado", bloco "Prioridade".
-4. ✅ **Sistema de prioridade automática**: 4 níveis (EXTREMA/ALTA/MÉDIA/BAIXA), engine em `frontend/src/lib/prioridade.js`, badge no admin com filtros + ordenação, badge no PDF e no ClientDashboard.
-5. ✅ **Login admin via Supabase Auth**: senha hardcoded removida, coluna `is_admin` em `clientes`, `useEffect` valida sessão + permissão.
-6. ✅ **RLS hardening**: policies em todas as 3 tabelas, função `is_admin()` SECURITY DEFINER, trigger anti-escalation, validação automatizada via curl.
-7. ✅ **Trigger `handle_new_user`** + recovery: auto-cria row em `clientes` quando user nasce em `auth.users`. `Cadastro.jsx` faz UPDATE em vez de INSERT.
-8. ✅ **Sessão persistente** (Hero/Login): botão da Hero detecta sessão ("Minha Área" vs "Área do Cliente"), Login redireciona se já logado.
-9. ✅ **Editar perfil + endereço**: card "Seus Dados" com modo edição inline, coluna `endereco` adicionada, PDF puxa endereço auto.
-10. ✅ **Nome legal vs nome social**: coluna `nome_social` adicionada, regra de exibição (social || legal), PDF mantém nome legal por ser documento oficial.
-11. ✅ **Botão "Solicitar Serviço"** no ClientDashboard: mini-form pré-preenchido, INSERT direto com `cliente_id`.
-12. ✅ **Fix erro "Unexpected end of JSON input"** na consulta de placa: `placaApi.js` agora trata response.text() antes de parsear, mensagens de erro distintas.
-13. ✅ **Validação de CPF** (algoritmo dos dígitos verificadores) no cadastro: Lógica local implementada em `frontend/src/lib/cpf.js` e integrada no `Cadastro.jsx`.
+3. ✅ **PDF profissional**: config centralizada em `oficina.js`, header completo, auto-fill CPF/veículo via `cliente_id`, bloco de prioridade.
+4. ✅ **Sistema de prioridade automática**: 4 níveis, engine em `prioridade.js`, badge no admin/cliente/PDF.
+5. ✅ **Login admin via Supabase Auth**: senha hardcoded removida, coluna `is_admin`, validação de sessão + permissão.
+6. ✅ **RLS hardening**: policies em todas as tabelas, função `is_admin()` SECURITY DEFINER, trigger anti-escalation.
+7. ✅ **Trigger `handle_new_user`**: auto-cria row em `clientes` no signup. `Cadastro.jsx` faz UPDATE.
+8. ✅ **Sessão persistente**: Hero/Login detectam sessão e redirecionam.
+9. ✅ **Editar perfil + endereço**: card com modo edição inline, coluna `endereco`.
+10. ✅ **Nome legal vs nome social**: coluna `nome_social`, regras de exibição.
+11. ✅ **Botão "Solicitar Serviço"** no ClientDashboard: mini-form pré-preenchido.
+12. ✅ **Validação de CPF**: algoritmo de dígitos verificadores em `cpf.js`.
+13. ✅ **Upload de fotos de serviço**: `UpdatePhotoModal.jsx` + Supabase Storage + tabela `atualizacoes_servico`.
+14. ✅ **Notificação por e-mail ao cliente**: endpoint `/api/send-update-email` via Resend.
+15. ✅ **Galeria estática**: grid 2x2 com fotos reais da oficina (foto1-4.jpeg).
+16. ✅ **Carrossel de avisos**: `AvisosCarousel.jsx` com dados da tabela `avisos` (auto-play 8s).
+17. ✅ **Modo TV**: `TvDashboard.jsx` fullscreen para exibição na oficina.
+18. ✅ **Emissão de NF (simulada)**: `InvoiceModal.jsx` com UI completa, aguarda API real.
+19. ✅ **Deploy em produção**: Vercel (frontend) + Render (backend) + variáveis de ambiente.
+20. ✅ **Notificação de orçamento para admins**: endpoint `/api/send-budget-notification` + template HTML.
+21. ✅ **API de Placas paga integrada**: dados completos (FIPE, restrições, chassi, specs) em Cadastro, ClientDashboard e ViewVehicleModal.
+22. ✅ **Cache persistente de placas**: tabela `cache_placas` no Supabase, sem expiração.
+23. ✅ **CNPJ do admin preenchido**: `61.004.527/0001-89` no campo cpf da conta admin.
+24. ✅ **Senha do admin resetada**: via Supabase Admin API.
+25. ✅ **Link TikTok corrigido**: já aponta para `@kadosh.auto.center`.
+26. ✅ **Pasta tools/ removida**: código legado eliminado.
 
 ---
 
 ## Próximas tarefas (priorizadas)
 
-1. ⏭️ **Preencher CPF do admin atual** manualmente via Supabase Table Editor (foi criado antes do trigger).
-2. ⏭️ **API Placas (apiplacas.com.br)** — integrar como provedor adicional na cascata + reduzir timeout 10s → 5s. Esperando token sair de análise.
-3. ⏭️ **Limpar `Gallery.jsx`** (array `images` morto que não renderiza).
-4. ⏭️ **Remover pasta `oficina-kadosh/tools/`** (código legado SQLite/Sheets).
-5. ⏭️ **Corrigir link do TikTok** em `AboutUs.jsx:20` (atualmente `https://www.tiktok.com/` genérico).
-6. ⏭️ **Reativar email confirmation** com template customizado + SMTP próprio (SendGrid/Gmail). Atualmente está DESLIGADO no Supabase Authentication settings.
-7. ⏭️ **Implantar (Fase G)** — deploy do frontend (Vercel/Netlify) + backend (Railway/Render).
+### 🟡 Média Prioridade
+1. ⏭️ **Integrar API de NF real** no `InvoiceModal.jsx` — hoje é simulação. Conectar com Focus NFe ou similar.
+2. ⏭️ **Reativar confirmação de e-mail** no Supabase com SMTP próprio + template customizado.
+
+### 🔵 Depende de Domínio Próprio (~R$30-40/ano)
+3. ⏭️ **Verificar domínio no Resend** — para enviar e-mails para qualquer admin (hoje limitado ao dono da conta).
+4. ⏭️ **Descomentar busca dinâmica de admins** no `server.js` (linhas 368-373) — depende do item 3.

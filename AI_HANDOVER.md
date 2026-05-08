@@ -316,7 +316,7 @@ RESEND_API_KEY, SUPABASE_SERVICE_ROLE_KEY, VITE_SUPABASE_URL, VITE_SUPABASE_ANON
 ## 📋 Pendências & TODO
 
 ### 🔴 Prioridade Alta
-1. **Preencher CPF do admin** (`kadoshautocenter7@gmail.com`) no Supabase Table Editor — foi criado antes do trigger.
+1. ~~**Preencher CPF/CNPJ do admin** (`kadoshautocenter7@gmail.com`)~~ — ✅ CONCLUÍDO. Preenchido com CNPJ `61.004.527/0001-89`.
 2. **Verificar domínio no Resend** — para poder enviar e-mails para qualquer admin (hoje limitado ao dono da conta).
 
 ### 🟡 Prioridade Média
@@ -325,9 +325,9 @@ RESEND_API_KEY, SUPABASE_SERVICE_ROLE_KEY, VITE_SUPABASE_URL, VITE_SUPABASE_ANON
 5. **Reativar confirmação de e-mail** no Supabase com SMTP próprio (Resend ou SendGrid) + template customizado.
 
 ### 🟢 Prioridade Baixa / Cleanup
-6. **Corrigir link do TikTok** em `AboutUs.jsx` — atualmente aponta para `https://www.tiktok.com/` genérico.
-7. **Remover pasta `oficina-kadosh/tools/`** — código legado (SQLite/Sheets), substituído pelo Supabase.
-8. **Descomentar busca dinâmica de admins** no endpoint `send-budget-notification` (linhas 237-242 do `server.js`) quando verificar domínio no Resend.
+6. ~~**Corrigir link do TikTok** em `AboutUs.jsx`~~ — ✅ CONCLUÍDO. Já aponta para `@kadosh.auto.center`.
+7. ~~**Remover pasta `oficina-kadosh/tools/`**~~ — ✅ CONCLUÍDO. Pasta já removida.
+8. **Descomentar busca dinâmica de admins** no endpoint `send-budget-notification` (linhas 368-373 do `server.js`) quando verificar domínio no Resend.
 
 ---
 

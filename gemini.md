@@ -5,11 +5,17 @@
 ## 🚀 QUICKSTART (leia primeiro)
 
 ### Stack atual
-- **Frontend**: React 19 + Vite + React Router v7 + Supabase JS (`@supabase/supabase-js`)
-- **Backend (placa)**: Express em `oficina-kadosh/frontend/server.js` (CommonJS no `package.json` é ESM por causa de `"type": "module"` — usar `import 'dotenv/config'`).
+- **Frontend**: React 19 + Vite 8 + React Router v7 + Supabase JS (`@supabase/supabase-js`)
+- **Backend (APIs)**: Express 5 em `oficina-kadosh/frontend/server.js` (ESM — `"type": "module"` no package.json)
 - **Banco + Auth**: Supabase (`https://qrzqvvvscruohlgypmvb.supabase.co`)
+- **E-mails**: Resend (notificações de orçamento → admin, atualizações de serviço → cliente)
 - **PDFs**: `@react-pdf/renderer`
-- **Plate lookup**: `sinesp-api` (instável) com fallback API Brasil → Placa FIPE.
+- **Consulta de placa**: SINESP (gratuito) → API Placas/wdapi2.com.br (paga, token configurado)
+- **Cache**: Tabela `cache_placas` no Supabase (persistente, sem expiração)
+
+### URLs de Produção
+- **Frontend**: `https://kadosh-auto-center.vercel.app`
+- **Backend**: `https://kadosh-auto-center.onrender.com`
 
 ### Como rodar localmente
 A partir de `oficina-kadosh/frontend/`, em **2 terminais**:
@@ -17,68 +23,89 @@ A partir de `oficina-kadosh/frontend/`, em **2 terminais**:
 # Terminal 1: Vite dev server (proxy /api → 3001)
 npm run dev
 
-# Terminal 2: API de placa
+# Terminal 2: Backend (APIs de placa + e-mails)
 npm run server
 ```
 - Frontend: http://localhost:5173
-- API placa: http://localhost:3001 (status em `/api/status`)
+- Backend: http://localhost:3001 (status em `/api/status`)
 
-`.env` está em `frontend/.env`. SINESP funciona sem token; API Brasil e Placa FIPE precisam de tokens (atualmente vazios).
+`.env` está em `frontend/.env` com: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `API_PLACAS_TOKEN`, `RESEND_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
 
 ### Estrutura de pastas
 ```
 oficina-kadosh/
-├── gemini.md              ← VOCÊ ESTÁ AQUI (constituição + quickstart)
-├── findings.md            ← schema, segurança, decisões, bugs pendentes
-├── task_plan.md           ← fases + checklist do que falta
-├── progress.md            ← log cronológico do que foi feito
-├── frontend/              ← APP REAL (React/Vite + Express de placa)
-│   ├── src/
-│   │   ├── App.jsx, main.jsx
-│   │   ├── components/
-│   │   │   ├── Hero.jsx, Services.jsx, Gallery.jsx, AboutUs.jsx
-│   │   │   ├── BudgetForm.jsx          ← form da landing
-│   │   │   ├── ClientDashboard.jsx     ← /cliente
-│   │   │   ├── Auth/Login.jsx, Cadastro.jsx
-│   │   │   └── Admin/AdminDashboard.jsx, PDFGenerator.jsx
-│   │   ├── lib/
-│   │   │   ├── supabase.js     ← client init
-│   │   │   ├── placaApi.js     ← chama /api/placa/:placa
-│   │   │   └── prioridade.js   ← engine de classificação automática
-│   │   └── config/
-│   │       └── oficina.js      ← dados FIXOS da oficina (CNPJ, endereço, contatos)
-│   ├── server.js          ← Express: cascata SINESP/API Brasil/Placa FIPE
-│   ├── .env               ← VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, tokens
-│   └── package.json       ← scripts: dev, server, build
-└── tools/                 ← ⚠️ LEGADO. NÃO USE. SQLite + Google Sheets, descontinuado.
+├── AI_HANDOVER.md          ← Documentação principal para continuidade
+├── gemini.md               ← VOCÊ ESTÁ AQUI (constituição + quickstart)
+├── findings.md             ← Schema, segurança, decisões, SQL rodado
+├── task_plan.md            ← Checklist do que está feito vs pendente
+├── progress.md             ← Log cronológico detalhado
+├── modelo.png              ← Referência visual do layout do PDF
+│
+└── frontend/
+    ├── server.js           ← Express: APIs de placa (c/ cache) + e-mails Resend
+    ├── vercel.json          ← Rewrites /api/* → Render
+    ├── package.json
+    ├── .env                ← Variáveis de ambiente (NÃO commitado)
+    ├── public/
+    │   └── foto1-4.jpeg    ← Fotos da galeria estática
+    │
+    └── src/
+        ├── App.jsx          ← Roteamento (react-router-dom)
+        ├── main.jsx         ← Entry point
+        ├── index.css        ← CSS global (variáveis, reset, tema dark)
+        ├── App.css          ← CSS de layout e componentes
+        │
+        ├── config/
+        │   └── oficina.js   ← Dados fixos da oficina (CNPJ, endereço, contatos)
+        │
+        ├── lib/
+        │   ├── supabase.js  ← Client Supabase
+        │   ├── placaApi.js  ← Helper consulta de placa (c/ tratamento de erros)
+        │   ├── prioridade.js← Engine de classificação automática (4 níveis)
+        │   └── cpf.js       ← Validação algorítmica de CPF
+        │
+        └── components/
+            ├── Hero.jsx, AvisosCarousel.jsx, Services.jsx
+            ├── Gallery.jsx, BudgetForm.jsx, AboutUs.jsx
+            ├── ClientDashboard.jsx, TvDashboard.jsx
+            ├── Auth/ (Login, Cadastro, ForgotPassword, ResetPassword)
+            └── Admin/ (AdminDashboard, PDFGenerator, UpdatePhotoModal,
+                        InvoiceModal, ViewVehicleModal)
 ```
 
 ### Rotas do app
-- `/` — landing (Hero + Services + Gallery + BudgetForm + AboutUs)
-- `/cadastro` — registro de cliente (cria `auth.users` + UPDATE `clientes`)
-- `/login` — login cliente (Supabase Auth)
-- `/cliente` — dashboard do cliente (perfil, veículos, solicitar serviço, histórico)
-- `/admin` — painel admin (lista orçamentos, mudar status, gerar PDF)
+| Rota | Componente | Acesso |
+|---|---|---|
+| `/` | Landing Page | Público |
+| `/cadastro` | Cadastro.jsx | Público |
+| `/login` | Login.jsx | Público |
+| `/esqueci-senha` | ForgotPassword.jsx | Público |
+| `/reset-password` | ResetPassword.jsx | Público |
+| `/cliente` | ClientDashboard.jsx | Autenticado |
+| `/admin` | AdminDashboard.jsx | Autenticado + `is_admin = true` |
+| `/tv` | TvDashboard.jsx | Público (tela da oficina) |
 
 ### Admin atual
 - Email: `kadoshautocenter7@gmail.com`
 - UUID: `9993df3c-7955-47aa-9d87-1e7d3a6f252d`
-- Pra criar mais admins: criar usuário em Supabase Dashboard → Auth → Users, depois `INSERT INTO clientes (id, nome, whatsapp, is_admin) VALUES (...)` no SQL Editor (bypassa RLS porque é role `postgres`).
+- CNPJ: `61.004.527/0001-89`
+- Para criar mais admins: criar usuário no Supabase Dashboard → Auth → Users, depois `UPDATE clientes SET is_admin = true WHERE id = '<uuid>'` no SQL Editor.
 
 ---
 
 ## 🔁 Como Retomar o Projeto (qualquer modelo/IA)
 
-Se você é uma IA recém-chamada para continuar este projeto, **leia estes 4 arquivos nesta ordem**:
+Se você é uma IA recém-chamada para continuar este projeto, **leia estes arquivos nesta ordem**:
 
-1. **`gemini.md`** (este arquivo) — quickstart, constituição, regras
-2. **`findings.md`** — schema atualizado do Supabase, segurança (RLS), decisões importantes, bugs pendentes
-3. **`task_plan.md`** — checklist do que está feito vs próximas tarefas
-4. **`progress.md`** — log cronológico detalhado com referências `arquivo:linha`
+1. **`AI_HANDOVER.md`** — Documentação principal completa (stack, schema, features, pendências)
+2. **`gemini.md`** (este arquivo) — quickstart, constituição, regras
+3. **`findings.md`** — Schema atualizado do Supabase, segurança (RLS), decisões
+4. **`task_plan.md`** — Checklist do que está feito vs próximas tarefas
+5. **`progress.md`** — Log cronológico detalhado
 
-**Antes de mudar código**: confirme que o estado descrito ainda bate com o código atual (o app evolui — coisas podem ter sido refatoradas entre sessões).
+**Antes de mudar código**: confirme que o estado descrito ainda bate com o código atual.
 
-**Sempre que terminar uma tarefa**: anote em `progress.md` (com data ISO `YYYY-MM-DD`), atualize `task_plan.md` (marque ✅), atualize `findings.md` se mudou schema/decisão importante.
+**Sempre que terminar uma tarefa**: anote em `progress.md`, atualize `task_plan.md`, atualize `AI_HANDOVER.md` e `findings.md` se mudou schema/decisão.
 
 ---
 
@@ -118,9 +145,9 @@ A constituição original mandava enviar pro Google Sheets. **Hoje a persistênc
 
 - **Não seguir mais** A.N.T 3-camadas estrita (gemini.md original mandava). Supabase substituiu Camada 3.
 - LLMs **não** tomam decisões em runtime aqui — toda lógica é determinística.
-- Frontend é Vite/React.
-- O servidor de placa em `frontend/server.js` é o único componente Express vivo.
-- Pasta `tools/` é legado abandonado (SQLite + Sheets) — pode ser removida em limpeza futura.
+- Frontend é Vite/React SPA.
+- O servidor Express em `frontend/server.js` é o único componente backend (APIs de placa + e-mails).
+- Deploy: Vercel (frontend) + Render (backend).
 
 ---
 

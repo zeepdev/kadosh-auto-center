@@ -29,11 +29,107 @@ app.use(express.json());
 const API_PLACAS_TOKEN = process.env.API_PLACAS_TOKEN || '';
 
 // ======================================================
-// CACHE DE CONSULTAS (sem expiração — persiste enquanto o servidor rodar)
+// CACHE PERSISTENTE NO SUPABASE (sem expiração)
+// Tabela: cache_placas (placa TEXT PK, dados JSONB, created_at TIMESTAMP)
 // ======================================================
-const cacheConsultas = new Map();
 
-// --- PROVEDOR 1: SINESP (via sinesp-api) ---
+// Cria a tabela automaticamente se não existir
+async function initCachePlacas() {
+  try {
+    // Tenta ler da tabela — se der erro, cria
+    const { error } = await supabase.from('cache_placas').select('placa').limit(1);
+    if (error && error.code === '42P01') { // tabela não existe
+      console.log('📦 Criando tabela cache_placas no Supabase...');
+      const { error: createError } = await supabase.rpc('exec_sql', {
+        query: `CREATE TABLE IF NOT EXISTS public.cache_placas (
+          placa TEXT PRIMARY KEY,
+          dados JSONB NOT NULL,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );`
+      });
+      if (createError) {
+        console.log('⚠️  Não foi possível criar tabela via RPC. Crie manualmente no Supabase SQL Editor:');
+        console.log('    CREATE TABLE cache_placas (placa TEXT PRIMARY KEY, dados JSONB NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW());');
+      } else {
+        console.log('✅ Tabela cache_placas criada com sucesso!');
+      }
+    } else {
+      const { count } = await supabase.from('cache_placas').select('*', { count: 'exact', head: true });
+      console.log(`💾 Cache de placas: ${count || 0} placas salvas no Supabase`);
+    }
+  } catch (err) {
+    console.log('⚠️  Erro ao verificar cache:', err.message);
+  }
+}
+
+// Busca no cache do Supabase
+async function cacheGet(placa) {
+  try {
+    const { data, error } = await supabase
+      .from('cache_placas')
+      .select('dados')
+      .eq('placa', placa)
+      .single();
+    if (error || !data) return null;
+    return data.dados;
+  } catch {
+    return null;
+  }
+}
+
+// Salva no cache do Supabase
+async function cacheSet(placa, dados) {
+  try {
+    await supabase
+      .from('cache_placas')
+      .upsert({ placa, dados, created_at: new Date().toISOString() }, { onConflict: 'placa' });
+  } catch (err) {
+    console.log('⚠️  Erro ao salvar cache:', err.message);
+  }
+}
+
+// ======================================================
+// ENDPOINT
+// ======================================================
+app.get('/api/placa/:placa', async (req, res) => {
+  const { placa } = req.params;
+  const placaLimpa = placa.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+
+  if (placaLimpa.length !== 7) {
+    return res.status(400).json({ success: false, error: 'Placa inválida. Deve ter 7 caracteres.' });
+  }
+
+  // Verificar cache no Supabase antes de chamar a API
+  const cached = await cacheGet(placaLimpa);
+  if (cached) {
+    console.log(`\n💾 Cache HIT: ${placaLimpa} — API não consumida`);
+    return res.json({ success: true, data: cached, fromCache: true });
+  }
+
+  console.log(`\n🔍 Consultando placa: ${placaLimpa} (cache MISS — chamando API)`);
+  console.log('─'.repeat(40));
+
+  try {
+    const resultado = await consultarPlacaComFallback(placaLimpa);
+    console.log(`✅ Resultado obtido via: ${resultado.fonte}`);
+    console.log('─'.repeat(40));
+
+    // Salvar no cache do Supabase (persistente)
+    resultado._cachedAt = new Date().toISOString();
+    await cacheSet(placaLimpa, resultado);
+    console.log(`💾 Placa ${placaLimpa} salva no cache Supabase`);
+
+    res.json({ success: true, data: resultado });
+  } catch (error) {
+    console.error('❌ Todas as consultas falharam');
+    console.log('─'.repeat(40));
+    res.status(500).json({
+      success: false,
+      error: 'Não foi possível consultar a placa no momento. Preencha os dados manualmente.',
+      detalhes: error.message
+    });
+  }
+});
 async function consultarSINESP(placa) {
   console.log('[SINESP] Tentando consulta...');
   return new Promise((resolve, reject) => {
@@ -210,48 +306,6 @@ async function consultarPlacaComFallback(placa) {
   throw new Error('Todas as APIs falharam:\n' + erros.join('\n'));
 }
 
-// ======================================================
-// ENDPOINT
-// ======================================================
-app.get('/api/placa/:placa', async (req, res) => {
-  const { placa } = req.params;
-  const placaLimpa = placa.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
-
-  if (placaLimpa.length !== 7) {
-    return res.status(400).json({ success: false, error: 'Placa inválida. Deve ter 7 caracteres.' });
-  }
-
-  // Verificar cache antes de chamar a API
-  if (cacheConsultas.has(placaLimpa)) {
-    const cached = cacheConsultas.get(placaLimpa);
-    console.log(`\n💾 Cache HIT: ${placaLimpa} (salvo em ${cached._cachedAt}) — API não consumida`);
-    return res.json({ success: true, data: cached });
-  }
-
-  console.log(`\n🔍 Consultando placa: ${placaLimpa} (cache MISS — chamando API)`);
-  console.log('─'.repeat(40));
-
-  try {
-    const resultado = await consultarPlacaComFallback(placaLimpa);
-    console.log(`✅ Resultado obtido via: ${resultado.fonte}`);
-    console.log('─'.repeat(40));
-
-    // Salvar no cache
-    resultado._cachedAt = new Date().toLocaleString('pt-BR');
-    cacheConsultas.set(placaLimpa, resultado);
-    console.log(`💾 Placa ${placaLimpa} salva no cache (total: ${cacheConsultas.size} placas)`);
-
-    res.json({ success: true, data: resultado });
-  } catch (error) {
-    console.error('❌ Todas as consultas falharam');
-    console.log('─'.repeat(40));
-    res.status(500).json({
-      success: false,
-      error: 'Não foi possível consultar a placa no momento. Preencha os dados manualmente.',
-      detalhes: error.message
-    });
-  }
-});
 
 // Endpoint de envio de e-mails (Atualização de Serviço)
 app.post('/api/send-update-email', async (req, res) => {
@@ -373,24 +427,29 @@ app.post('/api/send-budget-notification', async (req, res) => {
 });
 
 // Rota de status para verificar configuração
-app.get('/api/status', (req, res) => {
+app.get('/api/status', async (req, res) => {
+  const { count } = await supabase.from('cache_placas').select('*', { count: 'exact', head: true });
+  const { data: placas } = await supabase.from('cache_placas').select('placa');
   res.json({
     sinesp: '✅ Configurado (sempre disponível)',
     apiPlacas: API_PLACAS_TOKEN ? '✅ Token configurado' : '⚠️ Token não configurado',
     ordem: '1) SINESP → 2) API Placas',
     cache: {
-      placas_em_cache: cacheConsultas.size,
-      placas: [...cacheConsultas.keys()]
+      tipo: 'Supabase (persistente)',
+      placas_em_cache: count || 0,
+      placas: (placas || []).map(p => p.placa)
     }
   });
 });
 
 const PORT = 3001;
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`\n🚗 Servidor de Consulta de Placas`);
   console.log(`   Rodando em http://localhost:${PORT}`);
   console.log(`\n📡 Status dos Provedores:`);
   console.log(`   1. SINESP    → ✅ Sempre ativo`);
   console.log(`   2. API Placas→ ${API_PLACAS_TOKEN ? '✅ Token OK' : '⚠️  Sem token (configure API_PLACAS_TOKEN)'}`);
-  console.log(`\n   Ordem de consulta: SINESP → API Placas\n`);
+  console.log(`\n   Ordem de consulta: SINESP → API Placas`);
+  await initCachePlacas();
+  console.log('');
 });

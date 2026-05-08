@@ -271,3 +271,94 @@ Botão fica `disabled` se o cliente não tem nenhum veículo cadastrado, com tex
 - Criado utilitário `frontend/src/lib/cpf.js` com o algoritmo de validação dos dígitos verificadores.
 - Integrado no `Cadastro.jsx`: agora, antes de realizar o `signUp` no Supabase, a validação é executada. Caso inválido, a operação é abortada e um erro amigável é exibido na tela (`CPF inválido. Por favor, verifique o número digitado.`).
 - A validação bloqueia CPFs com sequências repetidas (ex: `111.111.111-11`) e aqueles cujo dígito verificador não bate matematicamente.
+
+### 2026-05-07 — Upload de fotos de serviço + notificação por e-mail
+
+**Contexto**: O mecânico precisava de uma forma de registrar o progresso do serviço com fotos e notificar o cliente automaticamente.
+
+**Mudanças**:
+- Criado `UpdatePhotoModal.jsx` — modal no admin para upload de foto (Supabase Storage, bucket `fotos_servico`) + descrição do serviço.
+- Criado endpoint `POST /api/send-update-email` no `server.js` — envia e-mail via Resend com foto embedded, template HTML dark com branding Kadosh.
+- Tabela `atualizacoes_servico` criada no Supabase (id, orcamento_id FK, cliente_id FK, foto_url, descricao, created_at).
+- Fluxo: mecânico seleciona foto → upload → registro no banco → e-mail automático ao cliente com link para o painel.
+
+### 2026-05-07 — Galeria estática na landing page
+
+**Contexto**: A galeria usava um widget do Instagram que parou de funcionar.
+
+**Mudanças**:
+- `Gallery.jsx` refeito com grid estático 2x2 usando `foto1-4.jpeg` em `public/`.
+- Fotos reais da oficina colocadas no diretório.
+- Array morto de `images` removido.
+
+### 2026-05-07 — Emissão de Nota Fiscal (InvoiceModal — SIMULADO)
+
+**Mudanças**:
+- Criado `InvoiceModal.jsx` — modal completo com seleção de tipo (NFS-e, NF-e, ambas), valores, CPF/CNPJ do tomador.
+- Auto-fill do CPF se o orçamento tiver `cliente_id`.
+- **Status: SIMULADO** — UI completa mas sem API real. Aguarda integração com Focus NFe ou similar.
+
+### 2026-05-07 — Consulta de veículo no admin (ViewVehicleModal)
+
+**Mudanças**:
+- Criado `ViewVehicleModal.jsx` no admin — botão 🚘 ao lado de cada orçamento.
+- Inicialmente com dados simulados (hardcoded).
+
+### 2026-05-07 — Modo TV (TvDashboard)
+
+**Mudanças**:
+- Criado `TvDashboard.jsx` — carrossel fullscreen para exibição na TV da oficina.
+- Busca avisos da tabela `avisos` no Supabase, troca a cada 10s, recarrega a cada 5 min.
+- Indicadores de progresso (pontinhos).
+- Rota `/tv` adicionada ao App.jsx.
+
+### 2026-05-07 — Carrossel de Avisos (AvisosCarousel)
+
+**Mudanças**:
+- Criado `AvisosCarousel.jsx` — carrossel na landing page com avisos/promoções.
+- Dados da tabela `avisos` no Supabase (url da imagem, created_at).
+- Auto-play a cada 8s, botões prev/next, indicadores clicáveis.
+
+### 2026-05-08 — Deploy em produção (Vercel + Render)
+
+**Mudanças**:
+- **Frontend → Vercel**: configurado `vercel.json` com rewrite `/api/*` → Render.
+- **Backend → Render**: serviço web rodando `node server.js` a partir de `frontend/`.
+- Variáveis de ambiente configuradas em ambas as plataformas.
+- URLs de produção: `https://kadosh-auto-center.vercel.app` (frontend) e `https://kadosh-auto-center.onrender.com` (backend).
+
+### 2026-05-08 — Notificação automática de orçamento para admins
+
+**Mudanças**:
+- Criado endpoint `POST /api/send-budget-notification` no `server.js`.
+- Template HTML dark com dados do cliente, veículo, serviço e link para o painel admin.
+- Integrado no `BudgetForm.jsx` — disparo fire-and-forget (não bloqueia o insert).
+- **Limitação**: Resend free tier só envia para o dono da conta (`isaqueduarte07@gmail.com`). Código para busca dinâmica de admins está pronto mas comentado — ativar quando verificar domínio próprio.
+
+### 2026-05-08 — Integração da API de Placas paga (apiplacas.com.br)
+
+**Mudanças**:
+1. **`server.js`** — Provedor `consultarAPIPlacas` atualizado para retornar TODOS os dados brutos da API em campo `extra` (FIPE, restrições, chassi, specs técnicas, documentação).
+2. **`placaApi.js`** — Helper frontend repassa o campo `extra`.
+3. **`ViewVehicleModal.jsx`** — Redesenhado completamente: seções accordion com Identificação, Specs Técnicas, Chassi/Documentação, Restrições, Tabela FIPE expandível.
+4. **`ClientDashboard.jsx`** — Preview compacto ao adicionar veículo: marca/modelo/ano, FIPE, restrições, specs.
+5. **`Cadastro.jsx`** — Mesmo preview compacto na tela de registro.
+- Token `API_PLACAS_TOKEN` configurado no `.env` e no Render.
+- Cascata reduzida para: SINESP → API Placas (removidos API Brasil e Placa FIPE que nunca funcionaram).
+
+### 2026-05-08 — Cache persistente de consultas de placa (Supabase)
+
+**Mudanças**:
+- Tabela `cache_placas` no Supabase (placa TEXT PK, dados JSONB, created_at TIMESTAMPTZ).
+- Funções `cacheGet(placa)` e `cacheSet(placa, dados)` no `server.js`.
+- `initCachePlacas()` verifica/cria a tabela no startup.
+- Cache sem expiração — 1ª consulta chama API (cobra), consultas subsequentes retornam do cache (grátis).
+- Endpoint `/api/status` mostra stats do cache (total de placas, lista).
+- Substituiu o cache em memória (Map) que se perdia a cada restart.
+
+### 2026-05-08 — CNPJ do admin + senha resetada
+
+**Mudanças**:
+- Campo `cpf` do admin (`kadoshautocenter7@gmail.com`) atualizado com CNPJ `61.004.527/0001-89` via API admin.
+- Senha da conta admin resetada via Supabase Admin API.
+- Pendências de prioridade baixa (TikTok, pasta tools/) verificadas como já resolvidas.
