@@ -426,6 +426,143 @@ app.post('/api/send-budget-notification', async (req, res) => {
   }
 });
 
+// ======================================================
+// ASAAS — EMISSÃO DE NOTA FISCAL DE SERVIÇO (NFS-e)
+// ======================================================
+const ASAAS_API_KEY = process.env.ASAAS_API_KEY || '';
+const ASAAS_BASE_URL = process.env.ASAAS_ENV === 'production'
+  ? 'https://api.asaas.com/v3'
+  : 'https://api-sandbox.asaas.com/v3';
+
+// Helper pra chamadas à API Asaas
+async function asaasRequest(method, path, body = null) {
+  const options = {
+    method,
+    headers: {
+      'access_token': ASAAS_API_KEY,
+      'Content-Type': 'application/json'
+    }
+  };
+  if (body) options.body = JSON.stringify(body);
+
+  const response = await fetch(`${ASAAS_BASE_URL}${path}`, options);
+  const data = await response.json();
+
+  if (!response.ok) {
+    console.error(`[Asaas Error] ${method} ${path}:`, JSON.stringify(data, null, 2));
+    const errorMsg = data.errors?.map(e => e.description).join('; ') || data.message || `HTTP ${response.status}`;
+    throw new Error(errorMsg);
+  }
+  return data;
+}
+
+// Busca ou cria cliente no Asaas pelo CPF/CNPJ
+async function getOrCreateAsaasCustomer(nome, cpfCnpj, email) {
+  // Limpa CPF/CNPJ — só números
+  const docLimpo = cpfCnpj.replace(/[^0-9]/g, '');
+
+  // Tenta buscar cliente existente
+  try {
+    const search = await asaasRequest('GET', `/customers?cpfCnpj=${docLimpo}`);
+    if (search.data && search.data.length > 0) {
+      console.log(`[Asaas] Cliente encontrado: ${search.data[0].id}`);
+      return search.data[0].id;
+    }
+  } catch (err) {
+    console.log(`[Asaas] Erro ao buscar cliente: ${err.message}`);
+  }
+
+  // Cria novo cliente
+  const novo = await asaasRequest('POST', '/customers', {
+    name: nome,
+    cpfCnpj: docLimpo,
+    email: email || undefined
+  });
+  console.log(`[Asaas] Novo cliente criado: ${novo.id}`);
+  return novo.id;
+}
+
+// POST /api/invoice/emit — Emitir NFS-e via Asaas
+app.post('/api/invoice/emit', async (req, res) => {
+  const { nome, cpfCnpj, email, valor, descricao, servicoDesejado } = req.body;
+
+  if (!ASAAS_API_KEY) {
+    return res.status(500).json({ success: false, error: 'Chave da API Asaas não configurada.' });
+  }
+
+  if (!cpfCnpj || !valor || !descricao) {
+    return res.status(400).json({ success: false, error: 'CPF/CNPJ, valor e descrição são obrigatórios.' });
+  }
+
+  try {
+    console.log(`\n🧾 [NFS-e] Emitindo nota para ${nome} — R$ ${valor}`);
+
+    // 1. Buscar ou criar cliente no Asaas
+    const customerId = await getOrCreateAsaasCustomer(nome || 'Cliente', cpfCnpj, email);
+
+    // 2. Criar/agendar a NFS-e
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+
+    const invoice = await asaasRequest('POST', '/invoices', {
+      customer: customerId,
+      serviceDescription: `${servicoDesejado ? servicoDesejado + ' — ' : ''}${descricao}`,
+      value: parseFloat(valor),
+      effectiveDate: today,
+      observations: `Kadosh Auto Center — Serviço: ${servicoDesejado || 'Manutenção'}`,
+      taxes: {
+        retainIss: false,
+        iss: 2, // ISS padrão para serviços de manutenção (verificar com o contador)
+        cofins: 0,
+        csll: 0,
+        inss: 0,
+        ir: 0,
+        pis: 0
+      }
+    });
+
+    console.log(`✅ [NFS-e] Nota agendada com sucesso! ID: ${invoice.id} — Status: ${invoice.status}`);
+
+    res.json({
+      success: true,
+      data: {
+        id: invoice.id,
+        status: invoice.status,
+        value: invoice.value,
+        effectiveDate: invoice.effectiveDate,
+        serviceDescription: invoice.serviceDescription,
+        customerId: customerId
+      }
+    });
+  } catch (error) {
+    console.error(`❌ [NFS-e] Erro:`, error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/invoice/:id/status — Consultar status da nota
+app.get('/api/invoice/:id/status', async (req, res) => {
+  if (!ASAAS_API_KEY) {
+    return res.status(500).json({ success: false, error: 'Chave da API Asaas não configurada.' });
+  }
+
+  try {
+    const invoice = await asaasRequest('GET', `/invoices/${req.params.id}`);
+    res.json({
+      success: true,
+      data: {
+        id: invoice.id,
+        status: invoice.status,
+        value: invoice.value,
+        effectiveDate: invoice.effectiveDate,
+        pdfUrl: invoice.pdfUrl || null,
+        xmlUrl: invoice.xmlUrl || null
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Rota de status para verificar configuração
 app.get('/api/status', async (req, res) => {
   const { count } = await supabase.from('cache_placas').select('*', { count: 'exact', head: true });
@@ -433,6 +570,7 @@ app.get('/api/status', async (req, res) => {
   res.json({
     sinesp: '✅ Configurado (sempre disponível)',
     apiPlacas: API_PLACAS_TOKEN ? '✅ Token configurado' : '⚠️ Token não configurado',
+    asaas: ASAAS_API_KEY ? `✅ Configurado (${process.env.ASAAS_ENV || 'sandbox'})` : '⚠️ Não configurado',
     ordem: '1) SINESP → 2) API Placas',
     cache: {
       tipo: 'Supabase (persistente)',
