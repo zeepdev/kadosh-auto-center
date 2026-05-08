@@ -25,6 +25,7 @@ const Cadastro = () => {
   const [status, setStatus] = useState('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [buscandoPlaca, setBuscandoPlaca] = useState(false);
+  const [dadosVeiculo, setDadosVeiculo] = useState(null);
 
   const handleClienteChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -37,6 +38,7 @@ const Cadastro = () => {
   const buscarDadosPlaca = async () => {
     if (veiculo.placa.length < 7) return;
     setBuscandoPlaca(true);
+    setDadosVeiculo(null);
     try {
       const dados = await consultarPlaca(veiculo.placa);
       setVeiculo({
@@ -45,6 +47,7 @@ const Cadastro = () => {
         modelo: dados.modelo,
         ano: dados.ano
       });
+      setDadosVeiculo(dados);
     } catch (err) {
       console.error(err);
       alert(err);
@@ -152,14 +155,57 @@ const Cadastro = () => {
         <div className="form-row" style={{ alignItems: 'flex-end' }}>
           <div className="form-group" style={{ flex: 2 }}>
             <label>Placa do Veículo</label>
-            <input type="text" name="placa" required value={veiculo.placa} onChange={handleVeiculoChange} placeholder="AAA-0A00" maxLength="8" />
+            <input type="text" name="placa" required value={veiculo.placa} onChange={e => { handleVeiculoChange(e); setDadosVeiculo(null); }} placeholder="AAA-0A00" maxLength="8" />
           </div>
           <div className="form-group" style={{ flex: 1 }}>
             <button type="button" onClick={buscarDadosPlaca} className="btn" style={{ width: '100%', background: '#333' }} disabled={buscandoPlaca}>
-              {buscandoPlaca ? 'Buscando...' : 'Consultar Placa'}
+              {buscandoPlaca ? 'Buscando...' : '🔍 Consultar'}
             </button>
           </div>
         </div>
+
+        {/* Preview dos dados do veículo */}
+        {dadosVeiculo && dadosVeiculo.extra && (() => {
+          const ex = dadosVeiculo.extra;
+          const fipeDados = ex.fipe || [];
+          const fipePrincipal = fipeDados.length > 0 ? [...fipeDados].sort((a, b) => (b.score || 0) - (a.score || 0))[0] : null;
+          const restricoes = [ex.restricao_1, ex.restricao_2, ex.restricao_3, ex.restricao_4].filter(r => r && r !== '');
+          const semRestricao = restricoes.every(r => r?.toUpperCase().includes('SEM RESTRICAO') || r?.toUpperCase().includes('SEM RESTRIÇÃO'));
+
+          return (
+            <div style={{ background: '#111', borderRadius: '10px', padding: '16px', marginBottom: '15px', border: '1px solid #222' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px solid #222' }}>
+                {ex.logo && <img src={ex.logo} alt="Logo" style={{ width: '30px', height: '30px', objectFit: 'contain', filter: 'brightness(0) invert(1)', opacity: 0.6 }} />}
+                <div>
+                  <p style={{ margin: 0, fontWeight: 'bold', fontSize: '1rem' }}>{dadosVeiculo.marca} {ex.modelo_completo || dadosVeiculo.modelo}</p>
+                  <p style={{ margin: '2px 0 0 0', color: '#666', fontSize: '0.8rem' }}>{ex.ano_fabricacao}/{ex.ano_modelo} • {dadosVeiculo.cor} • {ex.combustivel || ''}</p>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '8px', marginBottom: '10px' }}>
+                {ex.cilindradas && <div style={{ background: '#0a0a0a', padding: '6px 8px', borderRadius: '5px' }}><span style={{ color: '#666', fontSize: '0.65rem', display: 'block' }}>Motor</span><span style={{ fontWeight: 'bold', fontSize: '0.8rem' }}>{ex.cilindradas}cc</span></div>}
+                {ex.tipo_veiculo && <div style={{ background: '#0a0a0a', padding: '6px 8px', borderRadius: '5px' }}><span style={{ color: '#666', fontSize: '0.65rem', display: 'block' }}>Tipo</span><span style={{ fontWeight: 'bold', fontSize: '0.8rem' }}>{ex.tipo_veiculo}</span></div>}
+                {ex.origem && <div style={{ background: '#0a0a0a', padding: '6px 8px', borderRadius: '5px' }}><span style={{ color: '#666', fontSize: '0.65rem', display: 'block' }}>Origem</span><span style={{ fontWeight: 'bold', fontSize: '0.8rem' }}>{ex.origem}</span></div>}
+              </div>
+              {fipePrincipal && (
+                <div style={{ background: 'rgba(74, 222, 128, 0.06)', padding: '10px', borderRadius: '6px', border: '1px solid rgba(74, 222, 128, 0.15)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+                  <div>
+                    <p style={{ margin: 0, color: '#4ade80', fontSize: '0.65rem', fontWeight: 'bold', textTransform: 'uppercase' }}>Valor FIPE</p>
+                    <p style={{ margin: '2px 0 0 0', fontSize: '1.2rem', fontWeight: '800', color: '#4ade80' }}>{fipePrincipal.texto_valor}</p>
+                  </div>
+                  <p style={{ margin: 0, color: '#555', fontSize: '0.7rem' }}>{fipePrincipal.mes_referencia}</p>
+                </div>
+              )}
+              {restricoes.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 8px', borderRadius: '5px', background: semRestricao ? 'rgba(74,222,128,0.05)' : 'rgba(248,113,113,0.05)' }}>
+                  <span style={{ fontSize: '0.9rem' }}>{semRestricao ? '✅' : '⚠️'}</span>
+                  <span style={{ color: semRestricao ? '#4ade80' : '#f87171', fontSize: '0.8rem', fontWeight: '600' }}>
+                    {ex.situacao || (semRestricao ? 'Sem restrições' : 'Possui restrições')}
+                  </span>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         <div className="form-row">
           <div className="form-group">

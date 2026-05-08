@@ -41,6 +41,7 @@ export const consultarPlaca = async (placa) => {
     cor: result.data.cor || '',
     municipio: result.data.municipio || '',
     uf: result.data.uf || '',
-    fonte: result.data.fonte || 'Desconhecida'
+    fonte: result.data.fonte || 'Desconhecida',
+    extra: result.data.extra || null
   };
 };

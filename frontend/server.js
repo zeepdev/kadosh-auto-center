@@ -76,8 +76,8 @@ async function consultarAPIPlacas(placa) {
 
   if (data && (data.MARCA || data.marca)) {
     console.log('[API Placas] ✅ Sucesso!');
-    return formatarResultado(
-      data.MARCA || data.marca || '',
+    const resultado = formatarResultado(
+      data.marcaModelo || data.MARCA || data.marca || '',
       data.ANO || data.ano || '',
       data.ANO_MODELO || data.anoModelo || data.ANO || data.ano || '',
       data.COR || data.cor || '',
@@ -85,6 +85,65 @@ async function consultarAPIPlacas(placa) {
       data.UF || data.uf || '',
       placa
     );
+
+    // Inclui todos os dados brutos da API para o frontend exibir
+    const extra = data.extra || {};
+    resultado.extra = {
+      // Identificação completa
+      marcaModelo: data.marcaModelo || '',
+      modelo_completo: data.modelo || data.MODELO || '',
+      submodelo: data.SUBMODELO || data.submodelo || '',
+      versao: data.VERSAO || data.versao || '',
+      placa_alternativa: data.placa_alternativa || extra.placa_modelo_novo || '',
+      origem: data.origem || extra.nacionalidade || '',
+      logo: data.logo || '',
+      segmento: data.segmento || extra.segmento || '',
+      sub_segmento: data.sub_segmento || extra.sub_segmento || '',
+
+      // Datas
+      ano_fabricacao: extra.ano_fabricacao || data.ano || '',
+      ano_modelo: extra.ano_modelo || data.anoModelo || '',
+
+      // Especificações técnicas
+      cilindradas: extra.cilindradas || '',
+      combustivel: extra.combustivel || '',
+      tipo_veiculo: extra.tipo_veiculo || '',
+      especie: extra.especie || '',
+      quantidade_passageiro: extra.quantidade_passageiro || '',
+      tipo_montagem: extra.tipo_montagem || '',
+      tipo_carroceria: extra.tipo_carroceria || '',
+      peso_bruto_total: extra.peso_bruto_total || '',
+      cap_maxima_tracao: extra.cap_maxima_tracao || '',
+
+      // Chassi e documentação
+      chassi_parcial: data.chassi || '',
+      chassi_completo: extra.chassi || '',
+      situacao_chassi: extra.situacao_chassi || '',
+      situacao_veiculo: extra.situacao_veiculo || '',
+      tipo_doc_prop: extra.tipo_doc_prop || '',
+      faturado: extra.faturado || '',
+      tipo_doc_faturado: extra.tipo_doc_faturado || '',
+      uf_faturado: extra.uf_faturado || '',
+
+      // Localização
+      municipio: data.municipio || extra.municipio || '',
+      uf_placa: extra.uf_placa || '',
+
+      // Restrições
+      restricao_1: extra.restricao_1 || '',
+      restricao_2: extra.restricao_2 || '',
+      restricao_3: extra.restricao_3 || '',
+      restricao_4: extra.restricao_4 || '',
+      situacao: data.situacao || '',
+
+      // FIPE
+      fipe: data.fipe?.dados || [],
+
+      // Média de preço
+      media_preco: extra.media_preco || ''
+    };
+
+    return resultado;
   }
 
   if (data && data.message) {
