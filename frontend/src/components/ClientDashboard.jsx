@@ -632,6 +632,60 @@ const ClientDashboard = () => {
           </div>
         </div>
 
+        {/* Deixar Depoimento */}
+        <div className="glass" style={{ padding: '25px', marginBottom: '30px', borderLeft: '4px solid #f59e0b' }}>
+          <h3 style={{ margin: 0, color: '#f59e0b' }}>⭐ Deixar um Depoimento</h3>
+          <p style={{ color: '#aaa', margin: '5px 0 20px 0', fontSize: '0.9rem' }}>
+            Sua opinião é fundamental para nós. Conte como foi sua experiência na Kadosh!
+          </p>
+          
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const comentario = form.comentario.value;
+            const estrelas = form.estrelas.value;
+            
+            try {
+              const { error } = await supabase.from('depoimentos').insert([{
+                cliente_id: user.id,
+                nome: cliente?.nome_social || cliente?.nome || 'Cliente',
+                comentario,
+                estrelas: parseInt(estrelas),
+                aprovado: false
+              }]);
+              if (error) throw error;
+              alert('Depoimento enviado com sucesso! Ele passará por uma moderação antes de aparecer no site.');
+              form.reset();
+            } catch (err) {
+              alert('Erro ao enviar depoimento: ' + err.message);
+            }
+          }}>
+            <div style={{ display: 'flex', gap: '20px', alignItems: 'center', marginBottom: '15px' }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', color: '#aaa' }}>Sua Nota</label>
+                <select name="estrelas" style={{ width: '100%', padding: '12px', background: '#111', color: '#fff', border: '1px solid #333', borderRadius: '8px' }}>
+                  <option value="5">⭐⭐⭐⭐⭐ (Excelente)</option>
+                  <option value="4">⭐⭐⭐⭐ (Muito Bom)</option>
+                  <option value="3">⭐⭐⭐ (Bom)</option>
+                  <option value="2">⭐⭐ (Regular)</option>
+                  <option value="1">⭐ (Ruim)</option>
+                </select>
+              </div>
+            </div>
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', color: '#aaa' }}>Seu Comentário</label>
+              <textarea 
+                name="comentario" 
+                rows="3" 
+                required 
+                placeholder="Ex: Ótimo atendimento, serviço rápido e preço justo!"
+                style={{ width: '100%', padding: '12px', background: '#111', color: '#fff', border: '1px solid #333', borderRadius: '8px', resize: 'vertical' }}
+              />
+            </div>
+            <button type="submit" className="btn" style={{ background: '#f59e0b', color: '#000' }}>Enviar Depoimento</button>
+          </form>
+        </div>
+
         {/* Histórico de Orçamentos */}
         <div>
           <h3 style={{ marginBottom: '15px' }}>📋 Histórico de Serviços</h3>

@@ -317,7 +317,7 @@ app.post('/api/send-update-email', async (req, res) => {
 
   try {
     const data = await resend.emails.send({
-      from: 'Kadosh Auto Center <onboarding@resend.dev>',
+      from: 'Kadosh Auto Center <contato@kadoshautocenter.com>',
       to: [clientEmail],
       subject: `Atualização do seu ${carInfo} - Kadosh Auto Center`,
       html: `
@@ -364,22 +364,23 @@ app.post('/api/send-budget-notification', async (req, res) => {
     console.log('🔍 Buscando administradores para notificação...');
     
     // Resend no plano gratuito só permite envio para o dono da conta.
-    // Quando verificar um domínio próprio, descomentar o bloco dinâmico abaixo.
-    // const { data: admins, error: adminError } = await supabase
-    //   .from('clientes')
-    //   .select('email, nome')
-    //   .eq('is_admin', true);
-    // if (adminError) throw adminError;
-    // let adminEmails = admins?.map(a => a.email).filter(e => !!e) || [];
+    const { data: admins, error: adminError } = await supabase
+      .from('clientes')
+      .select('email, nome')
+      .eq('is_admin', true);
+    if (adminError) throw adminError;
+    let adminEmails = admins?.map(a => a.email).filter(e => !!e) || [];
 
-    // Por enquanto, envia apenas para o e-mail do dono da conta Resend
-    let adminEmails = ['isaqueduarte07@gmail.com'];
+    // Fallback caso não encontre nenhum admin por algum motivo
+    if (adminEmails.length === 0) {
+      adminEmails = ['isaqueduarte07@gmail.com'];
+    }
 
     console.log(`📧 Enviando notificação para: ${adminEmails.join(', ')}`);
 
     // 2. Enviar o e-mail via Resend
     const data = await resend.emails.send({
-      from: 'Kadosh Auto Center <onboarding@resend.dev>',
+      from: 'Kadosh Auto Center <contato@kadoshautocenter.com>',
       to: adminEmails,
       subject: `🆕 Novo Orçamento: ${nome} - ${placa}`,
       html: `

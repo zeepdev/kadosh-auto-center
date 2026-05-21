@@ -14,19 +14,25 @@ import ClientDashboard from './components/ClientDashboard'
 import TvDashboard from './components/TvDashboard'
 import AvisosCarousel from './components/AvisosCarousel'
 
+import Navbar from './components/Navbar'
+import Testimonials from './components/Testimonials'
+
 function App() {
   return (
-    <Routes>
-      <Route path="/" element={
-        <>
-          <Hero />
-          <AvisosCarousel />
-          <Services />
-          <Gallery />
-          <BudgetForm />
-          <AboutUs />
-        </>
-      } />
+    <>
+      <Navbar />
+      <Routes>
+        <Route path="/" element={
+          <>
+            <div id="inicio"><Hero /></div>
+            <AvisosCarousel />
+            <div id="servicos"><Services /></div>
+            <div id="galeria"><Gallery /></div>
+            <Testimonials />
+            <div id="orcamento"><BudgetForm /></div>
+            <div id="contato"><AboutUs /></div>
+          </>
+        } />
       <Route path="/admin" element={<AdminDashboard />} />
       <Route path="/tv" element={<TvDashboard />} />
       <Route path="/login" element={<Login />} />
