@@ -28,6 +28,7 @@ const AdminDashboard = () => {
   const [selectedClientForPDF, setSelectedClientForPDF] = useState(null);
   const [selectedForUpdate, setSelectedForUpdate] = useState(null);
   const [selectedPlacaForView, setSelectedPlacaForView] = useState(null);
+  const [selectedForInvoice, setSelectedForInvoice] = useState(null);
   const [depoimentos, setDepoimentos] = useState([]);
   const [activeTab, setActiveTab] = useState('atendimentos'); // 'atendimentos', 'financeiro', 'depoimentos'
 
