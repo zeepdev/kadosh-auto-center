@@ -143,7 +143,7 @@ const CafeComGraxa = () => {
           <p style={{ fontSize: '1.1rem', opacity: 0.8, marginBottom: '40px' }}>Confira os melhores momentos das edições passadas.</p>
           
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
-            {[1, 2, 3, 4, 5, 6].map((item) => (
+            {[1, 2, 3, 4, 5].map((item) => (
               <div key={item} style={{ 
                 aspectRatio: '1', 
                 backgroundColor: '#4a3224', 
@@ -173,7 +173,7 @@ const CafeComGraxa = () => {
             ))}
           </div>
           <p style={{ marginTop: '20px', fontSize: '0.9rem', color: 'rgba(251, 239, 224, 0.5)' }}>
-            (Para exibir as fotos, adicione imagens com o nome cafe-galeria-1.jpg até cafe-galeria-6.jpg na pasta public/images)
+            (Para exibir mais fotos, basta adicionar com os próximos números na pasta public/images)
           </p>
         </div>
       </section>
