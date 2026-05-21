@@ -257,6 +257,26 @@ const PDFGenerator = ({ initialData, onClose }) => {
     }
   };
 
+  const removeItem = (index) => {
+    setItems(items.filter((_, i) => i !== index));
+  };
+
+  const editItem = (index) => {
+    const item = items[index];
+    setNewItem({ qtd: item.qtd, desc: item.desc, unit: item.unit });
+    removeItem(index);
+  };
+
+  const removeLabor = (index) => {
+    setLabor(labor.filter((_, i) => i !== index));
+  };
+
+  const editLabor = (index) => {
+    const item = labor[index];
+    setNewLabor({ qtd: item.qtd, desc: item.desc, unit: item.unit });
+    removeLabor(index);
+  };
+
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.9)', zIndex: 9999, padding: '20px', overflowY: 'auto' }}>
       <div style={{ maxWidth: '800px', margin: '0 auto', backgroundColor: '#111', padding: '30px', borderRadius: '12px', color: '#fff' }}>
@@ -321,7 +341,15 @@ const PDFGenerator = ({ initialData, onClose }) => {
           <button onClick={addItem} className="btn" style={{ background: '#4ade80', color: '#000', padding: '10px 20px' }}>+ Peça</button>
         </div>
         <ul style={{ marginBottom: '30px', listStyle: 'none', padding: 0 }}>
-          {items.map((it, i) => <li key={i} style={{ color: '#aaa' }}>- {it.qtd}x {it.desc} (R$ {it.unit.toFixed(2)})</li>)}
+          {items.map((it, i) => (
+            <li key={i} style={{ color: '#aaa', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', padding: '8px', background: '#1a1a1a', borderRadius: '4px' }}>
+              <span>- {it.qtd}x {it.desc} (R$ {it.unit.toFixed(2)})</span>
+              <div>
+                <button onClick={() => editItem(i)} style={{ background: 'transparent', border: 'none', color: '#f59e0b', cursor: 'pointer', marginRight: '10px' }} title="Editar">✏️</button>
+                <button onClick={() => removeItem(i)} style={{ background: 'transparent', border: 'none', color: '#f87171', cursor: 'pointer' }} title="Remover">❌</button>
+              </div>
+            </li>
+          ))}
         </ul>
 
         {/* Adicionar Serviços */}
@@ -333,7 +361,15 @@ const PDFGenerator = ({ initialData, onClose }) => {
           <button onClick={addLabor} className="btn" style={{ background: '#60a5fa', color: '#000', padding: '10px 20px' }}>+ Serviço</button>
         </div>
         <ul style={{ marginBottom: '30px', listStyle: 'none', padding: 0 }}>
-          {labor.map((it, i) => <li key={i} style={{ color: '#aaa' }}>- {it.qtd}x {it.desc} (R$ {it.unit.toFixed(2)})</li>)}
+          {labor.map((it, i) => (
+            <li key={i} style={{ color: '#aaa', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', padding: '8px', background: '#1a1a1a', borderRadius: '4px' }}>
+              <span>- {it.qtd}x {it.desc} (R$ {it.unit.toFixed(2)})</span>
+              <div>
+                <button onClick={() => editLabor(i)} style={{ background: 'transparent', border: 'none', color: '#f59e0b', cursor: 'pointer', marginRight: '10px' }} title="Editar">✏️</button>
+                <button onClick={() => removeLabor(i)} style={{ background: 'transparent', border: 'none', color: '#f87171', cursor: 'pointer' }} title="Remover">❌</button>
+              </div>
+            </li>
+          ))}
         </ul>
 
         <div style={{ borderTop: '1px solid #333', paddingTop: '20px', textAlign: 'center' }}>
