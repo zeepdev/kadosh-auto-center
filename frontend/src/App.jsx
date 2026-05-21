@@ -13,6 +13,7 @@ import ResetPassword from './components/Auth/ResetPassword'
 import ClientDashboard from './components/ClientDashboard'
 import TvDashboard from './components/TvDashboard'
 import AvisosCarousel from './components/AvisosCarousel'
+import CafeComGraxa from './components/CafeComGraxa'
 
 import Navbar from './components/Navbar'
 import Testimonials from './components/Testimonials'
@@ -40,6 +41,7 @@ function App() {
       <Route path="/esqueci-senha" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/cliente" element={<ClientDashboard />} />
+      <Route path="/cafe-com-graxa" element={<CafeComGraxa />} />
     </Routes>
     </>
   )

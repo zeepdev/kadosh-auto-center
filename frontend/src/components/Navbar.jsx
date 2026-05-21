@@ -61,6 +61,9 @@ const Navbar = () => {
               {link.name}
             </button>
           ))}
+          <Link to="/cafe-com-graxa" className="nav-link-btn" style={{ color: '#d37a54', fontWeight: 'bold' }}>
+            ☕ Café com Graxa
+          </Link>
           <Link to={user ? '/cliente' : '/login'} className="btn nav-cta">
             {user ? 'Minha Área' : 'Área do Cliente'}
           </Link>
@@ -79,6 +82,9 @@ const Navbar = () => {
             {link.name}
           </button>
         ))}
+        <Link to="/cafe-com-graxa" className="mobile-link" onClick={() => setMobileMenuOpen(false)} style={{ color: '#d37a54', fontWeight: 'bold' }}>
+          ☕ Café com Graxa
+        </Link>
         <Link to={user ? '/cliente' : '/login'} className="btn" style={{ width: '100%', marginTop: '20px' }} onClick={() => setMobileMenuOpen(false)}>
           {user ? 'Minha Área' : 'Área do Cliente'}
         </Link>
