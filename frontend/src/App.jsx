@@ -41,6 +41,7 @@ function App() {
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/cliente" element={<ClientDashboard />} />
     </Routes>
+    </>
   )
 }
 
