@@ -52,7 +52,7 @@ const Footer = ({ theme = 'dark' }) => {
           📷 Instagram
         </a>
         <a 
-          href={OFICINA.tiktok || 'https://www.tiktok.com/@kadoshautocenter'} 
+          href={OFICINA.tiktok} 
           target="_blank" 
           rel="noreferrer" 
           style={styles.icon}

@@ -8,6 +8,7 @@ export const OFICINA = {
   whatsapp: '556281529741',
   email: 'kadoshautocenter7@gmail.com',
   instagram: 'https://www.instagram.com/kadosh.center/',
+  tiktok: 'https://www.tiktok.com/@kadosh.auto.center',
   garantiaServicos: '90 dias para serviços prestados. Peças conforme garantia do fabricante.',
   validadeOrcamento: 15
 };
