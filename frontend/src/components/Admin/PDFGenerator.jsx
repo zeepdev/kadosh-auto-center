@@ -188,7 +188,7 @@ const KadoshPDF = ({ clientData, items, labor }) => {
   );
 };
 
-const PDFGenerator = ({ initialData, onClose }) => {
+const PDFGenerator = ({ initialData, onClose, onUpdateSuccess }) => {
   const [clientData, setClientData] = useState({
     nome: initialData.nome || '',
     whatsapp: initialData.whatsapp || '',
@@ -275,6 +275,16 @@ const PDFGenerator = ({ initialData, onClose }) => {
     const item = labor[index];
     setNewLabor({ qtd: item.qtd, desc: item.desc, unit: item.unit });
     removeLabor(index);
+  };
+
+  const totalItems = items.reduce((acc, item) => acc + (item.qtd * item.unit), 0);
+  const totalLabor = labor.reduce((acc, item) => acc + (item.qtd * item.unit), 0);
+  const grandTotal = totalItems + totalLabor;
+
+  const handleDownloadClick = () => {
+    if (initialData.id && onUpdateSuccess) {
+      onUpdateSuccess(initialData.id, grandTotal);
+    }
   };
 
   return (
@@ -373,17 +383,19 @@ const PDFGenerator = ({ initialData, onClose }) => {
         </ul>
 
         <div style={{ borderTop: '1px solid #333', paddingTop: '20px', textAlign: 'center' }}>
-          <PDFDownloadLink
-            document={<KadoshPDF clientData={clientData} items={items} labor={labor} />}
-            fileName={`Orcamento_Kadosh_${clientData.placa || clientData.nome}.pdf`}
-            style={{
-              backgroundColor: '#dc2743', color: '#fff', textDecoration: 'none',
-              padding: '15px 30px', borderRadius: '8px', fontSize: '1.2rem', fontWeight: 'bold',
-              display: 'inline-block'
-            }}
-          >
-            {({ loading }) => (loading ? 'Gerando documento...' : '📥 Baixar PDF do Orçamento')}
-          </PDFDownloadLink>
+          <div onClick={handleDownloadClick} style={{ display: 'inline-block' }}>
+            <PDFDownloadLink
+              document={<KadoshPDF clientData={clientData} items={items} labor={labor} />}
+              fileName={`Orcamento_Kadosh_${clientData.placa || clientData.nome}.pdf`}
+              style={{
+                backgroundColor: '#dc2743', color: '#fff', textDecoration: 'none',
+                padding: '15px 30px', borderRadius: '8px', fontSize: '1.2rem', fontWeight: 'bold',
+                display: 'inline-block'
+              }}
+            >
+              {({ loading }) => (loading ? 'Gerando documento...' : '📥 Baixar PDF do Orçamento')}
+            </PDFDownloadLink>
+          </div>
         </div>
       </div>
     </div>

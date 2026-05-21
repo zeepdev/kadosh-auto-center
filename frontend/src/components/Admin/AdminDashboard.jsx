@@ -679,6 +679,7 @@ const AdminDashboard = () => {
         <PDFGenerator 
           initialData={selectedClientForPDF} 
           onClose={() => setSelectedClientForPDF(null)} 
+          onUpdateSuccess={(id, valor) => handleUpdateValor(id, valor)}
         />
       )}
 
