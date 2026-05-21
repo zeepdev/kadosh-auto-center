@@ -64,7 +64,7 @@ const CafeComGraxa = () => {
             Café com Graxa
           </h1>
           <p style={{ fontSize: '1.2rem', color: colors.textDark, opacity: 0.8, maxWidth: '600px', margin: '0 auto 40px', lineHeight: 1.6 }}>
-            Onde a paixão por motores se encontra com boas conversas, networking e muito café.
+            Um evento exclusivo para mulheres: aprenda sobre o seu carro de forma simples, prática e sem julgamentos.
           </p>
           
           <div style={{ 
@@ -89,18 +89,17 @@ const CafeComGraxa = () => {
           <div style={{ backgroundColor: colors.white, padding: '40px', borderRadius: '20px', boxShadow: '0 15px 30px rgba(59, 37, 22, 0.05)', borderTop: `5px solid ${colors.secondary}` }}>
             <h2 style={{ fontSize: '2rem', color: colors.primary, marginBottom: '20px' }}>O que é?</h2>
             <p style={{ fontSize: '1.1rem', lineHeight: 1.8, color: colors.textDark }}>
-              O <strong>Café com Graxa</strong> é um evento exclusivo organizado pela Kadosh Auto Center. 
-              Um momento de portas abertas onde reunimos clientes, amigos e entusiastas do mundo automotivo.
-              Não é só sobre carros, é sobre criar uma comunidade, trocar experiências, ouvir boa música e, claro, tomar aquele café especial em meio ao cenário da nossa oficina.
+              O <strong>Café com Graxa</strong> é um evento exclusivo feito <strong>somente para mulheres</strong>. 
+              É um momento criado para ensinar, de forma simples e sem julgamentos, sobre o funcionamento dos veículos.
+              Através de palestras e ensinos práticos totalmente descomplicados, mostramos de maneira efetiva como uma mulher pode entender melhor o seu carro.
             </p>
           </div>
 
           <div style={{ backgroundColor: colors.white, padding: '40px', borderRadius: '20px', boxShadow: '0 15px 30px rgba(59, 37, 22, 0.05)', borderTop: `5px solid ${colors.primary}` }}>
             <h2 style={{ fontSize: '2rem', color: colors.secondary, marginBottom: '20px' }}>Por que foi criado?</h2>
             <p style={{ fontSize: '1.1rem', lineHeight: 1.8, color: colors.textDark }}>
-              Criamos o projeto para desmistificar o ambiente de oficina mecânica. Queremos que você se sinta em casa. 
-              É uma oportunidade de mostrarmos nossa transparência, nossa infraestrutura e a paixão que temos pelo que fazemos,
-              estreitando laços de confiança e amizade fora do momento de "aperto" em que o carro quebra.
+              A Kadosh percebeu a grande necessidade de acolher o público feminino, que muitas vezes é julgado pela sociedade como menos entendedor sobre mecânica.
+              O objetivo principal é empoderar mulheres com conhecimento prático e real, evitando que passem por situações constrangedoras ou sofram golpes ao precisarem de manutenção em seus veículos.
             </p>
           </div>
 
