@@ -24,12 +24,32 @@ const CafeComGraxa = () => {
       
       {/* Hero Section */}
       <section style={{ 
+        position: 'relative',
         padding: '100px 20px 60px', 
         textAlign: 'center', 
-        background: `linear-gradient(135deg, ${colors.bg} 0%, #fae5cb 100%)`,
-        borderBottom: `4px solid ${colors.primary}`
+        borderBottom: `4px solid ${colors.primary}`,
+        overflow: 'hidden'
       }}>
-        <div className="container" style={{ maxWidth: '800px', margin: '0 auto' }}>
+        {/* Fundo Desfocado */}
+        <div style={{
+          position: 'absolute',
+          top: -20, left: -20, right: -20, bottom: -20,
+          backgroundImage: `url('/images/cafe-graxa-banner.png')`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          filter: 'blur(8px)',
+          zIndex: 0,
+          opacity: 0.6
+        }}></div>
+        {/* Overlay Creme */}
+        <div style={{
+          position: 'absolute',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(251, 239, 224, 0.75)',
+          zIndex: 1
+        }}></div>
+
+        <div className="container" style={{ maxWidth: '800px', margin: '0 auto', position: 'relative', zIndex: 2 }}>
           {/* Logo Placeholder */}
           <div style={{ 
             width: '250px', 
