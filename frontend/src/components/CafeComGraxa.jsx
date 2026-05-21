@@ -175,7 +175,7 @@ const CafeComGraxa = () => {
                 position: 'relative'
               }}>
                 <img 
-                  src={`/images/cafe-galeria-${item}.jpg`} 
+                  src={`/images/cafe-galeria-${item}.${item === 4 ? 'png' : 'jpg'}`} 
                   alt={`Galeria ${item}`}
                   onError={(e) => {
                     e.target.onerror = null; 
