@@ -78,36 +78,33 @@ const Cadastro = () => {
 
       const userId = authData.user.id;
 
-      // 2. Atualizar dados do cliente (a row foi criada pelo trigger handle_new_user no Supabase)
-      const { error: clienteError } = await supabase
-        .from('clientes')
-        .update({
+      // 2. Enviar dados para a nossa API segura (bypassa RLS temporariamente)
+      const res = await fetch('/api/complete-registration', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
           nome: formData.nome,
           cpf: formData.cpf.replace(/\D/g, ''),
-          whatsapp: formData.whatsapp.replace(/\D/g, '')
+          whatsapp: formData.whatsapp.replace(/\D/g, ''),
+          veiculo: {
+            placa: veiculo.placa.toUpperCase(),
+            marca: veiculo.marca,
+            modelo: veiculo.modelo,
+            ano: veiculo.ano
+          }
         })
-        .eq('id', userId);
+      });
 
-      if (clienteError) throw new Error("Erro ao salvar dados do cliente: " + clienteError.message);
-
-      // 3. Salvar o veículo principal na tabela veiculos
-      const { error: veiculoError } = await supabase
-        .from('veiculos')
-        .insert([{
-          cliente_id: userId,
-          placa: veiculo.placa.toUpperCase(),
-          marca: veiculo.marca,
-          modelo: veiculo.modelo,
-          ano: veiculo.ano,
-          is_principal: true
-        }]);
-
-      if (veiculoError) throw new Error("Erro ao salvar veículo: " + veiculoError.message);
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error("Erro ao salvar dados do veículo/cliente: " + errData.error);
+      }
 
       setStatus('success');
       setTimeout(() => {
-        navigate('/cliente');
-      }, 2000);
+        navigate('/login');
+      }, 5000);
 
     } catch (error) {
       console.error(error);
@@ -224,7 +221,7 @@ const Cadastro = () => {
 
         {errorMessage && <div style={{ color: '#f87171', marginTop: '20px', fontWeight: 'bold' }}>⚠️ {errorMessage}</div>}
         
-        {status === 'success' && <div style={{ color: '#4ade80', marginTop: '20px', textAlign: 'center' }}>Cadastro realizado com sucesso! Redirecionando...</div>}
+        {status === 'success' && <div style={{ color: '#4ade80', marginTop: '20px', textAlign: 'center', fontWeight: 'bold' }}>✅ Quase lá! Enviamos um link de confirmação para o seu e-mail. Por favor, acesse sua caixa de entrada e clique no link para ativar sua conta.</div>}
 
         <button type="submit" className="btn" style={{ width: '100%', marginTop: '30px' }} disabled={status === 'loading'}>
           {status === 'loading' ? 'Criando Conta...' : 'Finalizar Cadastro'}

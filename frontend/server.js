@@ -430,6 +430,40 @@ app.post('/api/send-budget-notification', async (req, res) => {
 // ======================================================
 // ASAAS — EMISSÃO DE NOTA FISCAL DE SERVIÇO (NFS-e)
 // ======================================================
+// Endpoint para completar cadastro (bypassa RLS porque o usuário ainda não confirmou o e-mail)
+app.post('/api/complete-registration', async (req, res) => {
+  const { userId, nome, cpf, whatsapp, veiculo } = req.body;
+
+  try {
+    // 1. Atualizar cliente
+    const { error: clienteError } = await supabase
+      .from('clientes')
+      .update({ nome, cpf, whatsapp })
+      .eq('id', userId);
+
+    if (clienteError) throw clienteError;
+
+    // 2. Inserir veículo principal
+    const { error: veiculoError } = await supabase
+      .from('veiculos')
+      .insert([{
+        cliente_id: userId,
+        placa: veiculo.placa,
+        marca: veiculo.marca,
+        modelo: veiculo.modelo,
+        ano: veiculo.ano,
+        is_principal: true
+      }]);
+
+    if (veiculoError) throw veiculoError;
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Erro no complete-registration:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 const ASAAS_API_KEY = process.env.ASAAS_API_KEY || '';
 const ASAAS_BASE_URL = process.env.ASAAS_ENV === 'production'
   ? 'https://api.asaas.com/v3'
