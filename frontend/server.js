@@ -337,7 +337,7 @@ app.post('/api/send-update-email', async (req, res) => {
           ` : ''}
 
           <p style="text-align: center; margin-top: 40px;">
-            <a href="https://kadosh-auto-center.vercel.app/login" style="background-color: #dc2743; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+            <a href="https://kadoshautocenter.com/login" style="background-color: #dc2743; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
               Acompanhar no Painel
             </a>
           </p>
@@ -408,7 +408,7 @@ app.post('/api/send-budget-notification', async (req, res) => {
           </div>
 
           <p style="text-align: center; margin-top: 40px;">
-            <a href="https://kadosh-auto-center.vercel.app/admin" style="background-color: #dc2743; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+            <a href="https://kadoshautocenter.com/admin" style="background-color: #dc2743; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
               Ver no Painel Administrativo
             </a>
           </p>
