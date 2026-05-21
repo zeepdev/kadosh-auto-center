@@ -45,7 +45,7 @@ const CafeComGraxa = () => {
           }}>
             {/* O usuário vai substituir este placeholder pela imagem real futuramente */}
             <img 
-              src="/images/cafe-graxa-logo.png" 
+              src="/cafe-graxa-logo.PNG" 
               alt="Logo Café com Graxa" 
               onError={(e) => {
                 e.target.onerror = null; 
