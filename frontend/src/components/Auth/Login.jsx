@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Link, useNavigate } from 'react-router-dom';
+import { translateError } from '../../lib/errorTranslations';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -36,7 +37,7 @@ const Login = () => {
 
     } catch (error) {
       console.error(error);
-      setErrorMessage("Erro ao fazer login. Verifique seu e-mail e senha.");
+      setErrorMessage(translateError(error.message));
       setStatus('error');
     }
   };

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
+import { translateError } from '../../lib/errorTranslations';
 
 const ResetPassword = () => {
   const navigate = useNavigate();
@@ -37,7 +38,7 @@ const ResetPassword = () => {
 
     } catch (error) {
       console.error(error);
-      setMessage(`❌ Erro ao alterar senha: ${error.message}`);
+      setMessage(`❌ ${translateError(error.message)}`);
       setStatus('error');
     }
   };

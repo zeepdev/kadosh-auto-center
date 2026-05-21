@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { consultarPlaca } from '../../lib/placaApi';
 import { validarCPF } from '../../lib/cpf';
 import { Link, useNavigate } from 'react-router-dom';
+import { translateError } from '../../lib/errorTranslations';
 
 const Cadastro = () => {
   const navigate = useNavigate();
@@ -108,7 +109,7 @@ const Cadastro = () => {
 
     } catch (error) {
       console.error(error);
-      setErrorMessage(error.message);
+      setErrorMessage(translateError(error.message));
       setStatus('error');
     }
   };

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Link } from 'react-router-dom';
+import { translateError } from '../../lib/errorTranslations';
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState('');
@@ -23,7 +24,7 @@ const ForgotPassword = () => {
       setMessage('✅ Verifique sua caixa de e-mail! Enviamos um link para você redefinir sua senha.');
     } catch (error) {
       console.error(error);
-      setMessage(`❌ Erro: ${error.message}`);
+      setMessage(`❌ ${translateError(error.message)}`);
       setStatus('error');
     }
   };
