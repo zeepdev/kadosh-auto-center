@@ -67,17 +67,47 @@ const CafeComGraxa = () => {
             Um evento exclusivo para mulheres: aprenda sobre o seu carro de forma simples, prática e sem julgamentos.
           </p>
           
-          <div style={{ 
-            display: 'inline-block', 
-            backgroundColor: colors.textDark, 
-            color: colors.bg, 
-            padding: '10px 30px', 
-            borderRadius: '50px',
-            fontWeight: 'bold',
-            fontSize: '1.1rem',
-            boxShadow: '0 10px 20px rgba(59, 37, 22, 0.2)'
-          }}>
-            🗓️ Próxima Edição: Em Breve!
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
+            <div style={{ 
+              display: 'inline-block', 
+              backgroundColor: colors.textDark, 
+              color: colors.bg, 
+              padding: '10px 30px', 
+              borderRadius: '50px',
+              fontWeight: 'bold',
+              fontSize: '1.1rem',
+              boxShadow: '0 10px 20px rgba(59, 37, 22, 0.2)'
+            }}>
+              🗓️ Próxima Edição: 20/06
+            </div>
+            
+            <a 
+              href="https://forms.gle/KJd5YR4weRBu5s6f8" 
+              target="_blank" 
+              rel="noreferrer"
+              style={{
+                display: 'inline-block',
+                backgroundColor: colors.secondary,
+                color: colors.white,
+                padding: '15px 35px',
+                borderRadius: '50px',
+                fontWeight: 'bold',
+                fontSize: '1.1rem',
+                textDecoration: 'none',
+                boxShadow: '0 10px 20px rgba(217, 134, 120, 0.3)',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.backgroundColor = colors.primary;
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.backgroundColor = colors.secondary;
+              }}
+            >
+              📝 Faça já sua inscrição
+            </a>
           </div>
         </div>
       </section>
