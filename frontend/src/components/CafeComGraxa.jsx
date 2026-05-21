@@ -169,7 +169,7 @@ const CafeComGraxa = () => {
             <h2 style={{ fontSize: '2rem', color: colors.secondary, marginBottom: '20px' }}>Por que foi criado?</h2>
             <p style={{ fontSize: '1.1rem', lineHeight: 1.8, color: colors.textDark }}>
               A Kadosh percebeu a grande necessidade de acolher o público feminino, que muitas vezes é julgado pela sociedade como menos entendedor sobre mecânica.
-              O objetivo principal é empoderar mulheres com conhecimento prático e real, evitando que passem por situações constrangedoras ou sofram golpes ao precisarem de manutenção em seus veículos.
+              O objetivo principal é ajudar mulheres com conhecimento prático e real, evitando que passem por situações constrangedoras ou sofram golpes ao precisarem de manutenção em seus veículos.
             </p>
           </div>
 
