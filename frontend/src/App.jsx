@@ -17,6 +17,7 @@ import CafeComGraxa from './components/CafeComGraxa'
 
 import Navbar from './components/Navbar'
 import Testimonials from './components/Testimonials'
+import Footer from './components/Footer'
 
 function App() {
   return (
@@ -32,14 +33,15 @@ function App() {
             <Testimonials />
             <div id="orcamento"><BudgetForm /></div>
             <div id="contato"><AboutUs /></div>
+            <Footer theme="dark" />
           </>
         } />
       <Route path="/admin" element={<AdminDashboard />} />
       <Route path="/tv" element={<TvDashboard />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/cadastro" element={<Cadastro />} />
-      <Route path="/esqueci-senha" element={<ForgotPassword />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/login" element={<><Login /><Footer theme="dark" /></>} />
+      <Route path="/cadastro" element={<><Cadastro /><Footer theme="dark" /></>} />
+      <Route path="/esqueci-senha" element={<><ForgotPassword /><Footer theme="dark" /></>} />
+      <Route path="/reset-password" element={<><ResetPassword /><Footer theme="dark" /></>} />
       <Route path="/cliente" element={<ClientDashboard />} />
       <Route path="/cafe-com-graxa" element={<CafeComGraxa />} />
     </Routes>

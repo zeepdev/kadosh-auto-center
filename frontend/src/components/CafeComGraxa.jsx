@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { OFICINA } from '../config/oficina';
+import Footer from './Footer';
 
 const CafeComGraxa = () => {
   useEffect(() => {
@@ -112,8 +113,27 @@ const CafeComGraxa = () => {
         </div>
       </section>
 
+      {/* Banner do Evento (que também está nos avisos da TV) */}
+      <section style={{ backgroundColor: colors.bg, padding: '20px 20px 40px' }}>
+        <div className="container" style={{ maxWidth: '1000px', margin: '0 auto' }}>
+          <img 
+            src="/images/cafe-graxa-banner.png" 
+            alt="Banner Café com Graxa" 
+            style={{ width: '100%', borderRadius: '20px', boxShadow: '0 15px 30px rgba(59, 37, 22, 0.1)' }}
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.style.display = 'none';
+              e.target.nextSibling.style.display = 'block';
+            }}
+          />
+          <div style={{ display: 'none', textAlign: 'center', padding: '40px', backgroundColor: colors.white, borderRadius: '20px', color: '#aaa', border: `2px dashed ${colors.primary}` }}>
+            <p>Para exibir o banner aqui, salve a imagem com o nome <strong>cafe-graxa-banner.png</strong> na pasta <strong>public/images/</strong></p>
+          </div>
+        </div>
+      </section>
+
       {/* Sobre o Evento */}
-      <section style={{ padding: '80px 20px' }}>
+      <section style={{ padding: '60px 20px' }}>
         <div className="container" style={{ maxWidth: '1000px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '40px' }}>
           
           <div style={{ backgroundColor: colors.white, padding: '40px', borderRadius: '20px', boxShadow: '0 15px 30px rgba(59, 37, 22, 0.05)', borderTop: `5px solid ${colors.secondary}` }}>
@@ -230,22 +250,8 @@ const CafeComGraxa = () => {
         </div>
       </section>
 
-      {/* Footer minimalista do evento */}
-      <footer style={{ padding: '30px 20px', textAlign: 'center', backgroundColor: colors.textDark, color: colors.bg }}>
-        <p style={{ margin: 0, opacity: 0.8 }}>© {new Date().getFullYear()} Café com Graxa - Kadosh Auto Center</p>
-        <Link 
-          to="/" 
-          style={{ 
-            display: 'inline-block', 
-            marginTop: '15px', 
-            color: colors.primary, 
-            textDecoration: 'underline',
-            fontWeight: 'bold'
-          }}
-        >
-          Voltar para o site principal
-        </Link>
-      </footer>
+      {/* Footer Global com tema Café */}
+      <Footer theme="cafe" />
 
     </div>
   );
