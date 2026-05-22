@@ -416,39 +416,24 @@ const PDFGenerator = ({ initialData, onClose, onUpdateSuccess }) => {
           ))}
         </ul>
 
-        <div style={{ borderTop: '1px solid #333', paddingTop: '20px', display: 'flex', gap: '15px', justifyContent: 'center', alignItems: 'center' }}>
-          {/* Botão Baixar Local */}
-          <div onClick={handleDownloadClick} style={{ display: 'inline-block' }}>
+        <div style={{ borderTop: '1px solid #333', paddingTop: '20px', textAlign: 'center' }}>
+          {driveStatus === 'loading' && <p style={{ color: '#60a5fa', marginBottom: '10px', fontSize: '0.9rem' }}>☁️ Enviando cópia para o Google Drive automaticamente...</p>}
+          {driveStatus === 'success' && <p style={{ color: '#4ade80', marginBottom: '10px', fontSize: '0.9rem' }}>✅ Cópia salva no Google Drive!</p>}
+          {driveStatus === 'error' && <p style={{ color: '#f87171', marginBottom: '10px', fontSize: '0.9rem' }}>⚠️ Erro ao salvar no Drive (o arquivo ainda foi baixado no PC).</p>}
+          
+          <div onClick={() => { handleDownloadClick(); handleDriveUpload(); }} style={{ display: 'inline-block' }}>
             <PDFDownloadLink
               document={<KadoshPDF clientData={clientData} items={items} labor={labor} />}
               fileName={`Orcamento_Kadosh_${clientData.placa || clientData.nome}.pdf`}
               style={{
-                backgroundColor: '#333', color: '#fff', textDecoration: 'none', border: '1px solid #444',
-                padding: '15px 30px', borderRadius: '8px', fontSize: '1.1rem', fontWeight: 'bold',
-                display: 'inline-block', transition: '0.2s'
+                backgroundColor: '#dc2743', color: '#fff', textDecoration: 'none',
+                padding: '15px 30px', borderRadius: '8px', fontSize: '1.2rem', fontWeight: 'bold',
+                display: 'inline-block', transition: '0.2s', opacity: driveStatus === 'loading' ? 0.7 : 1
               }}
             >
-              {({ loading }) => (loading ? 'Gerando documento...' : '💻 Baixar no Computador')}
+              {({ loading }) => (loading ? 'Gerando documento...' : '📥 Baixar PDF do Orçamento')}
             </PDFDownloadLink>
           </div>
-
-          {/* Botão Salvar no Drive */}
-          <button 
-            onClick={handleDriveUpload} 
-            disabled={driveStatus === 'loading' || driveStatus === 'success'}
-            style={{
-              backgroundColor: driveStatus === 'success' ? '#4ade80' : '#dc2743', 
-              color: driveStatus === 'success' ? '#000' : '#fff', 
-              border: 'none', cursor: driveStatus === 'loading' ? 'wait' : 'pointer',
-              padding: '15px 30px', borderRadius: '8px', fontSize: '1.1rem', fontWeight: 'bold',
-              display: 'inline-flex', alignItems: 'center', gap: '8px', transition: '0.2s'
-            }}
-          >
-            {driveStatus === 'idle' && '☁️ Salvar direto no Drive'}
-            {driveStatus === 'loading' && 'Enviando pro Drive...'}
-            {driveStatus === 'success' && '✅ Salvo no Drive!'}
-            {driveStatus === 'error' && '⚠️ Tentar Novamente'}
-          </button>
         </div>
       </div>
     </div>
