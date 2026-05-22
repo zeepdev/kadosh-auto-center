@@ -7,6 +7,8 @@ import { createClient } from '@supabase/supabase-js';
 import multer from 'multer';
 import { google } from 'googleapis';
 import { Readable } from 'stream';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import { Readable } from 'stream';
 
 // Configuração do Resend
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -746,6 +748,52 @@ app.post('/api/drive/upload', uploadMemory.single('pdf'), async (req, res) => {
   } catch (error) {
     console.error('❌ Erro no upload para o Drive:', error.message);
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ======================================================
+// INTELIGÊNCIA ARTIFICIAL (GEMINI) — CORREÇÃO DE TEXTO
+// ======================================================
+app.post('/api/ai/fix-text', async (req, res) => {
+  const { text } = req.body;
+  
+  if (!text) {
+    return res.status(400).json({ success: false, error: 'Texto não fornecido.' });
+  }
+
+  const geminiApiKey = process.env.GEMINI_API_KEY;
+  if (!geminiApiKey) {
+    return res.status(500).json({ success: false, error: 'Chave da API do Gemini não configurada no servidor (.env).' });
+  }
+
+  try {
+    const genAI = new GoogleGenerativeAI(geminiApiKey);
+    // Usando o modelo gemini-1.5-flash que é rápido e barato/gratuito
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+    const prompt = `
+Você é um corretor ortográfico e gramatical profissional trabalhando para uma oficina mecânica de alto padrão (Kadosh Auto Center).
+Sua tarefa é ler o depoimento de um cliente e reescrevê-lo para que fique gramaticalmente correto (acentuação, pontuação, concordância) e soe ligeiramente mais claro e profissional, mas SEM perder a essência do que o cliente quis dizer.
+
+REGRAS:
+1. Retorne APENAS o texto corrigido.
+2. Não adicione aspas no início ou no fim.
+3. Não faça comentários extras como "Aqui está a versão corrigida".
+
+Texto do cliente:
+${text}
+    `;
+
+    const result = await model.generateContent(prompt);
+    const responseText = result.response.text().trim();
+
+    // Remove aspas se a IA por acaso retornar com aspas
+    const cleanedText = responseText.replace(/^["']|["']$/g, '');
+
+    res.json({ success: true, correctedText: cleanedText });
+  } catch (error) {
+    console.error('❌ Erro na API do Gemini:', error.message);
+    res.status(500).json({ success: false, error: 'Erro ao processar o texto com Inteligência Artificial.' });
   }
 });
 

@@ -685,6 +685,7 @@ const ClientDashboard = () => {
                 placeholder="Ex: Ótimo atendimento, serviço rápido e preço justo!"
                 style={{ width: '100%', padding: '12px', background: '#111', color: '#fff', border: '1px solid #333', borderRadius: '8px', resize: 'vertical' }}
               />
+              <p style={{ margin: '5px 0 0 0', fontSize: '0.75rem', color: '#666', fontStyle: 'italic' }}>* Seu depoimento passará por uma leve revisão gramatical para legibilidade antes de ser publicado no site.</p>
             </div>
             <button type="submit" className="btn" style={{ background: '#f59e0b', color: '#000' }}>Enviar Depoimento</button>
           </form>

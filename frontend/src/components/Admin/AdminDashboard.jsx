@@ -181,6 +181,37 @@ const AdminDashboard = () => {
     }
   };
 
+  const [aiLoading, setAiLoading] = useState({});
+
+  const handleAIFix = async (id, text) => {
+    setAiLoading(prev => ({ ...prev, [id]: true }));
+    try {
+      const baseUrl = import.meta.env.VITE_API_URL || '';
+      const res = await fetch(`${baseUrl}/api/ai/fix-text`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      });
+      const data = await res.json();
+      
+      if (!data.success) throw new Error(data.error);
+
+      // Salva no banco de dados a versão corrigida
+      const { error } = await supabase
+        .from('depoimentos')
+        .update({ comentario: data.correctedText })
+        .eq('id', id);
+
+      if (error) throw error;
+      fetchDepoimentos();
+    } catch (err) {
+      console.error('Erro ao usar IA:', err);
+      alert('Erro ao corrigir texto com IA: ' + err.message);
+    } finally {
+      setAiLoading(prev => ({ ...prev, [id]: false }));
+    }
+  };
+
   const handleStatusChange = async (id, newStatus) => {
     try {
       const { error } = await supabase
@@ -568,16 +599,28 @@ const AdminDashboard = () => {
                     </div>
                     <p style={{ fontStyle: 'italic', fontSize: '0.9rem', marginBottom: '15px' }}>"{d.comentario}"</p>
                     <p style={{ fontWeight: 'bold', margin: 0 }}>{d.nome}</p>
-                    <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '20px', flexWrap: 'wrap' }}>
                       <button 
                         onClick={() => handleModeracaoDepoimento(d.id, !d.aprovado)}
-                        style={{ flex: 1, padding: '8px', borderRadius: '6px', border: 'none', background: d.aprovado ? '#666' : '#4ade80', color: '#000', fontWeight: 'bold', cursor: 'pointer' }}
+                        style={{ flex: 1, padding: '8px', borderRadius: '6px', border: 'none', background: d.aprovado ? '#666' : '#4ade80', color: '#000', fontWeight: 'bold', cursor: 'pointer', minWidth: '80px' }}
                       >
                         {d.aprovado ? 'Ocultar' : 'Aprovar'}
                       </button>
+                      
+                      {!d.aprovado && (
+                        <button 
+                          onClick={() => handleAIFix(d.id, d.comentario)}
+                          disabled={aiLoading[d.id]}
+                          style={{ flex: 1, padding: '8px', borderRadius: '6px', border: 'none', background: '#8b5cf6', color: '#fff', fontWeight: 'bold', cursor: aiLoading[d.id] ? 'wait' : 'pointer', minWidth: '120px' }}
+                        >
+                          {aiLoading[d.id] ? '✨ Corrigindo...' : '✨ Corrigir com IA'}
+                        </button>
+                      )}
+
                       <button 
                         onClick={() => handleDeleteDepoimento(d.id)}
                         style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #ef4444', background: 'transparent', color: '#ef4444', cursor: 'pointer' }}
+                        title="Excluir"
                       >
                         🗑️
                       </button>
