@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
 const Navbar = () => {
@@ -7,6 +7,7 @@ const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const isHome = location.pathname === '/';
 
   useEffect(() => {
@@ -28,18 +29,16 @@ const Navbar = () => {
 
   const scrollTo = (id) => {
     setMobileMenuOpen(false);
-    if (!isHome) {
-      window.location.href = `/#${id}`;
-      return;
-    }
     const el = document.getElementById(id);
     if (el) {
       el.scrollIntoView({ behavior: 'smooth' });
+    } else {
+      window.location.href = `/#${id}`;
     }
   };
 
   const navLinks = [
-    { name: 'Início', id: 'inicio', action: () => { setMobileMenuOpen(false); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+    { name: 'Início', id: 'inicio', action: () => { setMobileMenuOpen(false); if (isHome) { window.scrollTo({ top: 0, behavior: 'smooth' }); } else { navigate('/'); } } },
     { name: 'Serviços', id: 'servicos', action: () => scrollTo('servicos') },
     { name: 'Galeria', id: 'galeria', action: () => scrollTo('galeria') },
     { name: 'Orçamento', id: 'orcamento', action: () => scrollTo('orcamento') },
