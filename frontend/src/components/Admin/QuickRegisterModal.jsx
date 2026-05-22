@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { supabase } from '../../../lib/supabase';
-import { consultarPlaca } from '../../../lib/placaApi';
+import { supabase } from '../../lib/supabase';
+import { consultarPlaca } from '../../lib/placaApi';
 
 const QuickRegisterModal = ({ onClose, onUserCreated }) => {
   const [nome, setNome] = useState('');
