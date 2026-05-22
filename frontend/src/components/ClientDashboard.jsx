@@ -163,6 +163,10 @@ const ClientDashboard = () => {
       navigate('/login');
       return;
     }
+    if (user.email?.endsWith('@kadosh.temp')) {
+      navigate('/completar-cadastro');
+      return;
+    }
     setUser(user);
     await fetchDados(user.id);
   };

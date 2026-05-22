@@ -4,6 +4,7 @@ import PDFGenerator from './PDFGenerator';
 import UpdatePhotoModal from './UpdatePhotoModal';
 import ViewVehicleModal from './ViewVehicleModal';
 import InvoiceModal from './InvoiceModal';
+import QuickRegisterModal from './QuickRegisterModal';
 import { supabase } from '../../lib/supabase';
 import { calcularPrioridade, PRIORIDADES } from '../../lib/prioridade';
 
@@ -31,6 +32,7 @@ const AdminDashboard = () => {
   const [selectedForInvoice, setSelectedForInvoice] = useState(null);
   const [depoimentos, setDepoimentos] = useState([]);
   const [activeTab, setActiveTab] = useState('atendimentos'); // 'atendimentos', 'financeiro', 'depoimentos'
+  const [showQuickRegister, setShowQuickRegister] = useState(false);
 
   // Ao montar, verifica se já existe sessão Supabase válida e se o usuário é admin.
   useEffect(() => {
@@ -355,6 +357,7 @@ const AdminDashboard = () => {
             <p style={{ color: '#aaa', margin: '5px 0 0 0' }}>Gerenciamento de Orçamentos e Agendamentos</p>
           </div>
           <div style={{ display: 'flex', gap: '15px' }}>
+            <button onClick={() => setShowQuickRegister(true)} className="btn" style={{ background: '#10b981', color: '#fff', border: 'none' }}>+ Cadastrar Cliente</button>
             <button onClick={handleLogout} className="btn" style={{ background: 'transparent', border: '1px solid #dc2743', color: '#dc2743' }}>Sair</button>
             <Link to="/" className="btn" style={{ background: '#333' }}>Voltar ao Site</Link>
           </div>
@@ -708,6 +711,15 @@ const AdminDashboard = () => {
           onSuccess={() => {
             setSelectedForInvoice(null);
             alert('Nota Fiscal processada com sucesso e enviada ao e-mail do cliente!');
+          }}
+        />
+      )}
+
+      {showQuickRegister && (
+        <QuickRegisterModal 
+          onClose={() => setShowQuickRegister(false)}
+          onUserCreated={() => {
+            setShowQuickRegister(false);
           }}
         />
       )}

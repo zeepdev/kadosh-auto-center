@@ -23,8 +23,14 @@ const Login = () => {
     setErrorMessage('');
 
     try {
+      let loginEmail = email;
+      const cpfLimpo = email.replace(/[^0-9]/g, '');
+      if (cpfLimpo.length === 11 && !email.includes('@')) {
+        loginEmail = `${cpfLimpo}@kadosh.temp`;
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: email,
+        email: loginEmail,
         password: senha
       });
 
@@ -49,8 +55,8 @@ const Login = () => {
         <p style={{ color: '#aaa', marginBottom: '30px', textAlign: 'center' }}>Acesse sua área restrita.</p>
         
         <div className="form-group">
-          <label>E-mail</label>
-          <input type="email" required value={email} onChange={e => setEmail(e.target.value)} />
+          <label>E-mail ou CPF</label>
+          <input type="text" required value={email} onChange={e => setEmail(e.target.value)} placeholder="ex: joao@email.com ou 123.456.789-00" />
         </div>
         
         <div className="form-group" style={{ marginBottom: '10px' }}>

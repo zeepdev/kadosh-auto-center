@@ -10,6 +10,7 @@ import Login from './components/Auth/Login'
 import Cadastro from './components/Auth/Cadastro'
 import ForgotPassword from './components/Auth/ForgotPassword'
 import ResetPassword from './components/Auth/ResetPassword'
+import CompleteRegistration from './components/Auth/CompleteRegistration'
 import ClientDashboard from './components/ClientDashboard'
 import TvDashboard from './components/TvDashboard'
 import AvisosCarousel from './components/AvisosCarousel'
@@ -42,6 +43,7 @@ function App() {
       <Route path="/cadastro" element={<><Cadastro /><Footer theme="dark" /></>} />
       <Route path="/esqueci-senha" element={<><ForgotPassword /><Footer theme="dark" /></>} />
       <Route path="/reset-password" element={<><ResetPassword /><Footer theme="dark" /></>} />
+      <Route path="/completar-cadastro" element={<><CompleteRegistration /><Footer theme="dark" /></>} />
       <Route path="/cliente" element={<ClientDashboard />} />
       <Route path="/cafe-com-graxa" element={<CafeComGraxa />} />
     </Routes>

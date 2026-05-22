@@ -598,6 +598,102 @@ app.get('/api/invoice/:id/status', async (req, res) => {
   }
 });
 
+// ======================================================
+// ADMIN — CRIAÇÃO DE CLIENTE PRESENCIAL
+// ======================================================
+app.post('/api/admin/create-client', async (req, res) => {
+  const { adminToken, nome, cpf, whatsapp, veiculo } = req.body;
+
+  if (!adminToken) {
+    return res.status(401).json({ success: false, error: 'Token de administrador não fornecido.' });
+  }
+
+  try {
+    // 1. Validar se o token pertence a um admin
+    const { data: { user }, error: userError } = await supabase.auth.getUser(adminToken);
+    if (userError || !user) throw new Error('Token inválido ou expirado.');
+
+    const { data: adminData, error: adminQueryError } = await supabase
+      .from('clientes')
+      .select('is_admin')
+      .eq('id', user.id)
+      .single();
+
+    if (adminQueryError || !adminData?.is_admin) {
+      return res.status(403).json({ success: false, error: 'Usuário não tem permissão de administrador.' });
+    }
+
+    // 2. Limpar CPF
+    const cpfLimpo = cpf.replace(/[^0-9]/g, '');
+    if (cpfLimpo.length !== 11) {
+      return res.status(400).json({ success: false, error: 'CPF inválido.' });
+    }
+
+    // 3. Criar usuário no Auth (usando Service Role para bypassar RLS e não deslogar o admin)
+    const emailFake = `${cpfLimpo}@kadosh.temp`;
+    
+    // Configura o client admin com a service role key
+    const supabaseAdmin = createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+    
+    const { data: newAuthUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+      email: emailFake,
+      password: cpfLimpo,
+      email_confirm: true,
+      user_metadata: {
+        cpf: cpfLimpo,
+        nome: nome,
+        whatsapp: whatsapp
+      }
+    });
+
+    if (createError) {
+      if (createError.message.includes('already registered')) {
+        return res.status(400).json({ success: false, error: 'Este CPF já está cadastrado.' });
+      }
+      throw createError;
+    }
+
+    const userId = newAuthUser.user.id;
+
+    // 4. O trigger no banco vai criar a row em `clientes`. Vamos atualizar com nome, whatsapp, e cpf
+    // Como acabou de criar, pode ter um delay de milissegundos pro trigger rodar
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    const { error: updateError } = await supabaseAdmin
+      .from('clientes')
+      .update({ nome, whatsapp, cpf: cpfLimpo })
+      .eq('id', userId);
+
+    if (updateError) {
+      console.error('Erro ao atualizar cliente após criação:', updateError);
+      // Ignorar para não falhar o request todo, já que a conta foi criada
+    }
+
+    // 5. Inserir o veículo
+    if (veiculo && veiculo.placa) {
+      const { error: veiculoError } = await supabaseAdmin
+        .from('veiculos')
+        .insert([{
+          cliente_id: userId,
+          placa: veiculo.placa,
+          marca: veiculo.marca || '',
+          modelo: veiculo.modelo || '',
+          ano: veiculo.ano || '',
+          is_principal: true
+        }]);
+
+      if (veiculoError) {
+        console.error('Erro ao inserir veículo na criação do cliente:', veiculoError);
+      }
+    }
+
+    res.json({ success: true, userId: userId });
+  } catch (error) {
+    console.error('❌ Erro no create-client admin:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Rota de status para verificar configuração
 app.get('/api/status', async (req, res) => {
   const { count } = await supabase.from('cache_placas').select('*', { count: 'exact', head: true });

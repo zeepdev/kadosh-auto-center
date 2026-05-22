@@ -88,9 +88,8 @@ O projeto evoluiu além da arquitetura A.N.T (3-camadas) descrita em `gemini.md`
 - Senha: somente o usuário (dono da oficina) sabe
 
 ### Email confirmation (Supabase Auth)
-- **DESLIGADO** atualmente (em Authentication → Providers → Email).
-- Razão: com email confirmation ON, `signUp` não retorna sessão, e o UPDATE em `clientes` no `Cadastro.jsx` falha por RLS (auth.uid() é NULL).
-- A reativação no futuro deve vir junto com SMTP próprio (SendGrid/Gmail) e template customizado.
+- **ATIVADO** (em Authentication → Providers → Email).
+- A integração com `Cadastro.jsx` agora funciona perfeitamente mesmo com a confirmação ligada, pois o formulário repassa a responsabilidade de atualizar os dados do cliente e inserir o veículo para o backend `/api/complete-registration`, que utiliza a chave `SERVICE_ROLE` (bypassa o RLS).
 
 ### Tokens das APIs de placa
 Em `oficina-kadosh/frontend/.env`:
