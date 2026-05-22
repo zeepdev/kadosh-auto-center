@@ -39,11 +39,11 @@ const Navbar = () => {
   };
 
   const navLinks = [
-    { name: 'Início', id: 'inicio', action: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },
+    { name: 'Início', id: 'inicio', action: () => { setMobileMenuOpen(false); window.scrollTo({ top: 0, behavior: 'smooth' }); } },
     { name: 'Serviços', id: 'servicos', action: () => scrollTo('servicos') },
     { name: 'Galeria', id: 'galeria', action: () => scrollTo('galeria') },
     { name: 'Orçamento', id: 'orcamento', action: () => scrollTo('orcamento') },
-    { name: 'Contato', id: 'contato', action: () => scrollTo('contato') },
+    { name: 'Contato', id: 'contato', action: () => { setMobileMenuOpen(false); window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); } },
   ];
 
   return (
