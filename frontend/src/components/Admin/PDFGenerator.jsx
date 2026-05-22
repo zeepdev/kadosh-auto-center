@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Document, Page, Text, View, StyleSheet, PDFDownloadLink } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet, PDFDownloadLink, pdf } from '@react-pdf/renderer';
 import { OFICINA } from '../../config/oficina';
 import { supabase } from '../../lib/supabase';
 import { calcularPrioridade } from '../../lib/prioridade';
@@ -287,6 +287,40 @@ const PDFGenerator = ({ initialData, onClose, onUpdateSuccess }) => {
     }
   };
 
+  const [driveStatus, setDriveStatus] = useState('idle');
+
+  const handleDriveUpload = async () => {
+    setDriveStatus('loading');
+    try {
+      const blob = await pdf(<KadoshPDF clientData={clientData} items={items} labor={labor} />).toBlob();
+      
+      const formData = new FormData();
+      const filename = `Orcamento_Kadosh_${clientData.placa || clientData.nome || 'Novo'}.pdf`;
+      formData.append('pdf', blob, filename);
+      formData.append('fileName', filename);
+
+      const baseUrl = import.meta.env.VITE_API_URL || '';
+      const response = await fetch(`${baseUrl}/api/drive/upload`, {
+        method: 'POST',
+        body: formData
+      });
+
+      const result = await response.json();
+      if (!result.success) throw new Error(result.error);
+
+      setDriveStatus('success');
+      setTimeout(() => setDriveStatus('idle'), 4000);
+      
+      if (initialData.id && onUpdateSuccess) {
+        onUpdateSuccess(initialData.id, grandTotal);
+      }
+    } catch (err) {
+      console.error('Erro Drive:', err);
+      setDriveStatus('error');
+      alert('Erro ao enviar para o Drive: ' + err.message);
+    }
+  };
+
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.9)', zIndex: 9999, padding: '20px', overflowY: 'auto' }}>
       <div style={{ maxWidth: '800px', margin: '0 auto', backgroundColor: '#111', padding: '30px', borderRadius: '12px', color: '#fff' }}>
@@ -382,20 +416,39 @@ const PDFGenerator = ({ initialData, onClose, onUpdateSuccess }) => {
           ))}
         </ul>
 
-        <div style={{ borderTop: '1px solid #333', paddingTop: '20px', textAlign: 'center' }}>
+        <div style={{ borderTop: '1px solid #333', paddingTop: '20px', display: 'flex', gap: '15px', justifyContent: 'center', alignItems: 'center' }}>
+          {/* Botão Baixar Local */}
           <div onClick={handleDownloadClick} style={{ display: 'inline-block' }}>
             <PDFDownloadLink
               document={<KadoshPDF clientData={clientData} items={items} labor={labor} />}
               fileName={`Orcamento_Kadosh_${clientData.placa || clientData.nome}.pdf`}
               style={{
-                backgroundColor: '#dc2743', color: '#fff', textDecoration: 'none',
-                padding: '15px 30px', borderRadius: '8px', fontSize: '1.2rem', fontWeight: 'bold',
-                display: 'inline-block'
+                backgroundColor: '#333', color: '#fff', textDecoration: 'none', border: '1px solid #444',
+                padding: '15px 30px', borderRadius: '8px', fontSize: '1.1rem', fontWeight: 'bold',
+                display: 'inline-block', transition: '0.2s'
               }}
             >
-              {({ loading }) => (loading ? 'Gerando documento...' : '📥 Baixar PDF do Orçamento')}
+              {({ loading }) => (loading ? 'Gerando documento...' : '💻 Baixar no Computador')}
             </PDFDownloadLink>
           </div>
+
+          {/* Botão Salvar no Drive */}
+          <button 
+            onClick={handleDriveUpload} 
+            disabled={driveStatus === 'loading' || driveStatus === 'success'}
+            style={{
+              backgroundColor: driveStatus === 'success' ? '#4ade80' : '#dc2743', 
+              color: driveStatus === 'success' ? '#000' : '#fff', 
+              border: 'none', cursor: driveStatus === 'loading' ? 'wait' : 'pointer',
+              padding: '15px 30px', borderRadius: '8px', fontSize: '1.1rem', fontWeight: 'bold',
+              display: 'inline-flex', alignItems: 'center', gap: '8px', transition: '0.2s'
+            }}
+          >
+            {driveStatus === 'idle' && '☁️ Salvar direto no Drive'}
+            {driveStatus === 'loading' && 'Enviando pro Drive...'}
+            {driveStatus === 'success' && '✅ Salvo no Drive!'}
+            {driveStatus === 'error' && '⚠️ Tentar Novamente'}
+          </button>
         </div>
       </div>
     </div>

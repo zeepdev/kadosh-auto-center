@@ -4,6 +4,9 @@ import cors from 'cors';
 import { createRequire } from 'module';
 import { Resend } from 'resend';
 import { createClient } from '@supabase/supabase-js';
+import multer from 'multer';
+import { google } from 'googleapis';
+import { Readable } from 'stream';
 
 // Configuração do Resend
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -690,6 +693,58 @@ app.post('/api/admin/create-client', async (req, res) => {
     res.json({ success: true, userId: userId });
   } catch (error) {
     console.error('❌ Erro no create-client admin:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ======================================================
+// GOOGLE DRIVE — UPLOAD DE ORÇAMENTOS
+// ======================================================
+const uploadMemory = multer({ storage: multer.memoryStorage() });
+
+app.post('/api/drive/upload', uploadMemory.single('pdf'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ success: false, error: 'Nenhum arquivo enviado.' });
+  }
+
+  const credentialsBase64 = process.env.GOOGLE_CREDENTIALS_BASE64;
+  const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
+
+  if (!credentialsBase64 || !folderId) {
+    return res.status(500).json({ success: false, error: 'Integração com Google Drive não configurada no servidor (.env).' });
+  }
+
+  try {
+    const credentials = JSON.parse(Buffer.from(credentialsBase64, 'base64').toString('utf-8'));
+    const auth = new google.auth.GoogleAuth({
+      credentials,
+      scopes: ['https://www.googleapis.com/auth/drive.file']
+    });
+
+    const drive = google.drive({ version: 'v3', auth });
+
+    const bufferStream = new Readable();
+    bufferStream.push(req.file.buffer);
+    bufferStream.push(null);
+
+    const fileName = req.body.fileName || `Orcamento_${Date.now()}.pdf`;
+
+    const response = await drive.files.create({
+      requestBody: {
+        name: fileName,
+        parents: [folderId],
+        mimeType: 'application/pdf',
+      },
+      media: {
+        mimeType: 'application/pdf',
+        body: bufferStream,
+      },
+    });
+
+    console.log(`✅ [Drive] Upload concluído: ${fileName} (ID: ${response.data.id})`);
+    res.json({ success: true, fileId: response.data.id });
+  } catch (error) {
+    console.error('❌ Erro no upload para o Drive:', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
