@@ -62,6 +62,16 @@ const Footer = ({ theme = 'dark' }) => {
           🎵 TikTok
         </a>
         <a 
+          href={`https://wa.me/${OFICINA.whatsapp}`} 
+          target="_blank" 
+          rel="noreferrer" 
+          style={{ ...styles.icon, backgroundColor: '#25D366' }}
+          onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+          onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+        >
+          💬 WhatsApp
+        </a>
+        <a 
           href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(OFICINA.endereco)}`} 
           target="_blank" 
           rel="noreferrer" 

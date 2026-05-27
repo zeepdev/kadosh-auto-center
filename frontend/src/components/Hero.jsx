@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { OFICINA } from '../config/oficina';
 
 const Hero = () => {
   const [user, setUser] = useState(null);
@@ -30,7 +31,7 @@ const Hero = () => {
             Especialistas em mecânica avançada, revisão e estética automotiva.
             Traga seu carro para a Kadosh Auto Center e sinta a diferença de um serviço premium.
           </p>
-          <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '20px' }}>
             <button
               className="btn"
               onClick={() => document.getElementById('orcamento').scrollIntoView({ behavior: 'smooth' })}
@@ -40,6 +41,17 @@ const Hero = () => {
             <Link to={user ? '/cliente' : '/login'} className="btn" style={{ background: 'transparent', border: '2px solid #dc2743', color: '#fff' }}>
               {user ? 'Minha Área' : 'Área do Cliente'}
             </Link>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <a 
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(OFICINA.endereco)}`} 
+              target="_blank" 
+              rel="noreferrer" 
+              className="btn" 
+              style={{ background: '#3b82f6', border: 'none', color: '#fff' }}
+            >
+              📍 Localização
+            </a>
           </div>
         </div>
       </div>

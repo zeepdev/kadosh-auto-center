@@ -8,7 +8,6 @@ import multer from 'multer';
 import { google } from 'googleapis';
 import { Readable } from 'stream';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { Readable } from 'stream';
 
 // Configuração do Resend
 const resend = new Resend(process.env.RESEND_API_KEY);
