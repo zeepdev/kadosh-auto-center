@@ -65,7 +65,7 @@ const Footer = ({ theme = 'dark' }) => {
           href={`https://wa.me/${OFICINA.whatsapp}`} 
           target="_blank" 
           rel="noreferrer" 
-          style={{ ...styles.icon, backgroundColor: '#25D366' }}
+          style={styles.icon}
           onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
           onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
         >

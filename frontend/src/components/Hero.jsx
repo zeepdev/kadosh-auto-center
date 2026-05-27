@@ -48,7 +48,7 @@ const Hero = () => {
               target="_blank" 
               rel="noreferrer" 
               className="btn" 
-              style={{ background: '#3b82f6', border: 'none', color: '#fff' }}
+              style={{ background: 'transparent', border: '2px solid #dc2743', color: '#fff' }}
             >
               📍 Localização
             </a>
