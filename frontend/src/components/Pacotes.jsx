@@ -32,9 +32,8 @@ const Pacotes = () => {
       left: 0,
       width: '100%',
       height: '100%',
-      // Substitua pela imagem oficial enviada pelo usuário depois:
-      // backgroundImage: `url('/images/pacotes-capa.png')`,
-      background: 'linear-gradient(135deg, rgba(220, 39, 67, 0.2) 0%, rgba(10, 5, 5, 0.9) 100%)',
+      backgroundImage: `url('/images/pacotes-capa.png')`,
+      background: 'linear-gradient(135deg, rgba(220, 39, 67, 0.4) 0%, rgba(10, 5, 5, 0.9) 100%), url("/images/pacotes-capa.png")',
       backgroundSize: 'cover',
       backgroundPosition: 'center',
       zIndex: 1
