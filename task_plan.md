@@ -38,6 +38,8 @@
 24. ✅ **Senha do admin resetada**: via Supabase Admin API.
 25. ✅ **Link TikTok corrigido**: já aponta para `@kadosh.auto.center`.
 26. ✅ **Pasta tools/ removida**: código legado eliminado.
+27. ✅ **Botões de Contato (Hero e Footer)**: Adicionado botão de Localização e corrigido WhatsApp no rodapé.
+28. ✅ **Esqueleto da aba Pacotes**: Criados `Pacotes.jsx` e `PacoteDetalhes.jsx` com dados temporários e imagem de capa aplicada.
 
 ---
 
@@ -48,7 +50,8 @@
 2. ✅ **Configurar conta Admin** — CNPJ preenchido e senha resetada (`Zeepzada07.`).
 
 ### 🟡 Média Prioridade
-1. ⏭️ **Reativar confirmação de e-mail** no Supabase com SMTP próprio + template customizado.
+1. ⏭️ **Aplicar regras e valores dos Pacotes** — Aguardando setor financeiro validar descontos e itens para plugar a submissão de pacotes à API de orçamentos.
+2. ⏭️ **Reativar confirmação de e-mail** no Supabase com SMTP próprio + template customizado.
 
 ### 🔵 Depende de Domínio Próprio (~R$30-40/ano)
 3. ⏭️ **Verificar domínio no Resend** — para enviar e-mails para qualquer admin (hoje limitado ao dono da conta).

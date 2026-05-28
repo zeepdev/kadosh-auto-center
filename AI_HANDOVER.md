@@ -237,6 +237,8 @@ O sistema está integrado com a API do **Asaas** para emissão de Notas Fiscais 
 | `/cliente` | ClientDashboard.jsx | Autenticado |
 | `/admin` | AdminDashboard.jsx | Autenticado + `is_admin = true` |
 | `/tv` | TvDashboard.jsx | Público (tela de TV da oficina) |
+| `/pacotes` | Pacotes.jsx | Público (Landing page de planos e pacotes) |
+| `/pacotes/:id` | PacoteDetalhes.jsx | Público (Detalhes do pacote e solicitação) |
 
 ---
 
@@ -338,12 +340,17 @@ RESEND_API_KEY, SUPABASE_SERVICE_ROLE_KEY, VITE_SUPABASE_URL, VITE_SUPABASE_ANON
 - `placaApi.js` no frontend trata erros de JSON, body vazio, servidor offline.
 - Timeout de 5s por provedor.
 
+### 9. Pacotes de Serviço (Em Andamento)
+- Esqueleto visual criado em `Pacotes.jsx` e `PacoteDetalhes.jsx`.
+- **Atenção Próxima IA:** Os pacotes usam dados mockados (R$299, R$799) aguardando regras financeiras (descontos, combos). O botão de envio simula alerta, precisa ser integrado para envio ao admin.
+
 ---
 
 ## 📋 Pendências & TODO
 
 ### 🔴 Prioridade Alta
-1. **Verificar domínio no Resend** — para poder enviar e-mails para qualquer admin (hoje limitado ao dono da conta).
+1. **Regras da Aba de Pacotes** — O esqueleto da aba `/pacotes` foi criado, mas os preços e itens estão mockados. O dono aguarda aval do setor financeiro para aplicar os preços reais, regras de descontos para combos e plugar o botão "Solicitar" na API de submissão do admin.
+2. **Verificar domínio no Resend** — para poder enviar e-mails para qualquer admin (hoje limitado ao dono da conta).
 
 ### 🟡 Prioridade Média
 2. **Reativar confirmação de e-mail** no Supabase com SMTP próprio (Resend ou SendGrid) + template customizado.

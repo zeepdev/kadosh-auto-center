@@ -84,6 +84,7 @@ oficina-kadosh/
 | `/cliente` | ClientDashboard.jsx | Autenticado |
 | `/admin` | AdminDashboard.jsx | Autenticado + `is_admin = true` |
 | `/tv` | TvDashboard.jsx | Público (tela da oficina) |
+| `/pacotes` | Pacotes.jsx | Público (Landing page de pacotes) |
 
 ### Admin atual
 - Email: `kadoshautocenter7@gmail.com`

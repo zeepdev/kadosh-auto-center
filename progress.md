@@ -381,3 +381,19 @@ Botão fica `disabled` se o cliente não tem nenhum veículo cadastrado, com tex
 - **Configuração**:
   - Adicionadas variáveis `ASAAS_API_KEY` e `ASAAS_ENV` ao `.env`.
   - Sistema preparado para alternar entre Sandbox e Produção apenas via variável de ambiente.
+
+### 2026-05-27 — Layout Hero/Footer e Aba Pacotes (Esqueleto UI)
+
+**Contexto**: Sessão de ajustes visuais e adição de nova feature (planos/pacotes) a pedido do usuário.
+
+**Mudanças e Fixes**:
+1. **Fix Server.js**: Removida importação duplicada de `Readable` (`stream`) que estava causando crash no backend ao processar o endpoint de correção de IA (`/api/ai/fix-text`).
+2. **Botões de Contato (Home e Footer)**:
+   - Adicionado botão de **📍 Localização** no componente `Hero.jsx`, abaixo de "Solicitar Orçamento" e "Minha Área". Estilização unificada com fundo transparente e borda vermelha (`#dc2743`).
+   - Adicionado botão de **💬 WhatsApp** no `Footer.jsx`, puxando o número do `oficina.js`. A cor de fundo verde foi removida para herdar a cor do tema dos outros ícones (vermelho).
+3. **Nova Feature: Pacotes (Esqueleto Visual)**:
+   - Criado componente `Pacotes.jsx` servindo como vitrine (cards).
+   - O background hero utiliza imagem do usuário (`/images/pacotes-capa.png`).
+   - Criado componente de detalhes do pacote `PacoteDetalhes.jsx` acessível via rotas `/pacotes/:id`.
+   - Incluído link "📦 Pacotes" em `Navbar.jsx`.
+   - **Nota de Negócio**: A página está rodando com *textos "Lorem Ipsum"* e dados mockados (R$ 299,90 e R$ 799,90) aguardando as confirmações de regras, benefícios e combos de desconto por parte da equipe financeira do Kadosh Auto Center. A conexão de envio real para o backend também está pendente disso.
