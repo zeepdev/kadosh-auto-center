@@ -21,9 +21,9 @@ const Hero = () => {
         <div className="hero-content animate-fade-in">
           <div style={{ marginBottom: '30px' }}>
             <img
-              src="/logo_kadosh.jpg"
+              src="/logo_kadosh_transparent.png"
               alt="Logo Kadosh Auto Center"
-              style={{ maxHeight: '180px', width: 'auto', borderRadius: '12px' }}
+              style={{ maxHeight: '180px', width: 'auto' }}
             />
           </div>
           <h1>Alta Performance e Confiança para o seu Veículo</h1>

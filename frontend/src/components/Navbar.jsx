@@ -49,7 +49,7 @@ const Navbar = () => {
     <nav className={`navbar ${scrolled ? 'scrolled' : ''} ${mobileMenuOpen ? 'mobile-open' : ''}`}>
       <div className="container nav-container">
         <Link to="/" className="nav-logo" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-          <img src="/logo_kadosh.jpg" alt="Kadosh" />
+          <img src="/logo_kadosh_transparent.png" alt="Kadosh" style={{ borderRadius: 0 }} />
           <span>Kadosh</span>
         </Link>
 
