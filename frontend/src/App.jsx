@@ -15,8 +15,8 @@ import ClientDashboard from './components/ClientDashboard'
 import TvDashboard from './components/TvDashboard'
 import AvisosCarousel from './components/AvisosCarousel'
 import CafeComGraxa from './components/CafeComGraxa'
-import Pacotes from './components/Pacotes'
-import PacoteDetalhes from './components/PacoteDetalhes'
+import Revisoes from './components/Revisoes'
+import RevisaoDetalhes from './components/RevisaoDetalhes'
 
 import Navbar from './components/Navbar'
 import Testimonials from './components/Testimonials'
@@ -48,8 +48,8 @@ function App() {
       <Route path="/completar-cadastro" element={<><CompleteRegistration /><Footer theme="dark" /></>} />
       <Route path="/cliente" element={<ClientDashboard />} />
       <Route path="/cafe-com-graxa" element={<CafeComGraxa />} />
-      <Route path="/pacotes" element={<Pacotes />} />
-      <Route path="/pacotes/:id" element={<PacoteDetalhes />} />
+      <Route path="/revisoes" element={<Revisoes />} />
+      <Route path="/revisoes/:id" element={<RevisaoDetalhes />} />
     </Routes>
     </>
   )

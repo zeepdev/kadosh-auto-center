@@ -46,13 +46,16 @@
 ## Próximas tarefas (priorizadas)
 
 ### ✅ Concluído recentemente
-1. ✅ **Integrar API de NF real** no `InvoiceModal.jsx` — Conectado com Asaas (R$ 0,49/nota).
-2. ✅ **Configurar conta Admin** — CNPJ preenchido e senha resetada (`Zeepzada07.`).
+1. ✅ **Renomear de Pacotes para Revisões**: Mudança de escopo de "Pacotes" para "Revisões" finalizada em `/revisoes` e `/revisoes/:id`.
+2. ✅ **Valores e Itens das Revisões Básica e Premium**: Aplicado conteúdo exato enviado pelo financeiro (Básica: R$ 799,00 e Premium: R$ 1.799,00) contendo tabelas separadas de Serviços e Peças (excluída a aba de Benefícios Exclusivos).
+3. ✅ **Conexão Real do Botão "Quero esta revisão"**: Totalmente integrado com inserção direta na tabela `orcamentos` do Supabase e disparando notificação por e-mail real aos administradores através da API `/api/send-budget-notification`.
+4. ✅ **Correção de Contraste e Desfoque no Cabeçalho (Navbar)**: Adicionado um fundo descontraído com `backdrop-filter: blur(10px)` e fundo preto semitransparente na Navbar global para legibilidade instantânea em todas as páginas.
+5. ✅ **Integrar API de NF real** no `InvoiceModal.jsx` — Conectado com Asaas (R$ 0,49/nota).
+6. ✅ **Configurar conta Admin** — CNPJ preenchido e senha resetada (`Zeepzada07.`).
 
 ### 🟡 Média Prioridade
-1. ⏭️ **Aplicar regras e valores dos Pacotes** — Aguardando setor financeiro validar descontos e itens para plugar a submissão de pacotes à API de orçamentos.
-2. ⏭️ **Reativar confirmação de e-mail** no Supabase com SMTP próprio + template customizado.
+1. ⏭️ **Reativar confirmação de e-mail** no Supabase com SMTP próprio + template customizado.
 
 ### 🔵 Depende de Domínio Próprio (~R$30-40/ano)
-3. ⏭️ **Verificar domínio no Resend** — para enviar e-mails para qualquer admin (hoje limitado ao dono da conta).
-4. ⏭️ **Descomentar busca dinâmica de admins** no `server.js` (linhas 368-373) — depende do item 3.
+2. ⏭️ **Verificar domínio no Resend** — para enviar e-mails para qualquer admin (hoje limitado ao dono da conta).
+3. ⏭️ **Descomentar busca dinâmica de admins** no `server.js` (linhas 368-373) — depende do item anterior.

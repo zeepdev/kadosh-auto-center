@@ -63,8 +63,8 @@ const Navbar = () => {
           <Link to="/cafe-com-graxa" className="nav-link-btn" style={{ color: '#d37a54', fontWeight: 'bold' }}>
             ☕ Café com Graxa
           </Link>
-          <Link to="/pacotes" className="nav-link-btn" style={{ color: '#4ade80', fontWeight: 'bold' }}>
-            📦 Pacotes
+          <Link to="/revisoes" className="nav-link-btn" style={{ color: '#4ade80', fontWeight: 'bold' }}>
+            🛠️ Revisões
           </Link>
           <Link to={user ? '/cliente' : '/login'} className="btn nav-cta">
             {user ? 'Minha Área' : 'Área do Cliente'}
@@ -87,8 +87,8 @@ const Navbar = () => {
         <Link to="/cafe-com-graxa" className="mobile-link" onClick={() => setMobileMenuOpen(false)} style={{ color: '#d37a54', fontWeight: 'bold' }}>
           ☕ Café com Graxa
         </Link>
-        <Link to="/pacotes" className="mobile-link" onClick={() => setMobileMenuOpen(false)} style={{ color: '#4ade80', fontWeight: 'bold' }}>
-          📦 Pacotes
+        <Link to="/revisoes" className="mobile-link" onClick={() => setMobileMenuOpen(false)} style={{ color: '#4ade80', fontWeight: 'bold' }}>
+          🛠️ Revisões
         </Link>
         <Link to={user ? '/cliente' : '/login'} className="btn" style={{ width: '100%', marginTop: '20px' }} onClick={() => setMobileMenuOpen(false)}>
           {user ? 'Minha Área' : 'Área do Cliente'}

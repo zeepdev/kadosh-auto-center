@@ -258,7 +258,10 @@ section {
   padding: 20px 0;
   z-index: 1000;
   transition: all 0.3s ease;
-  background: transparent;
+  background: rgba(10, 5, 5, 0.45);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.02);
 }
 
 .navbar.scrolled {
