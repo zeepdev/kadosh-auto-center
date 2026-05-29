@@ -174,16 +174,17 @@ const RevisaoDetalhes = () => {
 
     const payload = {
       nome: formData.nome,
-      email: formData.email,
+      email: formData.email || '',
       whatsapp: formData.whatsapp.replace(/\D/g, ''),
       telefone: formData.whatsapp.replace(/\D/g, ''),
       placa: formData.placa.toUpperCase(),
+      cep: '', // Garante campo cep preenchido para evitar restrições de coluna
       servicoDesejado: plano.nome,
       descricao: `Solicitação de revisão via site (${plano.nome})`,
       avaliacaoSite: '5',
       dataAgendamento,
       status: 'Pendente',
-      ...(user && { cliente_id: user.id })
+      cliente_id: user ? user.id : null // Garante explicitamente null ou UUID para RLS
     };
 
     try {
@@ -191,8 +192,10 @@ const RevisaoDetalhes = () => {
       const { error } = await supabase.from('orcamentos').insert([payload]);
       if (error) throw error;
 
-      // 2. Enviar notificação aos admins
-      await fetch('/api/send-budget-notification', {
+      setStatus('success');
+
+      // 2. Enviar notificação aos admins (NÃO BLOQUEANTE - evita que lentidões/erros de e-mail travem o usuário)
+      fetch('/api/send-budget-notification', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -205,9 +208,8 @@ const RevisaoDetalhes = () => {
           descricao: payload.descricao,
           dataAgendamento
         })
-      });
+      }).catch(err => console.error("Erro ao notificar admin:", err));
 
-      setStatus('success');
       setTimeout(() => {
         if (user) {
           navigate('/cliente');
@@ -218,7 +220,7 @@ const RevisaoDetalhes = () => {
       }, 3500);
 
     } catch (err) {
-      console.error(err);
+      console.error("Erro ao solicitar revisão:", err);
       setStatus('error');
     } finally {
       setLoading(false);
