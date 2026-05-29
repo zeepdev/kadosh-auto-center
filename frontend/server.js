@@ -792,7 +792,7 @@ ${text}
     res.json({ success: true, correctedText: cleanedText });
   } catch (error) {
     console.error('❌ Erro na API do Gemini:', error.message);
-    res.status(500).json({ success: false, error: 'Erro ao processar o texto com Inteligência Artificial.' });
+    res.status(500).json({ success: false, error: `Erro ao processar o texto com Inteligência Artificial: ${error.message}` });
   }
 });
 
