@@ -19,7 +19,7 @@ const Hero = () => {
       <div className="hero-bg"></div>
       <div className="container">
         <div className="hero-content animate-fade-in">
-          <div style={{ marginBottom: '30px' }}>
+          <div style={{ marginTop: '80px', marginBottom: '30px' }}>
             <img
               src="/logo_kadosh_transparent.png"
               alt="Logo Kadosh Auto Center"
