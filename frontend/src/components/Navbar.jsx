@@ -49,7 +49,7 @@ const Navbar = () => {
     <nav className={`navbar ${scrolled ? 'scrolled' : ''} ${mobileMenuOpen ? 'mobile-open' : ''}`}>
       <div className="container nav-container">
         <Link to="/" className="nav-logo" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-          <img src="/logo_kadosh_transparent.png" alt="Kadosh" style={{ borderRadius: 0, height: '36px', marginTop: '4px' }} />
+          <img src="/logo_kadosh_transparent.png" alt="Kadosh" style={{ borderRadius: 0, height: '34px', position: 'relative', top: '7px' }} />
           <span>Kadosh</span>
         </Link>
 
@@ -64,7 +64,7 @@ const Navbar = () => {
             ☕ Café com Graxa
           </Link>
           <Link to="/revisoes" className="nav-link-btn" style={{ color: '#4ade80', fontWeight: 'bold' }}>
-            🛠️ Revisões
+            📦 Pacotes
           </Link>
           <Link to={user ? '/cliente' : '/login'} className="btn nav-cta">
             {user ? 'Minha Área' : 'Área do Cliente'}
@@ -88,7 +88,7 @@ const Navbar = () => {
           ☕ Café com Graxa
         </Link>
         <Link to="/revisoes" className="mobile-link" onClick={() => setMobileMenuOpen(false)} style={{ color: '#4ade80', fontWeight: 'bold' }}>
-          🛠️ Revisões
+          📦 Pacotes
         </Link>
         <Link to={user ? '/cliente' : '/login'} className="btn" style={{ width: '100%', marginTop: '20px' }} onClick={() => setMobileMenuOpen(false)}>
           {user ? 'Minha Área' : 'Área do Cliente'}
