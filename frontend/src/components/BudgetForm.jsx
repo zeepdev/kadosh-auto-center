@@ -4,10 +4,11 @@ import { supabase } from '../lib/supabase';
 const BudgetForm = () => {
   const [formData, setFormData] = useState({
     nome: '', email: '', telefone: '', whatsapp: '', cep: '', placa: '',
-    servicoDesejado: 'Revisão', descricao: '', avaliacaoSite: '5',
+    servicoDesejado: 'Revisão Geral', descricao: '', avaliacaoSite: '5',
     dataReserva: '', horaReserva: '', 
     foraDeHorario: false, motivoForaHorario: ''
   });
+  const [showDetails, setShowDetails] = useState(false);
   const [status, setStatus] = useState('idle');
   const [formErrors, setFormErrors] = useState('');
 
@@ -119,7 +120,7 @@ const BudgetForm = () => {
 
         setFormData({
           nome: '', email: '', telefone: '', whatsapp: '', cep: '', placa: '',
-          servicoDesejado: 'Revisão', descricao: '', avaliacaoSite: '5',
+          servicoDesejado: 'Revisão Geral', descricao: '', avaliacaoSite: '5',
           dataReserva: '', horaReserva: '', foraDeHorario: false, motivoForaHorario: ''
         });
         setTimeout(() => setStatus('idle'), 5000);
@@ -165,19 +166,8 @@ const BudgetForm = () => {
           
           <div className="form-row">
             <div className="form-group">
-              <label>Telefone</label>
-              <input type="text" name="telefone" value={formData.telefone} onChange={handleChange} />
-            </div>
-            <div className="form-group">
               <label>WhatsApp *</label>
               <input type="text" name="whatsapp" required value={formData.whatsapp} onChange={handleChange} />
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label>E-mail</label>
-              <input type="email" name="email" value={formData.email} onChange={handleChange} />
             </div>
             <div className="form-group">
               <label>Placa do Veículo *</label>
@@ -185,84 +175,120 @@ const BudgetForm = () => {
             </div>
           </div>
 
-          <div className="form-group" style={{ marginBottom: '20px' }}>
-            <label>CEP</label>
-            <input type="text" name="cep" value={formData.cep} onChange={handleChange} />
+          <div style={{ margin: '25px 0' }}>
+            <button 
+              type="button" 
+              className="btn-outline" 
+              onClick={() => setShowDetails(!showDetails)}
+            >
+              {showDetails ? (
+                <>
+                  <span>Ocultar Detalhes</span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: '8px' }}><polyline points="18 15 12 9 6 15"></polyline></svg>
+                </>
+              ) : (
+                <>
+                  <span>Detalhar Orçamento (Opcional)</span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: '8px' }}><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </>
+              )}
+            </button>
           </div>
 
-          <div className="form-group" style={{ marginBottom: '20px' }}>
-            <label>Serviço Desejado *</label>
-            <select name="servicoDesejado" value={formData.servicoDesejado} onChange={handleChange}>
-              <option>Revisão Geral</option>
-              <option>Motor / Mecânica</option>
-              <option>Suspensão / Freios</option>
-              <option>Estética / Polimento</option>
-              <option>Outro</option>
-            </select>
-          </div>
-
-          <div className="form-group" style={{ marginBottom: '20px' }}>
-            <label>Data e Horário Desejado (Opcional)</label>
-            
-            <div style={{ display: 'flex', gap: '15px', alignItems: 'center', marginBottom: '15px' }}>
-              <input type="checkbox" id="foraHorario" name="foraDeHorario" checked={formData.foraDeHorario} onChange={handleChange} style={{ width: 'auto' }} />
-              <label htmlFor="foraHorario" style={{ cursor: 'pointer', margin: 0 }}>Preciso de um atendimento fora do horário de serviço</label>
-            </div>
-
-            {formData.foraDeHorario ? (
-              <div>
-                <label style={{ fontSize: '0.9rem', color: '#aaa' }}>Motivo e Horário Especial Desejado *</label>
-                <input 
-                  type="text" 
-                  name="motivoForaHorario" 
-                  placeholder="Ex: Chego do trabalho às 20h. Posso levar o carro?" 
-                  value={formData.motivoForaHorario} 
-                  onChange={handleChange} 
-                />
-              </div>
-            ) : (
+          {showDetails && (
+            <div className="animate-fade-in-fast">
               <div className="form-row">
                 <div className="form-group">
-                  <input type="date" name="dataReserva" value={formData.dataReserva} onChange={handleChange} />
+                  <label>Telefone</label>
+                  <input type="text" name="telefone" value={formData.telefone} onChange={handleChange} />
                 </div>
                 <div className="form-group">
-                  <select name="horaReserva" value={formData.horaReserva} onChange={handleChange}>
-                    <option value="">Selecione a hora...</option>
-                    <option value="08:00">08:00</option>
-                    <option value="08:30">08:30</option>
-                    <option value="09:00">09:00</option>
-                    <option value="09:30">09:30</option>
-                    <option value="10:00">10:00</option>
-                    <option value="10:30">10:30</option>
-                    <option value="11:00">11:00</option>
-                    <option value="11:30">11:30</option>
-                    <option value="12:00">12:00</option>
-                    <option value="12:30">12:30</option>
-                    <option value="13:00">13:00</option>
-                    <option value="13:30">13:30</option>
-                    <option value="14:00">14:00</option>
-                    <option value="14:30">14:30</option>
-                    <option value="15:00">15:00</option>
-                    <option value="15:30">15:30</option>
-                    <option value="16:00">16:00</option>
-                    <option value="16:30">16:30</option>
-                    <option value="17:00">17:00</option>
-                    <option value="17:30">17:30</option>
-                    <option value="18:00">18:00</option>
+                  <label>E-mail</label>
+                  <input type="email" name="email" value={formData.email} onChange={handleChange} />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>CEP</label>
+                  <input type="text" name="cep" value={formData.cep} onChange={handleChange} />
+                </div>
+                <div className="form-group">
+                  <label>Serviço Desejado *</label>
+                  <select name="servicoDesejado" value={formData.servicoDesejado} onChange={handleChange}>
+                    <option>Revisão Geral</option>
+                    <option>Motor / Mecânica</option>
+                    <option>Suspensão / Freios</option>
+                    <option>Estética / Polimento</option>
+                    <option>Outro</option>
                   </select>
                 </div>
               </div>
-            )}
-          </div>
+
+              <div className="form-group" style={{ marginBottom: '20px' }}>
+                <label>Data e Horário Desejado (Opcional)</label>
+                
+                <div style={{ display: 'flex', gap: '15px', alignItems: 'center', marginBottom: '15px' }}>
+                  <input type="checkbox" id="foraHorario" name="foraDeHorario" checked={formData.foraDeHorario} onChange={handleChange} style={{ width: 'auto' }} />
+                  <label htmlFor="foraHorario" style={{ cursor: 'pointer', margin: 0 }}>Preciso de um atendimento fora do horário de serviço</label>
+                </div>
+
+                {formData.foraDeHorario ? (
+                  <div>
+                    <label style={{ fontSize: '0.9rem', color: '#aaa' }}>Motivo e Horário Especial Desejado *</label>
+                    <input 
+                      type="text" 
+                      name="motivoForaHorario" 
+                      placeholder="Ex: Chego do trabalho às 20h. Posso levar o carro?" 
+                      value={formData.motivoForaHorario} 
+                      onChange={handleChange} 
+                    />
+                  </div>
+                ) : (
+                  <div className="form-row">
+                    <div className="form-group">
+                      <input type="date" name="dataReserva" value={formData.dataReserva} onChange={handleChange} />
+                    </div>
+                    <div className="form-group">
+                      <select name="horaReserva" value={formData.horaReserva} onChange={handleChange}>
+                        <option value="">Selecione a hora...</option>
+                        <option value="08:00">08:00</option>
+                        <option value="08:30">08:30</option>
+                        <option value="09:00">09:00</option>
+                        <option value="09:30">09:30</option>
+                        <option value="10:00">10:00</option>
+                        <option value="10:30">10:30</option>
+                        <option value="11:00">11:00</option>
+                        <option value="11:30">11:30</option>
+                        <option value="12:00">12:00</option>
+                        <option value="12:30">12:30</option>
+                        <option value="13:00">13:00</option>
+                        <option value="13:30">13:30</option>
+                        <option value="14:00">14:00</option>
+                        <option value="14:30">14:30</option>
+                        <option value="15:00">15:00</option>
+                        <option value="15:30">15:30</option>
+                        <option value="16:00">16:00</option>
+                        <option value="16:30">16:30</option>
+                        <option value="17:00">17:00</option>
+                        <option value="17:30">17:30</option>
+                        <option value="18:00">18:00</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label>Avaliação do Site (1 a 5)</label>
+                <input type="number" name="avaliacaoSite" min="1" max="5" value={formData.avaliacaoSite} onChange={handleChange} />
+              </div>
+            </div>
+          )}
 
           <div className="form-group">
             <label>Descrição do Problema / Serviço *</label>
             <textarea name="descricao" rows="3" required value={formData.descricao} onChange={handleChange}></textarea>
-          </div>
-
-          <div className="form-group">
-            <label>Avaliação do Site (1 a 5)</label>
-            <input type="number" name="avaliacaoSite" min="1" max="5" value={formData.avaliacaoSite} onChange={handleChange} />
           </div>
 
           {formErrors && <div style={{ color: '#f87171', marginBottom: '15px', fontWeight: 'bold' }}>⚠️ {formErrors}</div>}

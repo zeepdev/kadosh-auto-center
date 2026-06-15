@@ -203,6 +203,40 @@ section {
   align-items: center;
 }
 
+.btn-outline {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-muted);
+  padding: 12px 24px;
+  border: 1px dashed var(--glass-border);
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  width: 100%;
+}
+
+.btn-outline:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--accent-color);
+  border-style: solid;
+  color: #fff;
+}
+
+@keyframes fadeInFast {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in-fast {
+  animation: fadeInFast 0.25s ease-out forwards;
+}
+
 .form-group {
   margin-bottom: 20px;
 }
