@@ -4,6 +4,24 @@ import { supabase } from '../lib/supabase';
 import { consultarPlaca } from '../lib/placaApi';
 import { calcularPrioridade } from '../lib/prioridade';
 
+const parseProgresso = (status, avaliacaoSite) => {
+  if (status === 'Finalizado') {
+    return { passo: 4, ponto: 'Serviço Concluído' };
+  }
+  
+  if (avaliacaoSite && avaliacaoSite.includes('|')) {
+    const [passoStr, ponto] = avaliacaoSite.split(' | ');
+    const passo = parseInt(passoStr, 10);
+    return { passo: isNaN(passo) ? 0 : passo, ponto: ponto || '' };
+  }
+  
+  if (status === 'Agendado') {
+    return { passo: 0, ponto: 'Agendamento Confirmado' };
+  }
+  
+  return { passo: 0, ponto: 'Orçamento Recebido' };
+};
+
 const ClientDashboard = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
@@ -294,6 +312,140 @@ const ClientDashboard = () => {
     }
   };
 
+  const renderProgressSection = () => {
+    // Filtrar orçamentos ativos (não finalizados)
+    const activeServices = orcamentos.filter(item => item.status !== 'Finalizado');
+    if (activeServices.length === 0) return null;
+
+    return (
+      <div style={{ marginBottom: '35px' }}>
+        <h3 style={{ marginBottom: '15px', color: '#dc2743', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          🔧 Progresso do Serviço em Tempo Real
+        </h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
+          {activeServices.map(item => {
+            const { passo, ponto } = parseProgresso(item.status, item.avaliacaoSite);
+            
+            const steps = [
+              { label: 'Recebido', desc: 'Entrada na Oficina' },
+              { label: 'Diagnóstico', desc: 'Avaliação técnica' },
+              { label: 'Manutenção', desc: 'Reparos e Trocas' },
+              { label: 'Fase Final', desc: 'Ajustes e Testes' },
+              { label: 'Pronto', desc: 'Pronto para Retirar' }
+            ];
+
+            // Ícone de carro que muda com base no passo
+            let carIcon = '🚗💥'; // Passo 0: Quebrado
+            if (passo >= 1 && passo <= 3) {
+              carIcon = '🚗🔧'; // Passos 1-3: Sendo consertado
+            } else if (passo === 4) {
+              carIcon = '🚗✨'; // Passo 4: Arrrumado / Pronto
+            }
+
+            return (
+              <div key={item.id} className="glass" style={{ padding: '25px', borderLeft: '4px solid #dc2743' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px', marginBottom: '15px' }}>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '1.25rem', color: '#fff' }}>
+                      {item.servicoDesejado} - Placa: <span style={{ color: '#dc2743', fontWeight: 'bold' }}>{item.placa}</span>
+                    </h4>
+                    <p style={{ margin: '5px 0 0 0', color: '#aaa', fontSize: '0.9rem' }}>
+                      {item.descricao}
+                    </p>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <span style={{ 
+                      padding: '5px 12px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold',
+                      background: 'rgba(220, 39, 67, 0.15)', color: '#dc2743', border: '1px solid #dc2743'
+                    }}>
+                      Etapa Atual: {ponto}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Linha de Progresso Visual */}
+                <div style={{ position: 'relative', height: '70px', marginTop: '35px', display: 'flex', alignItems: 'center', padding: '0 15px' }}>
+                  {/* Linha Cinza de Fundo */}
+                  <div style={{ position: 'absolute', top: '50%', left: '15px', right: '15px', height: '4px', background: '#222', transform: 'translateY(-50%)', borderRadius: '2px', zIndex: 1 }}></div>
+                  
+                  {/* Linha Vermelha de Progresso */}
+                  <div style={{ 
+                    position: 'absolute', 
+                    top: '50%', 
+                    left: '15px', 
+                    width: `calc(${(passo / 4) * 100}% - ${passo === 0 ? 0 : 30}px)`, 
+                    height: '4px', 
+                    background: '#dc2743', 
+                    transform: 'translateY(-50%)', 
+                    borderRadius: '2px', 
+                    zIndex: 2,
+                    transition: 'width 0.5s ease-out'
+                  }}></div>
+
+                  {/* Nodes de Etapa */}
+                  {steps.map((step, idx) => {
+                    const isCompleted = idx <= passo;
+                    const isActive = idx === passo;
+                    return (
+                      <div 
+                        key={idx} 
+                        style={{ 
+                          position: 'absolute', 
+                          left: `${(idx / 4) * 100}%`, 
+                          transform: 'translateX(-50%)', 
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          alignItems: 'center',
+                          zIndex: 3 
+                        }}
+                      >
+                        {/* Indicador circular da etapa */}
+                        <div style={{ 
+                          width: '18px', 
+                          height: '18px', 
+                          borderRadius: '50%', 
+                          background: isActive ? '#dc2743' : isCompleted ? '#dc2743' : '#111', 
+                          border: isCompleted ? '2px solid #fff' : '2px solid #444',
+                          transition: 'all 0.3s ease',
+                          boxShadow: isActive ? '0 0 12px #dc2743' : 'none'
+                        }}></div>
+                        
+                        {/* Rótulo da etapa */}
+                        <span style={{ 
+                          fontSize: '0.75rem', 
+                          color: isActive ? '#fff' : isCompleted ? '#aaa' : '#555', 
+                          marginTop: '8px', 
+                          fontWeight: isActive ? 'bold' : 'normal',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {step.label}
+                        </span>
+                      </div>
+                    );
+                  })}
+
+                  {/* Carro que Anda */}
+                  <div style={{ 
+                    position: 'absolute', 
+                    left: `${(passo / 4) * 100}%`, 
+                    transform: 'translate(-50%, -35px)', 
+                    fontSize: '1.8rem',
+                    zIndex: 4,
+                    transition: 'left 0.5s ease-out',
+                    pointerEvents: 'none',
+                    filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.6))'
+                  }}>
+                    {carIcon}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: '#0a0505', color: '#fff', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
@@ -492,6 +644,9 @@ const ClientDashboard = () => {
             </div>
           )}
         </div>
+
+        {/* Progresso do Serviço em Tempo Real */}
+        {renderProgressSection()}
 
         {/* Veículos */}
         <div style={{ marginBottom: '30px' }}>

@@ -8,6 +8,24 @@ import QuickRegisterModal from './QuickRegisterModal';
 import { supabase } from '../../lib/supabase';
 import { calcularPrioridade, PRIORIDADES } from '../../lib/prioridade';
 
+const parseProgresso = (status, avaliacaoSite) => {
+  if (status === 'Finalizado') {
+    return { passo: 4, ponto: 'Serviço Concluído' };
+  }
+  
+  if (avaliacaoSite && avaliacaoSite.includes('|')) {
+    const [passoStr, ponto] = avaliacaoSite.split(' | ');
+    const passo = parseInt(passoStr, 10);
+    return { passo: isNaN(passo) ? 0 : passo, ponto: ponto || '' };
+  }
+  
+  if (status === 'Agendado') {
+    return { passo: 0, ponto: 'Agendamento Confirmado' };
+  }
+  
+  return { passo: 0, ponto: 'Orçamento Recebido' };
+};
+
 const AdminDashboard = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
@@ -225,6 +243,22 @@ const AdminDashboard = () => {
       console.error('Erro ao atualizar status', error);
       // Fallback update in UI if the status column doesn't exist in Supabase yet
       setAtendimentos(prev => prev.map(item => item.id === id ? { ...item, status: newStatus } : item));
+    }
+  };
+
+  const handleProgressChange = async (id, passo, ponto) => {
+    try {
+      const packedValue = `${passo} | ${ponto}`;
+      const { error } = await supabase
+        .from('orcamentos')
+        .update({ avaliacaoSite: packedValue })
+        .eq('id', id);
+
+      if (error) throw error;
+      fetchAtendimentos();
+    } catch (error) {
+      console.error('Erro ao atualizar progresso', error);
+      alert('Erro ao atualizar progresso.');
     }
   };
 
@@ -689,20 +723,48 @@ const AdminDashboard = () => {
                           />
                         </div>
                       </td>
-                      <td style={{ padding: '15px' }}>
+                      <td style={{ padding: '15px', minWidth: '180px' }}>
                         <select 
                           value={item.status} 
                           onChange={(e) => handleStatusChange(item.id, e.target.value)}
                           style={{ 
                             padding: '8px', borderRadius: '4px', background: '#222', color: '#fff', 
                             border: item.status === 'Finalizado' ? '1px solid #4ade80' : '1px solid #dc2743',
-                            fontSize: '0.85rem'
+                            fontSize: '0.85rem', width: '100%', marginBottom: '8px'
                           }}
                         >
                           <option value="Pendente">Pendente</option>
                           <option value="Agendado">Agendado</option>
                           <option value="Finalizado">Finalizado</option>
                         </select>
+
+                        {item.status !== 'Finalizado' && (() => {
+                          const { passo, ponto } = parseProgresso(item.status, item.avaliacaoSite);
+                          return (
+                            <div style={{ padding: '8px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                              <label style={{ display: 'block', fontSize: '0.7rem', color: '#888', marginBottom: '4px' }}>Progresso (Passo)</label>
+                              <select 
+                                value={passo} 
+                                onChange={(e) => handleProgressChange(item.id, parseInt(e.target.value, 10), ponto)}
+                                style={{ width: '100%', padding: '4px', background: '#111', color: '#fff', border: '1px solid #333', borderRadius: '4px', fontSize: '0.75rem', marginBottom: '8px' }}
+                              >
+                                <option value="0">0 - Recebido 🚗💥</option>
+                                <option value="1">1 - Diagnóstico 🚗🔧</option>
+                                <option value="2">2 - Manutenção 🚗⚙️</option>
+                                <option value="3">3 - Fase Final 🚗✨</option>
+                              </select>
+
+                              <label style={{ display: 'block', fontSize: '0.7rem', color: '#888', marginBottom: '4px' }}>Nome da Etapa</label>
+                              <input 
+                                type="text" 
+                                defaultValue={ponto}
+                                onBlur={(e) => handleProgressChange(item.id, passo, e.target.value)}
+                                placeholder="Ex: Chegou à oficina"
+                                style={{ width: '100%', padding: '5px', background: '#111', color: '#fff', border: '1px solid #333', borderRadius: '4px', fontSize: '0.75rem' }}
+                              />
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td style={{ padding: '15px' }}>
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>

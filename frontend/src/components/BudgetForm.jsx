@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 const BudgetForm = () => {
   const [formData, setFormData] = useState({
     nome: '', email: '', telefone: '', whatsapp: '', cep: '', placa: '',
-    servicoDesejado: 'Revisão Geral', descricao: '', avaliacaoSite: '5',
+    servicoDesejado: 'Revisão Geral', descricao: '',
     dataReserva: '', horaReserva: '', 
     foraDeHorario: false, motivoForaHorario: ''
   });
@@ -96,6 +96,7 @@ const BudgetForm = () => {
 
     const payload = {
       ...dbData,
+      avaliacaoSite: '5', // Valor padrão no banco de dados
       dataAgendamento: dataAgendamentoFinal,
       ...(user && { cliente_id: user.id })
     };
@@ -120,7 +121,7 @@ const BudgetForm = () => {
 
         setFormData({
           nome: '', email: '', telefone: '', whatsapp: '', cep: '', placa: '',
-          servicoDesejado: 'Revisão Geral', descricao: '', avaliacaoSite: '5',
+          servicoDesejado: 'Revisão Geral', descricao: '',
           dataReserva: '', horaReserva: '', foraDeHorario: false, motivoForaHorario: ''
         });
         setTimeout(() => setStatus('idle'), 5000);
@@ -279,10 +280,7 @@ const BudgetForm = () => {
                 )}
               </div>
 
-              <div className="form-group">
-                <label>Avaliação do Site (1 a 5)</label>
-                <input type="number" name="avaliacaoSite" min="1" max="5" value={formData.avaliacaoSite} onChange={handleChange} />
-              </div>
+
             </div>
           )}
 
