@@ -716,7 +716,35 @@ app.post('/api/drive/upload', uploadMemory.single('pdf'), async (req, res) => {
   }
 
   try {
-    const credentials = JSON.parse(Buffer.from(credentialsBase64, 'base64').toString('utf-8'));
+    let credentials;
+    let decoded = credentialsBase64.trim();
+
+    // Remove outer quotes if wrapped by env configuration
+    if (decoded.startsWith('"') && decoded.endsWith('"')) {
+      try {
+        decoded = JSON.parse(decoded);
+      } catch (e) {
+        decoded = decoded.slice(1, -1);
+      }
+      decoded = decoded.trim();
+    }
+
+    // If it's not raw JSON, decode from base64
+    if (!decoded.startsWith('{') && !decoded.startsWith('[')) {
+      decoded = Buffer.from(decoded, 'base64').toString('utf-8').trim();
+    }
+
+    // Check if decoded string is wrapped in quotes
+    if (decoded.startsWith('"') && decoded.endsWith('"')) {
+      try {
+        decoded = JSON.parse(decoded);
+      } catch (e) {
+        decoded = decoded.slice(1, -1).trim();
+      }
+    }
+
+    credentials = typeof decoded === 'string' ? JSON.parse(decoded) : decoded;
+
     const auth = new google.auth.GoogleAuth({
       credentials,
       scopes: ['https://www.googleapis.com/auth/drive.file']
@@ -747,6 +775,45 @@ app.post('/api/drive/upload', uploadMemory.single('pdf'), async (req, res) => {
   } catch (error) {
     console.error('❌ Erro no upload para o Drive:', error.message);
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ======================================================
+// GOOGLE RECAPTCHA V3 — VERIFICAÇÃO ANTI-SPAM
+// ======================================================
+app.post('/api/verify-recaptcha', async (req, res) => {
+  const { token } = req.body;
+
+  if (!token) {
+    return res.status(400).json({ success: false, error: 'Token do reCAPTCHA não fornecido.' });
+  }
+
+  const secretKey = process.env.RECAPTCHA_SECRET_KEY;
+
+  if (!secretKey) {
+    console.log('⚠️ [reCAPTCHA] RECAPTCHA_SECRET_KEY não configurada no servidor. Ignorando validação.');
+    return res.json({ success: true, message: 'Bypass: Secret Key não configurada no servidor.' });
+  }
+
+  try {
+    const response = await fetch('https://www.google.com/recaptcha/api/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `secret=${secretKey}&response=${token}`
+    });
+
+    const data = await response.json();
+
+    if (data.success && data.score >= 0.5) {
+      console.log(`✅ [reCAPTCHA] Verificado com sucesso. Score: ${data.score}`);
+      res.json({ success: true, score: data.score });
+    } else {
+      console.warn(`❌ [reCAPTCHA] Verificação falhou ou score suspeito. Score: ${data.score || 'N/A'}`);
+      res.status(400).json({ success: false, error: 'Verificação anti-spam do reCAPTCHA falhou ou comportamento suspeito detectado.', details: data });
+    }
+  } catch (error) {
+    console.error('❌ [reCAPTCHA] Erro ao verificar:', error.message);
+    res.status(500).json({ success: false, error: 'Erro de comunicação com o servidor do reCAPTCHA.', detalhes: error.message });
   }
 });
 

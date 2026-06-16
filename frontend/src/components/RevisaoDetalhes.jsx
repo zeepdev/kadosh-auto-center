@@ -168,6 +168,45 @@ const RevisaoDetalhes = () => {
     setLoading(true);
     setStatus('loading');
 
+    // --- Integração reCAPTCHA v3 ---
+    let recaptchaToken = null;
+    if (window.grecaptcha) {
+      try {
+        recaptchaToken = await new Promise((resolve, reject) => {
+          window.grecaptcha.ready(async () => {
+            try {
+              const token = await window.grecaptcha.execute('6LcR5iItAAAAANu65uMHXWIlD9FX8IvGUGvZOB4F', { action: 'submit_budget' });
+              resolve(token);
+            } catch (err) {
+              reject(err);
+            }
+          });
+        });
+      } catch (err) {
+        console.error('Erro ao obter token do reCAPTCHA:', err);
+      }
+    }
+
+    if (recaptchaToken) {
+      try {
+        const verifyRes = await fetch('/api/verify-recaptcha', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: recaptchaToken })
+        });
+        const verifyData = await verifyRes.json();
+        if (!verifyData.success) {
+          alert(verifyData.error || 'Verificação anti-spam do reCAPTCHA falhou. Por favor, tente novamente.');
+          setStatus('idle');
+          setLoading(false);
+          return;
+        }
+      } catch (err) {
+        console.error('Erro ao verificar reCAPTCHA no servidor:', err);
+        // Em caso de erro do servidor de reCAPTCHA, permitimos prosseguir para não travar clientes legítimos
+      }
+    }
+
     const dataAgendamento = formData.dataReserva && formData.horaReserva
       ? `${formData.dataReserva}T${formData.horaReserva}`
       : '';

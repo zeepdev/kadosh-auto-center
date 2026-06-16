@@ -421,3 +421,21 @@ Botão fica `disabled` se o cliente não tem nenhum veículo cadastrado, com tex
 4. **Validação**:
    - O projeto foi testado e compilado com sucesso executando `npm run build`.
    - Compatibilidade reversa de banco: registros antigos com a coluna `avaliacaoSite` vazia ou com notas numéricas antigas são graciosamente interpretados como passo 0 (Pendente) ou passo 4 (Finalizado).
+
+### 2026-06-16 — Correção do Google Drive e Integração do Google reCAPTCHA v3
+
+**Contexto**: O usuário relatou um erro de parsing de JSON ao enviar orçamentos para o Google Drive em produção. Adicionalmente, solicitou a implementação do Google reCAPTCHA v3 para proteção contra spam nos formulários de orçamento do site.
+
+**Mudanças**:
+1. **Correção de Parsing no Google Drive (`server.js`)**:
+   - Ajustada a decodificação da variável de ambiente `GOOGLE_CREDENTIALS_BASE64` para remover aspas externas inseridas automaticamente por plataformas de deploy (como Render).
+   - Implementado suporte robusto e automático para ler a credencial tanto em formato JSON plano (texto corrido) quanto em Base64, evitando falhas de caractere inválido (`Unexpected token... is not valid JSON`).
+2. **Endpoint de Verificação do reCAPTCHA (`server.js`)**:
+   - Criado o endpoint `POST /api/verify-recaptcha` no Express. Ele faz a chamada para `https://www.google.com/recaptcha/api/siteverify` usando a chave secreta cadastrada na variável de ambiente `RECAPTCHA_SECRET_KEY`.
+   - Incluído um bypass de segurança que permite o funcionamento normal (retorna sucesso) caso a chave secreta não esteja preenchida localmente, evitando travar desenvolvedores em ambiente de desenvolvimento.
+3. **Integração no Frontend (`index.html`, `BudgetForm.jsx` & `RevisaoDetalhes.jsx`)**:
+   - Inserida a tag de script oficial do reCAPTCHA v3 carregando de forma assíncrona no cabeçalho do `index.html`.
+   - Adicionada a validação do token nos dois formulários de solicitação públicos do site (`BudgetForm.jsx` e `RevisaoDetalhes.jsx`).
+   - Se o reCAPTCHA falhar (score menor que 0.5), o formulário é travado e o usuário recebe um feedback de erro anti-spam. Caso o script seja bloqueado por adblock ou o servidor tenha problemas temporários, a validação é contornada de forma resiliente para não bloquear clientes legítimos.
+4. **Variáveis de Ambiente (`.env`)**:
+   - Adicionado o placeholder `RECAPTCHA_SECRET_KEY=` no arquivo de desenvolvimento.

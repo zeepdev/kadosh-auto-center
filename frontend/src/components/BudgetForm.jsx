@@ -82,6 +82,44 @@ const BudgetForm = () => {
 
     setStatus('loading');
     
+    // --- Integração reCAPTCHA v3 ---
+    let recaptchaToken = null;
+    if (window.grecaptcha) {
+      try {
+        recaptchaToken = await new Promise((resolve, reject) => {
+          window.grecaptcha.ready(async () => {
+            try {
+              const token = await window.grecaptcha.execute('6LcR5iItAAAAANu65uMHXWIlD9FX8IvGUGvZOB4F', { action: 'submit_budget' });
+              resolve(token);
+            } catch (err) {
+              reject(err);
+            }
+          });
+        });
+      } catch (err) {
+        console.error('Erro ao obter token do reCAPTCHA:', err);
+      }
+    }
+
+    if (recaptchaToken) {
+      try {
+        const verifyRes = await fetch('/api/verify-recaptcha', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: recaptchaToken })
+        });
+        const verifyData = await verifyRes.json();
+        if (!verifyData.success) {
+          setFormErrors(verifyData.error || 'Verificação anti-spam do reCAPTCHA falhou. Por favor, tente novamente.');
+          setStatus('idle');
+          return;
+        }
+      } catch (err) {
+        console.error('Erro ao verificar reCAPTCHA no servidor:', err);
+        // Em caso de erro do servidor de reCAPTCHA, permitimos prosseguir para não travar clientes legítimos
+      }
+    }
+
     // Preparar dados para o envio
     let dataAgendamentoFinal = '';
     if (formData.foraDeHorario) {
