@@ -53,7 +53,10 @@
 5. ✅ **Integrar API de NF real** no `InvoiceModal.jsx` — Conectado com Asaas (R$ 0,49/nota).
 6. ✅ **Configurar conta Admin** — CNPJ preenchido e senha resetada (`Zeepzada07.`).
 7. ✅ **Simplificação de Formulário e Acompanhamento do Veículo**: Simplificação do formulário de orçamento inicial com botão de expansão "Detalhar Orçamento (Opcional)"; remoção da avaliação de 1 a 5 do site; e criação de barra de progresso de serviço em tempo real com carro dinâmico e controle integrado no painel administrativo.
-8. ✅ **Correção no Upload do Google Drive (JSON Parse)**: Desenvolvido um extrator e decodificador inteligente em `server.js` que processa corretamente a credencial `GOOGLE_CREDENTIALS_BASE64` mesmo se estiver em texto puro (JSON bruto), em base64, ou envolta em aspas duplas adicionadas pelo painel da hospedagem.
+8. ✅ **Correção e Migração do Google Drive (JSON Parse e Suporte a OAuth2)**:
+   - Corrigido o decodificador inteligente em `server.js` que processa corretamente `GOOGLE_CREDENTIALS_BASE64` (texto puro, base64 ou envolta em aspas).
+   - Implementado suporte a **OAuth 2.0 (com Refresh Token)** para permitir uploads em contas pessoais do Gmail (evitando o erro `Service Accounts do not have storage quota` já que contas de serviço agora possuem cota zero para armazenamento próprio).
+   - Adicionado o parâmetro `supportsAllDrives: true` para compatibilidade total com Drives Compartilhados.
 9. ✅ **Integração do Google reCAPTCHA v3**: Site Key instalada no `index.html` e scripts de token adicionados aos formulários públicos (`BudgetForm.jsx` e `RevisaoDetalhes.jsx`). Criado o endpoint `/api/verify-recaptcha` no backend para validar os envios usando a `RECAPTCHA_SECRET_KEY` (com bypass de segurança caso a chave não esteja configurada localmente, para não travar o desenvolvimento).
 
 ### 🟡 Média Prioridade

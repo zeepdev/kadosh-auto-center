@@ -711,44 +711,65 @@ app.post('/api/drive/upload', uploadMemory.single('pdf'), async (req, res) => {
   const credentialsBase64 = process.env.GOOGLE_CREDENTIALS_BASE64;
   const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
 
-  if (!credentialsBase64 || !folderId) {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+
+  const hasOAuth = clientId && clientSecret && refreshToken;
+  const hasServiceAccount = credentialsBase64;
+
+  if (!hasOAuth && !hasServiceAccount) {
     return res.status(500).json({ success: false, error: 'Integração com Google Drive não configurada no servidor (.env).' });
   }
 
+  if (!folderId) {
+    return res.status(500).json({ success: false, error: 'ID da pasta do Google Drive (GOOGLE_DRIVE_FOLDER_ID) não configurado.' });
+  }
+
   try {
-    let credentials;
-    let decoded = credentialsBase64.trim();
+    let auth;
 
-    // Remove outer quotes if wrapped by env configuration
-    if (decoded.startsWith('"') && decoded.endsWith('"')) {
-      try {
-        decoded = JSON.parse(decoded);
-      } catch (e) {
-        decoded = decoded.slice(1, -1);
+    if (hasOAuth) {
+      console.log('🔑 [Drive] Utilizando autenticação OAuth 2.0 (conta pessoal)');
+      const oauth2Client = new google.auth.OAuth2(clientId, clientSecret);
+      oauth2Client.setCredentials({ refresh_token: refreshToken });
+      auth = oauth2Client;
+    } else {
+      console.log('🔑 [Drive] Utilizando autenticação por Conta de Serviço (Service Account)');
+      let credentials;
+      let decoded = credentialsBase64.trim();
+
+      // Remove outer quotes if wrapped by env configuration
+      if (decoded.startsWith('"') && decoded.endsWith('"')) {
+        try {
+          decoded = JSON.parse(decoded);
+        } catch (e) {
+          decoded = decoded.slice(1, -1);
+        }
+        decoded = decoded.trim();
       }
-      decoded = decoded.trim();
-    }
 
-    // If it's not raw JSON, decode from base64
-    if (!decoded.startsWith('{') && !decoded.startsWith('[')) {
-      decoded = Buffer.from(decoded, 'base64').toString('utf-8').trim();
-    }
-
-    // Check if decoded string is wrapped in quotes
-    if (decoded.startsWith('"') && decoded.endsWith('"')) {
-      try {
-        decoded = JSON.parse(decoded);
-      } catch (e) {
-        decoded = decoded.slice(1, -1).trim();
+      // If it's not raw JSON, decode from base64
+      if (!decoded.startsWith('{') && !decoded.startsWith('[')) {
+        decoded = Buffer.from(decoded, 'base64').toString('utf-8').trim();
       }
+
+      // Check if decoded string is wrapped in quotes
+      if (decoded.startsWith('"') && decoded.endsWith('"')) {
+        try {
+          decoded = JSON.parse(decoded);
+        } catch (e) {
+          decoded = decoded.slice(1, -1).trim();
+        }
+      }
+
+      credentials = typeof decoded === 'string' ? JSON.parse(decoded) : decoded;
+
+      auth = new google.auth.GoogleAuth({
+        credentials,
+        scopes: ['https://www.googleapis.com/auth/drive.file']
+      });
     }
-
-    credentials = typeof decoded === 'string' ? JSON.parse(decoded) : decoded;
-
-    const auth = new google.auth.GoogleAuth({
-      credentials,
-      scopes: ['https://www.googleapis.com/auth/drive.file']
-    });
 
     const drive = google.drive({ version: 'v3', auth });
 

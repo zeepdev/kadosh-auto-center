@@ -427,9 +427,11 @@ Botão fica `disabled` se o cliente não tem nenhum veículo cadastrado, com tex
 **Contexto**: O usuário relatou um erro de parsing de JSON ao enviar orçamentos para o Google Drive em produção. Adicionalmente, solicitou a implementação do Google reCAPTCHA v3 para proteção contra spam nos formulários de orçamento do site.
 
 **Mudanças**:
-1. **Correção de Parsing no Google Drive (`server.js`)**:
+1. **Correção e Migração do Google Drive (`server.js`)**:
    - Ajustada a decodificação da variável de ambiente `GOOGLE_CREDENTIALS_BASE64` para remover aspas externas inseridas automaticamente por plataformas de deploy (como Render).
    - Implementado suporte robusto e automático para ler a credencial tanto em formato JSON plano (texto corrido) quanto em Base64, evitando falhas de caractere inválido (`Unexpected token... is not valid JSON`).
+   - Adicionada integração nativa via **OAuth 2.0 (com Refresh Token)** para contornar a nova restrição do Google (contas de serviço criadas recentemente possuem cota zero de armazenamento e não conseguem efetuar uploads em contas pessoais do Gmail). O sistema agora aceita as variáveis `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` e `GOOGLE_REFRESH_TOKEN` para autenticação baseada no usuário pessoal, mantendo fallback para Service Account.
+   - Adicionado o parâmetro `supportsAllDrives: true` para garantir compatibilidade com Drives Compartilhados.
 2. **Endpoint de Verificação do reCAPTCHA (`server.js`)**:
    - Criado o endpoint `POST /api/verify-recaptcha` no Express. Ele faz a chamada para `https://www.google.com/recaptcha/api/siteverify` usando a chave secreta cadastrada na variável de ambiente `RECAPTCHA_SECRET_KEY`.
    - Incluído um bypass de segurança que permite o funcionamento normal (retorna sucesso) caso a chave secreta não esteja preenchida localmente, evitando travar desenvolvedores em ambiente de desenvolvimento.
@@ -438,4 +440,4 @@ Botão fica `disabled` se o cliente não tem nenhum veículo cadastrado, com tex
    - Adicionada a validação do token nos dois formulários de solicitação públicos do site (`BudgetForm.jsx` e `RevisaoDetalhes.jsx`).
    - Se o reCAPTCHA falhar (score menor que 0.5), o formulário é travado e o usuário recebe um feedback de erro anti-spam. Caso o script seja bloqueado por adblock ou o servidor tenha problemas temporários, a validação é contornada de forma resiliente para não bloquear clientes legítimos.
 4. **Variáveis de Ambiente (`.env`)**:
-   - Adicionado o placeholder `RECAPTCHA_SECRET_KEY=` no arquivo de desenvolvimento.
+   - Adicionados os placeholders para `RECAPTCHA_SECRET_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` e `GOOGLE_REFRESH_TOKEN` no arquivo de desenvolvimento.
