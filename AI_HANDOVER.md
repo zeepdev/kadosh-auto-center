@@ -198,8 +198,8 @@ O sistema está integrado com a API do **Asaas** para emissão de Notas Fiscais 
 | `servicoDesejado` | TEXT | Dropdown: Revisão / Motor / Suspensão / Estética / Outro |
 | `descricao` | TEXT | |
 | `dataAgendamento` | TEXT | Data + hora ou "Fora de Horário: motivo" |
-| `avaliacaoSite` | TEXT | 1-5 (NPS caseiro) |
-| `status` | TEXT | Gerenciado pelo admin |
+| `avaliacaoSite` | TEXT | Reutilizada sob o capô para armazenar o progresso do serviço no formato `"passo | etapa"` (ex: `"2 | Desmontagem do motor"`) |
+| `status` | TEXT | Gerenciado pelo admin (Pendente, Agendado, Finalizado) |
 
 ### Tabela `atualizacoes_servico`
 | Coluna | Tipo | Notas |
@@ -300,8 +300,7 @@ RESEND_API_KEY, SUPABASE_SERVICE_ROLE_KEY, VITE_SUPABASE_URL, VITE_SUPABASE_ANON
 - **Carrossel de Avisos** (dados da tabela `avisos` no Supabase, auto-play a cada 8s, botões prev/next, indicadores clicáveis).
 - **Seção de Serviços** oferecidos.
 - **Galeria** estática (grid 4 fotos `foto1-4.jpeg`).
-- **Formulário de Orçamento** público (anônimo ou logado): máscaras de WhatsApp/CEP/Placa, validação, checkbox "fora de horário", dropdown de horários, dispara notificação e-mail para admin.
-- **Sobre Nós** com links para redes sociais + WhatsApp.
+- **Formulário de Orçamento** público (anônimo ou logado): Layout compacto por padrão (exibe Nome, WhatsApp, Placa e Descrição). Um botão "Detalhar Orçamento (Opcional)" expande o formulário exibindo os demais campos (Telefone, E-mail, CEP, Serviço e Agendamento). Validações de máscara e notificação automática de e-mail para o administrador.
 
 ### 2. Sistema de Autenticação Completo
 - Login, Cadastro (com validação de CPF), Esqueci Senha, Redefinir Senha.
@@ -311,12 +310,14 @@ RESEND_API_KEY, SUPABASE_SERVICE_ROLE_KEY, VITE_SUPABASE_URL, VITE_SUPABASE_ANON
 ### 3. Dashboard do Cliente (`/cliente`)
 - **Dados pessoais** com edição inline (nome social, WhatsApp, endereço). Nome legal, CPF e e-mail são read-only.
 - **Gestão de veículos**: adicionar por placa (consulta API), remover, marcar como principal.
+- **Acompanhamento de Progresso**: Exibe no topo do painel uma barra de progresso horizontal e um ícone de veículo dinâmico que se move e muda de estado (🚗💥 → 🚗🔧 → 🚗✨) conforme o passo atualizado pela oficina.
 - **Solicitar serviço**: mini-form pré-preenchido com dados do perfil e dropdown dos veículos cadastrados.
 - **Histórico de serviços**: lista com badge de prioridade, ordenado por prioridade desc → id desc.
 
 ### 4. Painel Administrativo (`/admin`)
 - **Login via Supabase Auth** (senha hardcoded foi removida). Verifica `is_admin` após login, faz `signOut` se não for admin.
 - **Lista de orçamentos**: busca textual + filtros por prioridade (EXTREMA/ALTA/MÉDIA/BAIXA) com contadores.
+- **Controle de Progresso**: Permite selecionar o passo (0 a 3) e preencher o texto da etapa atual do serviço diretamente na coluna **Status** dos orçamentos ativos (não finalizados).
 - **Sistema de prioridade automática** (`prioridade.js`): 4 níveis com keyword matching + fallback por categoria. Calculada on-the-fly (não persistida).
 - **Ações por orçamento**: mudar status, gerar PDF, upload de foto com notificação, consultar veículo, emitir NF.
 - **Geração de PDF profissional** (`PDFGenerator.jsx`): header com dados da oficina, auto-fill de CPF/veículo/endereço via `cliente_id`, bloco de prioridade colorido, termos de garantia.

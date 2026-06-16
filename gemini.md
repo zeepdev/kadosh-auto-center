@@ -123,7 +123,7 @@ Se você é uma IA recém-chamada para continuar este projeto, **leia estes arqu
   "placa": "string",
   "servicoDesejado": "string",
   "descricao": "string",
-  "avaliacaoSite": "string",
+  "avaliacaoSite": "string (Reutilizada sob o capô para progresso: 'passo | etapa')",
   "dataAgendamento": "string"
 }
 ```
@@ -159,6 +159,12 @@ A constituição original mandava enviar pro Google Sheets. **Hoje a persistênc
 - **Cores temáticas**: `#dc2743` (vermelho Kadosh), `#0a0505` (background dark), `#4ade80` (verde sucesso/CTA secundário), `#aaa` (texto auxiliar).
 - **Glassmorphism**: classe `.glass` (em `index.css`).
 - **Toda mudança de schema no Supabase** precisa ser registrada em `findings.md` (seção schema) E acompanhada das policies RLS necessárias.
+- **Rastreamento de Progresso**: Para evitar falhas de migração pela falta da RPC `exec_sql`, reutilizamos a coluna `avaliacaoSite` na tabela `orcamentos` para empacotar o progresso em tempo real do veículo no formato `"passo | etapa"` (ex: `"2 | Desmontagem do motor"`). 
+  - Passo 0: Recebido
+  - Passo 1: Diagnóstico
+  - Passo 2: Manutenção
+  - Passo 3: Fase Final
+  - Passo 4: Finalizado (quando status é "Finalizado")
 
 ---
 

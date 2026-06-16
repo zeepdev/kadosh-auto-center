@@ -52,6 +52,7 @@
 4. ✅ **Correção de Contraste e Desfoque no Cabeçalho (Navbar)**: Adicionado um fundo descontraído com `backdrop-filter: blur(10px)` e fundo preto semitransparente na Navbar global para legibilidade instantânea em todas as páginas.
 5. ✅ **Integrar API de NF real** no `InvoiceModal.jsx` — Conectado com Asaas (R$ 0,49/nota).
 6. ✅ **Configurar conta Admin** — CNPJ preenchido e senha resetada (`Zeepzada07.`).
+7. ✅ **Simplificação de Formulário e Acompanhamento do Veículo**: Simplificação do formulário de orçamento inicial com botão de expansão "Detalhar Orçamento (Opcional)"; remoção da avaliação de 1 a 5 do site; e criação de barra de progresso de serviço em tempo real com carro dinâmico e controle integrado no painel administrativo.
 
 ### 🟡 Média Prioridade
 1. ⏭️ **Reativar confirmação de e-mail** no Supabase com SMTP próprio + template customizado.

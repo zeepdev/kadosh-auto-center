@@ -397,3 +397,27 @@ Botão fica `disabled` se o cliente não tem nenhum veículo cadastrado, com tex
    - Criado componente de detalhes do pacote `PacoteDetalhes.jsx` acessível via rotas `/pacotes/:id`.
    - Incluído link "📦 Pacotes" em `Navbar.jsx`.
    - **Nota de Negócio**: A página está rodando com *textos "Lorem Ipsum"* e dados mockados (R$ 299,90 e R$ 799,90) aguardando as confirmações de regras, benefícios e combos de desconto por parte da equipe financeira do Kadosh Auto Center. A conexão de envio real para o backend também está pendente disso.
+
+### 2026-06-16 — Simplificação de Formulário e Barra de Acompanhamento do Veículo
+
+**Contexto**: O dono solicitou a redução da quantidade de campos exibidos inicialmente no formulário de orçamento público para diminuir a fricção do cliente, bem como a implementação de uma barra de rastreamento do veículo no painel do cliente, similar ao rastreamento de entregas.
+
+**Mudanças**:
+1. **Formulário de Orçamento Simplificado (`BudgetForm.jsx` & `index.css`)**:
+   - Redesenhado o formulário público para exibir inicialmente apenas os campos essenciais: *Nome Completo*, *WhatsApp* (em linha com *Placa do Veículo*) e *Descrição do Problema*.
+   - Adicionado o botão tracejado `.btn-outline` "Detalhar Orçamento (Opcional)" que exibe/oculta os outros campos (*Telefone*, *E-mail*, *CEP*, *Serviço Desejado*, *Data e Horário Desejado*) usando uma animação suave de fade-in (`.animate-fade-in-fast`).
+   - Removido o campo "Avaliação do Site (1 a 5)". O formulário envia o valor padrão `'5'` sob o capô para compatibilidade com o banco de dados.
+
+2. **Acompanhamento de Serviços Ativos (`ClientDashboard.jsx`)**:
+   - Criada a seção **Progresso do Serviço em Tempo Real** no topo do painel do cliente. Esta seção é exibida dinamicamente caso o cliente possua serviços ativos (status diferente de "Finalizado").
+   - A barra exibe 5 marcos horizontais (*Recebido*, *Diagnóstico*, *Manutenção*, *Fase Final*, *Pronto*).
+   - Um ícone de carro dinâmico move-se horizontalmente ao longo da linha de progresso baseado no passo e muda de estado (quebrado `🚗💥` → em conserto `🚗🔧` → consertado e brilhando `🚗✨`).
+
+3. **Gerenciamento de Etapa de Serviço (`AdminDashboard.jsx`)**:
+   - Inseridos seletores de progresso diretamente na coluna **Status** para atendimentos que não estão finalizados.
+   - O administrador pode escolher o **Passo do Progresso** (de 0 a 3) e preencher o texto da **Etapa Atual** em tempo real. O estado é salvo de forma empacotada no formato `"passo | etapa"` na antiga coluna `avaliacaoSite` do banco, evitando a necessidade de realizar alterações de DDL (`ALTER TABLE`) que poderiam falhar sem a função `exec_sql` habilitada no Supabase.
+   - Quando o status geral do serviço é marcado como "Finalizado", o passo 4 ("Serviço Concluído") é preenchido automaticamente para o cliente.
+
+4. **Validação**:
+   - O projeto foi testado e compilado com sucesso executando `npm run build`.
+   - Compatibilidade reversa de banco: registros antigos com a coluna `avaliacaoSite` vazia ou com notas numéricas antigas são graciosamente interpretados como passo 0 (Pendente) ou passo 4 (Finalizado).
