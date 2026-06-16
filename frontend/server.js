@@ -759,6 +759,7 @@ app.post('/api/drive/upload', uploadMemory.single('pdf'), async (req, res) => {
     const fileName = req.body.fileName || `Orcamento_${Date.now()}.pdf`;
 
     const response = await drive.files.create({
+      supportsAllDrives: true,
       requestBody: {
         name: fileName,
         parents: [folderId],
