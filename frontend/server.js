@@ -840,6 +840,38 @@ app.post('/api/verify-recaptcha', async (req, res) => {
 });
 
 // ======================================================
+// INTELIGÊNCIA ARTIFICIAL (GEMINI) — DIAGNÓSTICO DE MODELOS
+// ======================================================
+app.get('/api/ai/test', async (req, res) => {
+  const geminiApiKey = process.env.GEMINI_API_KEY;
+  if (!geminiApiKey) {
+    return res.status(500).json({ success: false, error: 'Chave GEMINI_API_KEY não configurada no servidor.' });
+  }
+
+  const modelsToTest = [
+    'gemini-1.5-flash',
+    'gemini-2.0-flash',
+    'gemini-2.5-flash',
+    'gemini-1.5-pro'
+  ];
+
+  const results = {};
+  const genAI = new GoogleGenerativeAI(geminiApiKey);
+
+  for (const modelName of modelsToTest) {
+    try {
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent('OK');
+      results[modelName] = { success: true, response: result.response.text().trim() };
+    } catch (error) {
+      results[modelName] = { success: false, error: error.message };
+    }
+  }
+
+  res.json({ success: true, results });
+});
+
+// ======================================================
 // INTELIGÊNCIA ARTIFICIAL (GEMINI) — CORREÇÃO DE TEXTO
 // ======================================================
 app.post('/api/ai/fix-text', async (req, res) => {
