@@ -212,9 +212,7 @@ const CafeComGraxa = () => {
               </div>
             ))}
           </div>
-          <p style={{ marginTop: '20px', fontSize: '0.9rem', color: 'rgba(251, 239, 224, 0.5)' }}>
-            (Para exibir mais fotos, basta adicionar com os próximos números na pasta public/images)
-          </p>
+
         </div>
       </section>
 
