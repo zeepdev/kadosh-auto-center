@@ -714,13 +714,32 @@ const AdminDashboard = () => {
                       </td>
                       <td style={{ padding: '15px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                          <span style={{ color: '#666', fontSize: '0.8rem' }}>R$</span>
+                          <span style={{ color: '#888', fontSize: '0.85rem', fontWeight: 'bold' }}>R$</span>
                           <input 
                             key={item.id + '_' + (item.valor_total || 0)}
                             type="number" 
                             defaultValue={item.valor_total}
-                            onBlur={(e) => handleUpdateValor(item.id, e.target.value)}
-                            style={{ width: '90px', padding: '5px', borderRadius: '4px', background: '#111', color: '#4ade80', border: '1px solid #333', fontWeight: 'bold' }}
+                            style={{ 
+                              width: '100px', 
+                              padding: '6px 10px', 
+                              borderRadius: '6px', 
+                              background: '#120707', 
+                              color: '#4ade80', 
+                              border: '1px solid #333', 
+                              fontWeight: '800',
+                              fontSize: '0.95rem',
+                              outline: 'none',
+                              transition: 'all 0.2s ease-in-out',
+                            }}
+                            onFocus={(e) => {
+                              e.target.style.borderColor = '#4ade80';
+                              e.target.style.boxShadow = '0 0 8px rgba(74, 222, 128, 0.3)';
+                            }}
+                            onBlur={(e) => {
+                              e.target.style.borderColor = '#333';
+                              e.target.style.boxShadow = 'none';
+                              handleUpdateValor(item.id, e.target.value);
+                            }}
                           />
                         </div>
                       </td>

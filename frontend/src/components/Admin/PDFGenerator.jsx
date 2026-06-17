@@ -334,19 +334,12 @@ const PDFGenerator = ({ initialData, onClose, onUpdateSuccess }) => {
   const totalLabor = labor.reduce((acc, item) => acc + (item.qtd * item.unit), 0);
   const grandTotal = totalItems + totalLabor;
 
-  const handleDownloadClick = () => {
-    if (initialData.id && onUpdateSuccess) {
-      onUpdateSuccess(initialData.id, grandTotal);
-    }
-  };
-
+  const [downloading, setDownloading] = useState(false);
   const [driveStatus, setDriveStatus] = useState('idle');
 
-  const handleDriveUpload = async () => {
+  const handleDriveUpload = async (blob) => {
     setDriveStatus('loading');
     try {
-      const blob = await pdf(<KadoshPDF clientData={clientData} items={items} labor={labor} />).toBlob();
-      
       const formData = new FormData();
       const filename = `Orcamento_Kadosh_${clientData.placa || clientData.nome || 'Novo'}.pdf`;
       formData.append('pdf', blob, filename);
@@ -363,14 +356,38 @@ const PDFGenerator = ({ initialData, onClose, onUpdateSuccess }) => {
 
       setDriveStatus('success');
       setTimeout(() => setDriveStatus('idle'), 4000);
-      
-      if (initialData.id && onUpdateSuccess) {
-        onUpdateSuccess(initialData.id, grandTotal);
-      }
     } catch (err) {
       console.error('Erro Drive:', err);
       setDriveStatus('error');
-      alert('Erro ao enviar para o Drive: ' + err.message);
+      alert('PDF baixado com sucesso, mas não foi possível salvar cópia no Google Drive: ' + err.message);
+    }
+  };
+
+  const handleGenerateAndDownload = async () => {
+    setDownloading(true);
+    try {
+      const doc = <KadoshPDF clientData={clientData} items={items} labor={labor} />;
+      const blob = await pdf(doc).toBlob();
+      
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Orcamento_Kadosh_${clientData.placa || clientData.nome || 'Novo'}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      if (initialData.id && onUpdateSuccess) {
+        await onUpdateSuccess(initialData.id, grandTotal);
+      }
+
+      await handleDriveUpload(blob);
+    } catch (err) {
+      console.error('Erro ao gerar/baixar PDF:', err);
+      alert('Erro ao gerar o PDF: ' + err.message);
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -496,19 +513,18 @@ const PDFGenerator = ({ initialData, onClose, onUpdateSuccess }) => {
           {driveStatus === 'success' && <p style={{ color: '#4ade80', marginBottom: '10px', fontSize: '0.9rem' }}>✅ Cópia salva no Google Drive!</p>}
           {driveStatus === 'error' && <p style={{ color: '#f87171', marginBottom: '10px', fontSize: '0.9rem' }}>⚠️ Erro ao salvar no Drive (o arquivo ainda foi baixado no PC).</p>}
           
-          <div onClick={() => { handleDownloadClick(); handleDriveUpload(); }} style={{ display: 'inline-block' }}>
-            <PDFDownloadLink
-              document={<KadoshPDF clientData={clientData} items={items} labor={labor} />}
-              fileName={`Orcamento_Kadosh_${clientData.placa || clientData.nome}.pdf`}
-              style={{
-                backgroundColor: '#dc2743', color: '#fff', textDecoration: 'none',
-                padding: '15px 30px', borderRadius: '8px', fontSize: '1.2rem', fontWeight: 'bold',
-                display: 'inline-block', transition: '0.2s', opacity: driveStatus === 'loading' ? 0.7 : 1
-              }}
-            >
-              {({ loading }) => (loading ? 'Gerando documento...' : '📥 Baixar PDF do Orçamento')}
-            </PDFDownloadLink>
-          </div>
+          <button 
+            onClick={handleGenerateAndDownload}
+            disabled={downloading || driveStatus === 'loading'}
+            style={{
+              backgroundColor: '#dc2743', color: '#fff', textDecoration: 'none', border: 'none',
+              padding: '15px 30px', borderRadius: '8px', fontSize: '1.2rem', fontWeight: 'bold',
+              display: 'inline-block', transition: '0.2s', cursor: 'pointer',
+              opacity: (downloading || driveStatus === 'loading') ? 0.7 : 1
+            }}
+          >
+            {downloading ? 'Gerando documento...' : '📥 Baixar PDF do Orçamento'}
+          </button>
         </div>
       </div>
     </div>
