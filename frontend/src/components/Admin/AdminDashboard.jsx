@@ -716,6 +716,7 @@ const AdminDashboard = () => {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                           <span style={{ color: '#666', fontSize: '0.8rem' }}>R$</span>
                           <input 
+                            key={item.id + '_' + (item.valor_total || 0)}
                             type="number" 
                             defaultValue={item.valor_total}
                             onBlur={(e) => handleUpdateValor(item.id, e.target.value)}

@@ -3,6 +3,7 @@ import { Document, Page, Text, View, StyleSheet, PDFDownloadLink, pdf } from '@r
 import { OFICINA } from '../../config/oficina';
 import { supabase } from '../../lib/supabase';
 import { calcularPrioridade } from '../../lib/prioridade';
+import { consultarPlaca } from '../../lib/placaApi';
 
 const styles = StyleSheet.create({
   page: { padding: 30, fontSize: 10, fontFamily: 'Helvetica' },
@@ -99,14 +100,30 @@ const KadoshPDF = ({ clientData, items, labor }) => {
           <View style={styles.row}>
             <Text style={styles.label}>Placa:</Text>
             <Text style={styles.value}>{clientData.placa}</Text>
-            <Text style={styles.label}>Marca/Modelo:</Text>
-            <Text style={styles.value}>{clientData.veiculo}</Text>
+            <Text style={styles.label}>Marca:</Text>
+            <Text style={styles.value}>{clientData.marca || '-'}</Text>
           </View>
           <View style={styles.row}>
-            <Text style={styles.label}>Ano:</Text>
-            <Text style={styles.value}>{clientData.ano}</Text>
+            <Text style={styles.label}>Modelo:</Text>
+            <Text style={styles.value}>{clientData.modelo || '-'}</Text>
+            <Text style={styles.label}>Submodelo:</Text>
+            <Text style={styles.value}>{clientData.submodelo || '-'}</Text>
+          </View>
+          <View style={styles.row}>
+            <Text style={styles.label}>Ano Fab.:</Text>
+            <Text style={styles.value}>{clientData.anoFabricacao || '-'}</Text>
+            <Text style={styles.label}>Ano Modelo:</Text>
+            <Text style={styles.value}>{clientData.anoModelo || '-'}</Text>
+          </View>
+          <View style={styles.row}>
             <Text style={styles.label}>Cor:</Text>
-            <Text style={styles.value}>{clientData.cor}</Text>
+            <Text style={styles.value}>{clientData.cor || '-'}</Text>
+            <Text style={styles.label}>Combustível:</Text>
+            <Text style={styles.value}>{clientData.combustivel || '-'}</Text>
+          </View>
+          <View style={styles.row}>
+            <Text style={styles.label}>Segmento:</Text>
+            <Text style={{ width: '80%' }}>{clientData.segmento || '-'}</Text>
           </View>
         </View>
 
@@ -199,6 +216,13 @@ const PDFGenerator = ({ initialData, onClose, onUpdateSuccess }) => {
     veiculo: '',
     ano: '',
     cor: '',
+    marca: '',
+    modelo: '',
+    submodelo: '',
+    anoFabricacao: '',
+    anoModelo: '',
+    segmento: '',
+    combustivel: '',
     servicoDesejado: initialData.servicoDesejado || '',
     descricao: initialData.descricao || ''
   });
@@ -234,6 +258,35 @@ const PDFGenerator = ({ initialData, onClose, onUpdateSuccess }) => {
       }
     })();
   }, [initialData.cliente_id, initialData.placa]);
+
+  // Busca dados detalhados do veículo usando a placa
+  useEffect(() => {
+    if (!initialData.placa) return;
+
+    (async () => {
+      try {
+        const dados = await consultarPlaca(initialData.placa);
+        if (dados) {
+          const extra = dados.extra || {};
+          setClientData(prev => ({
+            ...prev,
+            marca: dados.marca || prev.marca || '',
+            modelo: extra.modelo_completo || dados.modelo || prev.modelo || '',
+            submodelo: extra.submodelo || prev.submodelo || '',
+            anoFabricacao: extra.ano_fabricacao || prev.anoFabricacao || '',
+            anoModelo: extra.ano_modelo || dados.ano || prev.anoModelo || '',
+            cor: dados.cor || prev.cor || '',
+            segmento: extra.segmento || prev.segmento || '',
+            combustivel: extra.combustivel || prev.combustivel || '',
+            veiculo: prev.veiculo || `${dados.marca} ${dados.modelo}`.trim(),
+            ano: prev.ano || dados.ano || ''
+          }));
+        }
+      } catch (err) {
+        console.error('Erro ao consultar dados da placa para o PDF:', err);
+      }
+    })();
+  }, [initialData.placa]);
 
   const [items, setItems] = useState([]);
   const [labor, setLabor] = useState([]);
@@ -357,22 +410,44 @@ const PDFGenerator = ({ initialData, onClose, onUpdateSuccess }) => {
         </div>
 
         <h3 style={{ color: '#aaa', borderBottom: '1px solid #333', paddingBottom: '10px' }}>Veículo</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '15px', marginBottom: '30px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '15px', marginBottom: '20px' }}>
           <div>
             <label>Placa</label>
             <input type="text" name="placa" value={clientData.placa} onChange={handleClientChange} style={inputStyle} />
           </div>
           <div>
-            <label>Marca/Modelo</label>
-            <input type="text" name="veiculo" value={clientData.veiculo} onChange={handleClientChange} style={inputStyle} />
+            <label>Marca</label>
+            <input type="text" name="marca" value={clientData.marca} onChange={handleClientChange} style={inputStyle} />
           </div>
           <div>
-            <label>Ano</label>
-            <input type="text" name="ano" value={clientData.ano} onChange={handleClientChange} style={inputStyle} />
+            <label>Modelo</label>
+            <input type="text" name="modelo" value={clientData.modelo} onChange={handleClientChange} style={inputStyle} />
+          </div>
+          <div>
+            <label>Submodelo</label>
+            <input type="text" name="submodelo" value={clientData.submodelo} onChange={handleClientChange} style={inputStyle} />
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '15px', marginBottom: '30px' }}>
+          <div>
+            <label>Ano Fabricação</label>
+            <input type="text" name="anoFabricacao" value={clientData.anoFabricacao} onChange={handleClientChange} style={inputStyle} />
+          </div>
+          <div>
+            <label>Ano Modelo</label>
+            <input type="text" name="anoModelo" value={clientData.anoModelo} onChange={handleClientChange} style={inputStyle} />
           </div>
           <div>
             <label>Cor</label>
             <input type="text" name="cor" value={clientData.cor} onChange={handleClientChange} style={inputStyle} />
+          </div>
+          <div>
+            <label>Combustível</label>
+            <input type="text" name="combustivel" value={clientData.combustivel} onChange={handleClientChange} style={inputStyle} />
+          </div>
+          <div style={{ gridColumn: '1 / -1' }}>
+            <label>Segmento</label>
+            <input type="text" name="segmento" value={clientData.segmento} onChange={handleClientChange} style={inputStyle} />
           </div>
         </div>
 
