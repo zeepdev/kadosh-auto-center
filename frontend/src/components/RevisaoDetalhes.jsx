@@ -4,6 +4,25 @@ import { supabase } from '../lib/supabase';
 import { consultarPlaca } from '../lib/placaApi';
 import Footer from './Footer';
 
+const getTodayLocalDateString = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getMaxLocalDateString = () => {
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth(); // 0-11
+  if (currentMonth === 11) {
+    return `${currentYear + 1}-01-31`;
+  } else {
+    return `${currentYear}-12-31`;
+  }
+};
+
 const RevisaoDetalhes = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -163,6 +182,19 @@ const RevisaoDetalhes = () => {
     if (!formData.nome || !formData.whatsapp || !formData.placa) {
       alert('Por favor, preencha todos os campos obrigatórios (*).');
       return;
+    }
+
+    if (formData.dataReserva) {
+      const todayStr = getTodayLocalDateString();
+      const maxStr = getMaxLocalDateString();
+      if (formData.dataReserva < todayStr) {
+        alert('Não é possível agendar serviços para datas que já passaram.');
+        return;
+      }
+      if (formData.dataReserva > maxStr) {
+        alert('Não é possível agendar serviços com tanta antecedência.');
+        return;
+      }
     }
 
     setLoading(true);
@@ -528,6 +560,8 @@ const RevisaoDetalhes = () => {
                   type="date" 
                   value={formData.dataReserva} 
                   onChange={e => setFormData(prev => ({ ...prev, dataReserva: e.target.value }))}
+                  min={getTodayLocalDateString()}
+                  max={getMaxLocalDateString()}
                 />
               </div>
 

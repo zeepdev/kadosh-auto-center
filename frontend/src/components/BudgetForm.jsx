@@ -1,6 +1,25 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 
+const getTodayLocalDateString = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getMaxLocalDateString = () => {
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth(); // 0-11
+  if (currentMonth === 11) {
+    return `${currentYear + 1}-01-31`;
+  } else {
+    return `${currentYear}-12-31`;
+  }
+};
+
 const BudgetForm = () => {
   const [formData, setFormData] = useState({
     nome: '', email: '', telefone: '', whatsapp: '', cep: '', placa: '',
@@ -78,6 +97,19 @@ const BudgetForm = () => {
     if (!formData.foraDeHorario && formData.dataReserva && !formData.horaReserva) {
       setFormErrors('Por favor, selecione um horário na lista.');
       return;
+    }
+
+    if (formData.dataReserva) {
+      const todayStr = getTodayLocalDateString();
+      const maxStr = getMaxLocalDateString();
+      if (formData.dataReserva < todayStr) {
+        setFormErrors('Não é possível agendar serviços para datas que já passaram.');
+        return;
+      }
+      if (formData.dataReserva > maxStr) {
+        setFormErrors('Não é possível agendar serviços com tanta antecedência.');
+        return;
+      }
     }
 
     setStatus('loading');
@@ -286,7 +318,14 @@ const BudgetForm = () => {
                 ) : (
                   <div className="form-row">
                     <div className="form-group">
-                      <input type="date" name="dataReserva" value={formData.dataReserva} onChange={handleChange} />
+                      <input 
+                        type="date" 
+                        name="dataReserva" 
+                        value={formData.dataReserva} 
+                        onChange={handleChange} 
+                        min={getTodayLocalDateString()}
+                        max={getMaxLocalDateString()}
+                      />
                     </div>
                     <div className="form-group">
                       <select name="horaReserva" value={formData.horaReserva} onChange={handleChange}>

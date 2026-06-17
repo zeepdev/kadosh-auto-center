@@ -4,6 +4,25 @@ import { supabase } from '../lib/supabase';
 import { consultarPlaca } from '../lib/placaApi';
 import { calcularPrioridade } from '../lib/prioridade';
 
+const getTodayLocalDateString = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getMaxLocalDateString = () => {
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth(); // 0-11
+  if (currentMonth === 11) {
+    return `${currentYear + 1}-01-31`;
+  } else {
+    return `${currentYear}-12-31`;
+  }
+};
+
 const parseProgresso = (status, avaliacaoSite) => {
   if (status === 'Finalizado') {
     return { passo: 4, ponto: 'Serviço Concluído' };
@@ -78,6 +97,19 @@ const ClientDashboard = () => {
     if (novoServico.dataReserva && !novoServico.horaReserva) {
       alert('Selecione um horário para a data escolhida.');
       return;
+    }
+
+    if (novoServico.dataReserva) {
+      const todayStr = getTodayLocalDateString();
+      const maxStr = getMaxLocalDateString();
+      if (novoServico.dataReserva < todayStr) {
+        alert('Não é possível agendar serviços para datas que já passaram.');
+        return;
+      }
+      if (novoServico.dataReserva > maxStr) {
+        alert('Não é possível agendar serviços com tanta antecedência.');
+        return;
+      }
     }
 
     setEnviandoServico(true);
@@ -677,7 +709,13 @@ const ClientDashboard = () => {
               <div className="form-row">
                 <div className="form-group">
                   <label>Data desejada (opcional)</label>
-                  <input type="date" value={novoServico.dataReserva} onChange={e => setNovoServico({ ...novoServico, dataReserva: e.target.value })} />
+                  <input 
+                    type="date" 
+                    value={novoServico.dataReserva} 
+                    onChange={e => setNovoServico({ ...novoServico, dataReserva: e.target.value })} 
+                    min={getTodayLocalDateString()}
+                    max={getMaxLocalDateString()}
+                  />
                 </div>
                 <div className="form-group">
                   <label>Horário</label>
