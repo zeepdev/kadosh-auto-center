@@ -688,41 +688,54 @@ const AdminDashboard = () => {
                   const agendamentoFormatado = item.dataAgendamento ? (item.dataAgendamento.includes('Fora') ? item.dataAgendamento : new Date(item.dataAgendamento).toLocaleString('pt-BR').slice(0, 16)) : 'Apenas Orçamento';
 
                   return (
-                    <tr key={item.id} style={{ borderBottom: '1px solid #333' }}>
-                      <td style={{ padding: '15px' }}>
+                     <tr key={item.id} style={{ 
+                      borderBottom: '1px solid rgba(255,255,255,0.03)',
+                      transition: 'background 0.2s',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.01)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <td style={{ padding: '20px 15px' }}>
                         <span style={{
-                          padding: '4px 10px', borderRadius: '4px', fontSize: '0.8rem',
+                          padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem',
                           fontWeight: 'bold', whiteSpace: 'nowrap',
                           background: item.prioridade.bg, color: item.prioridade.cor,
-                          border: `1px solid ${item.prioridade.cor}`
+                          border: `1px solid ${item.prioridade.cor}33`
                         }}>
                           {item.prioridade.icone} {item.prioridade.label}
                         </span>
                       </td>
-                      <td style={{ padding: '15px' }}>
-                        <div style={{ fontWeight: 'bold', fontSize: '0.95rem' }}>{item.nome}</div>
-                        <div style={{ fontSize: '0.8rem', color: '#aaa' }}>{item.placa} • {new Date(item.dataHora).toLocaleDateString('pt-BR')}</div>
-                        <div style={{ display: 'flex', gap: '10px', marginTop: '5px' }}>
-                          <a href={`https://wa.me/55${item.whatsapp.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" style={{ color: '#4ade80', textDecoration: 'underline', fontSize: '0.75rem' }}>WhatsApp</a>
-                          <button onClick={() => setSelectedPlacaForView(item.placa)} style={{ background: 'transparent', border: 'none', color: '#f59e0b', textDecoration: 'underline', cursor: 'pointer', fontSize: '0.75rem', padding: 0 }}>Veículo 🔍</button>
-                          <button onClick={() => setHistoryFilter(item.placa)} style={{ background: 'transparent', border: 'none', color: '#3b82f6', textDecoration: 'underline', cursor: 'pointer', fontSize: '0.75rem', padding: 0 }}>Histórico 📋</button>
+                      <td style={{ padding: '20px 15px' }}>
+                        <div style={{ fontWeight: '700', fontSize: '1rem', color: '#fff', marginBottom: '4px' }}>{item.nome}</div>
+                        <div style={{ fontSize: '0.8rem', color: '#888', display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px' }}>
+                          <span style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px', color: '#ccc', fontWeight: 'bold' }}>{item.placa}</span>
+                          <span>•</span>
+                          <span>{new Date(item.dataHora).toLocaleDateString('pt-BR')}</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                          <a href={`https://wa.me/55${item.whatsapp.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" style={{ color: '#4ade80', textDecoration: 'none', fontSize: '0.75rem', fontWeight: '600', transition: 'opacity 0.2s' }} onMouseEnter={e => e.target.style.opacity = 0.8} onMouseLeave={e => e.target.style.opacity = 1}>🟢 WhatsApp</a>
+                          <button onClick={() => setSelectedPlacaForView(item.placa)} style={{ background: 'transparent', border: 'none', color: '#f59e0b', cursor: 'pointer', fontSize: '0.75rem', fontWeight: '600', padding: 0, transition: 'opacity 0.2s' }} onMouseEnter={e => e.target.style.opacity = 0.8} onMouseLeave={e => e.target.style.opacity = 1}>🔍 Veículo</button>
+                          <button onClick={() => setHistoryFilter(item.placa)} style={{ background: 'transparent', border: 'none', color: '#3b82f6', cursor: 'pointer', fontSize: '0.75rem', fontWeight: '600', padding: 0, transition: 'opacity 0.2s' }} onMouseEnter={e => e.target.style.opacity = 0.8} onMouseLeave={e => e.target.style.opacity = 1}>📋 Histórico</button>
                         </div>
                       </td>
-                      <td style={{ padding: '15px' }}>
-                        <div style={{ fontWeight: 'bold' }}>{item.servicoDesejado}</div>
-                        <div style={{ fontSize: '0.8rem', color: item.dataAgendamento ? '#dc2743' : '#666' }}>🕒 {agendamentoFormatado}</div>
+                      <td style={{ padding: '20px 15px' }}>
+                        <div style={{ fontWeight: '600', color: '#fff', fontSize: '0.95rem', marginBottom: '4px' }}>{item.servicoDesejado}</div>
+                        <div style={{ fontSize: '0.8rem', color: item.dataAgendamento ? '#ef4444' : '#666', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span>🕒</span>
+                          <span>{agendamentoFormatado}</span>
+                        </div>
                       </td>
-                      <td style={{ padding: '15px' }}>
+                      <td style={{ padding: '20px 15px' }}>
                         <div style={{ 
                           display: 'flex', 
                           alignItems: 'center', 
                           gap: '6px', 
-                          background: 'rgba(255,255,255,0.03)', 
+                          background: 'rgba(255,255,255,0.02)', 
                           padding: '6px 12px', 
                           borderRadius: '8px', 
-                          border: '1px solid rgba(255,255,255,0.08)', 
+                          border: '1px solid rgba(255,255,255,0.05)', 
                           width: 'fit-content',
-                          transition: 'all 0.2s ease-in-out'
+                          transition: 'all 0.2s ease'
                         }}>
                           <span style={{ color: '#4ade80', fontSize: '0.85rem', fontWeight: 'bold' }}>R$</span>
                           <input 
@@ -734,98 +747,111 @@ const AdminDashboard = () => {
                               background: 'transparent', 
                               color: '#4ade80', 
                               border: 'none', 
-                              fontWeight: '800',
+                              fontWeight: '700',
                               fontSize: '1rem',
                               outline: 'none',
                               textAlign: 'left',
                             }}
                             onFocus={(e) => {
                               e.currentTarget.parentElement.style.borderColor = '#4ade80';
-                              e.currentTarget.parentElement.style.background = 'rgba(74, 222, 128, 0.05)';
-                              e.currentTarget.parentElement.style.boxShadow = '0 0 8px rgba(74, 222, 128, 0.2)';
+                              e.currentTarget.parentElement.style.background = 'rgba(74, 222, 128, 0.03)';
+                              e.currentTarget.parentElement.style.boxShadow = '0 0 10px rgba(74, 222, 128, 0.15)';
                             }}
                             onBlur={(e) => {
-                              e.currentTarget.parentElement.style.borderColor = 'rgba(255,255,255,0.08)';
-                              e.currentTarget.parentElement.style.background = 'rgba(255,255,255,0.03)';
+                              e.currentTarget.parentElement.style.borderColor = 'rgba(255,255,255,0.05)';
+                              e.currentTarget.parentElement.style.background = 'rgba(255,255,255,0.02)';
                               e.currentTarget.parentElement.style.boxShadow = 'none';
                               handleUpdateValor(item.id, e.target.value || 0);
                             }}
                           />
                         </div>
                       </td>
-                      <td style={{ padding: '15px', minWidth: '180px' }}>
-                        <select 
-                          value={item.status} 
-                          onChange={(e) => handleStatusChange(item.id, e.target.value)}
-                          style={{ 
-                            padding: '8px 12px', 
-                            borderRadius: '8px', 
-                            background: '#150b0b', 
-                            color: item.status === 'Finalizado' ? '#4ade80' : item.status === 'Agendado' ? '#60a5fa' : '#ef4444', 
-                            border: `1px solid ${item.status === 'Finalizado' ? '#4ade80' : item.status === 'Agendado' ? '#3b82f6' : '#dc2743'}`,
-                            fontSize: '0.85rem', 
-                            width: '100%', 
-                            fontWeight: 'bold',
-                            marginBottom: '8px',
-                            cursor: 'pointer',
-                            outline: 'none',
-                            transition: 'all 0.2s'
-                          }}
-                        >
-                          <option value="Pendente" style={{ color: '#ef4444', background: '#111' }}>Pendente</option>
-                          <option value="Agendado" style={{ color: '#60a5fa', background: '#111' }}>Agendado</option>
-                          <option value="Finalizado" style={{ color: '#4ade80', background: '#111' }}>Finalizado</option>
-                        </select>
- 
-                        {item.status !== 'Finalizado' && (() => {
-                          const { passo, ponto } = parseProgresso(item.status, item.avaliacaoSite);
-                          return (
-                            <div style={{ padding: '8px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                              <label style={{ display: 'block', fontSize: '0.7rem', color: '#888', marginBottom: '4px' }}>Progresso (Passo)</label>
-                              <select 
-                                value={passo} 
-                                onChange={(e) => handleProgressChange(item.id, parseInt(e.target.value, 10), ponto)}
-                                style={{ width: '100%', padding: '4px', background: '#111', color: '#fff', border: '1px solid #333', borderRadius: '4px', fontSize: '0.75rem', marginBottom: '8px' }}
-                              >
-                                <option value="0">0 - Recebido 🚗💥</option>
-                                <option value="1">1 - Diagnóstico 🚗🔧</option>
-                                <option value="2">2 - Manutenção 🚗⚙️</option>
-                                <option value="3">3 - Fase Final 🚗✨</option>
-                              </select>
- 
-                              <label style={{ display: 'block', fontSize: '0.7rem', color: '#888', marginBottom: '4px' }}>Nome da Etapa</label>
-                              <input 
-                                type="text" 
-                                defaultValue={ponto}
-                                onBlur={(e) => handleProgressChange(item.id, passo, e.target.value)}
-                                placeholder="Ex: Chegou à oficina"
-                                style={{ width: '100%', padding: '5px', background: '#111', color: '#fff', border: '1px solid #333', borderRadius: '4px', fontSize: '0.75rem' }}
-                              />
-                            </div>
-                          );
-                        })()}
+                      <td style={{ padding: '20px 15px', minWidth: '200px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <select 
+                            value={item.status} 
+                            onChange={(e) => handleStatusChange(item.id, e.target.value)}
+                            style={{ 
+                              padding: '8px 12px', 
+                              borderRadius: '8px', 
+                              background: 'rgba(255,255,255,0.02)', 
+                              color: item.status === 'Finalizado' ? '#4ade80' : item.status === 'Agendado' ? '#60a5fa' : '#ef4444', 
+                              border: `1px solid ${item.status === 'Finalizado' ? 'rgba(74,222,128,0.2)' : item.status === 'Agendado' ? 'rgba(59,130,246,0.2)' : 'rgba(239,68,68,0.2)'}`,
+                              fontSize: '0.85rem', 
+                              width: '100%', 
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              outline: 'none',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            <option value="Pendente" style={{ color: '#ef4444', background: '#111' }}>Pendente</option>
+                            <option value="Agendado" style={{ color: '#60a5fa', background: '#111' }}>Agendado</option>
+                            <option value="Finalizado" style={{ color: '#4ade80', background: '#111' }}>Finalizado</option>
+                          </select>
+   
+                          {item.status !== 'Finalizado' && (() => {
+                            const { passo, ponto } = parseProgresso(item.status, item.avaliacaoSite);
+                            return (
+                              <div style={{ 
+                                padding: '10px', 
+                                background: 'rgba(255,255,255,0.01)', 
+                                borderRadius: '8px', 
+                                border: '1px solid rgba(255,255,255,0.03)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '6px'
+                              }}>
+                                <select 
+                                  value={passo} 
+                                  onChange={(e) => handleProgressChange(item.id, parseInt(e.target.value, 10), ponto)}
+                                  style={{ width: '100%', padding: '6px', background: '#111', color: '#fff', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px', fontSize: '0.75rem' }}
+                                >
+                                  <option value="0">0 - Recebido 🚗💥</option>
+                                  <option value="1">1 - Diagnóstico 🚗🔧</option>
+                                  <option value="2">2 - Manutenção 🚗⚙️</option>
+                                  <option value="3">3 - Fase Final 🚗✨</option>
+                                </select>
+   
+                                <input 
+                                  type="text" 
+                                  defaultValue={ponto}
+                                  onBlur={(e) => handleProgressChange(item.id, passo, e.target.value)}
+                                  placeholder="Nome da etapa..."
+                                  style={{ width: '100%', padding: '6px', background: '#111', color: '#fff', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px', fontSize: '0.75rem' }}
+                                />
+                              </div>
+                            );
+                          })()}
+                        </div>
                       </td>
-                      <td style={{ padding: '15px' }}>
-                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <td style={{ padding: '20px 15px' }}>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                           <button 
                             onClick={() => setSelectedForUpdate(item)} 
                             style={{ 
-                              background: 'rgba(59, 130, 246, 0.15)', 
+                              background: 'rgba(59, 130, 246, 0.08)', 
                               color: '#60a5fa', 
-                              border: '1px solid rgba(59, 130, 246, 0.3)', 
-                              padding: '8px 12px', 
-                              borderRadius: '8px', 
+                              border: '1px solid rgba(59, 130, 246, 0.15)', 
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '50%', 
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
                               cursor: 'pointer',
-                              fontSize: '1rem',
+                              fontSize: '0.95rem',
                               transition: 'all 0.2s',
                             }}
                             onMouseEnter={(e) => {
                               e.currentTarget.style.background = '#3b82f6';
                               e.currentTarget.style.color = '#fff';
+                              e.currentTarget.style.transform = 'translateY(-2px)';
                             }}
                             onMouseLeave={(e) => {
-                              e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)';
+                              e.currentTarget.style.background = 'rgba(59, 130, 246, 0.08)';
                               e.currentTarget.style.color = '#60a5fa';
+                              e.currentTarget.style.transform = 'translateY(0)';
                             }}
                             title="Atualizar status com foto"
                           >
@@ -834,22 +860,28 @@ const AdminDashboard = () => {
                           <button 
                             onClick={() => setSelectedClientForPDF(item)} 
                             style={{ 
-                              background: 'rgba(220, 39, 67, 0.15)', 
+                              background: 'rgba(220, 39, 67, 0.08)', 
                               color: '#f87171', 
-                              border: '1px solid rgba(220, 39, 67, 0.3)', 
-                              padding: '8px 12px', 
-                              borderRadius: '8px', 
+                              border: '1px solid rgba(220, 39, 67, 0.15)', 
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '50%', 
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
                               cursor: 'pointer',
-                              fontSize: '1rem',
+                              fontSize: '0.95rem',
                               transition: 'all 0.2s',
                             }}
                             onMouseEnter={(e) => {
                               e.currentTarget.style.background = '#dc2743';
                               e.currentTarget.style.color = '#fff';
+                              e.currentTarget.style.transform = 'translateY(-2px)';
                             }}
                             onMouseLeave={(e) => {
-                              e.currentTarget.style.background = 'rgba(220, 39, 67, 0.15)';
+                              e.currentTarget.style.background = 'rgba(220, 39, 67, 0.08)';
                               e.currentTarget.style.color = '#f87171';
+                              e.currentTarget.style.transform = 'translateY(0)';
                             }}
                             title="Gerar PDF"
                           >
@@ -858,22 +890,28 @@ const AdminDashboard = () => {
                           <button 
                             onClick={() => setSelectedForInvoice(item)} 
                             style={{ 
-                              background: 'rgba(16, 185, 129, 0.15)', 
+                              background: 'rgba(16, 185, 129, 0.08)', 
                               color: '#34d399', 
-                              border: '1px solid rgba(16, 185, 129, 0.3)', 
-                              padding: '8px 12px', 
-                              borderRadius: '8px', 
+                              border: '1px solid rgba(16, 185, 129, 0.15)', 
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '50%', 
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
                               cursor: 'pointer',
-                              fontSize: '1rem',
+                              fontSize: '0.95rem',
                               transition: 'all 0.2s',
                             }}
                             onMouseEnter={(e) => {
                               e.currentTarget.style.background = '#10b981';
                               e.currentTarget.style.color = '#fff';
+                              e.currentTarget.style.transform = 'translateY(-2px)';
                             }}
                             onMouseLeave={(e) => {
-                              e.currentTarget.style.background = 'rgba(16, 185, 129, 0.15)';
+                              e.currentTarget.style.background = 'rgba(16, 185, 129, 0.08)';
                               e.currentTarget.style.color = '#34d399';
+                              e.currentTarget.style.transform = 'translateY(0)';
                             }}
                             title="Emitir NF"
                           >
@@ -882,22 +920,28 @@ const AdminDashboard = () => {
                           <button 
                             onClick={() => handleDeleteAtendimento(item.id)} 
                             style={{ 
-                              background: 'rgba(239, 68, 68, 0.05)', 
+                              background: 'rgba(239, 68, 68, 0.04)', 
                               color: '#ef4444', 
-                              border: '1px solid rgba(239, 68, 68, 0.2)', 
-                              padding: '8px 12px', 
-                              borderRadius: '8px', 
+                              border: '1px solid rgba(239, 68, 68, 0.1)', 
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '50%', 
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
                               cursor: 'pointer',
-                              fontSize: '1rem',
+                              fontSize: '0.95rem',
                               transition: 'all 0.2s',
                             }}
                             onMouseEnter={(e) => {
                               e.currentTarget.style.background = '#ef4444';
                               e.currentTarget.style.color = '#fff';
+                              e.currentTarget.style.transform = 'translateY(-2px)';
                             }}
                             onMouseLeave={(e) => {
-                              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.05)';
+                              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.04)';
                               e.currentTarget.style.color = '#ef4444';
+                              e.currentTarget.style.transform = 'translateY(0)';
                             }}
                             title="Apagar"
                           >
