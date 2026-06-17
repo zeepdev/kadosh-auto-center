@@ -42,6 +42,8 @@ const ClientDashboard = () => {
   const [editingProfile, setEditingProfile] = useState(false);
   const [editForm, setEditForm] = useState({ nome_social: '', whatsapp: '', endereco: '' });
   const [savingProfile, setSavingProfile] = useState(false);
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
 
   // Estado para solicitar serviço
   const [showSolicitar, setShowSolicitar] = useState(false);
@@ -138,28 +140,65 @@ const ClientDashboard = () => {
     return v;
   };
 
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert('A foto deve ter no máximo 5MB.');
+        e.target.value = '';
+        return;
+      }
+      setAvatarFile(file);
+      setPreviewUrl(URL.createObjectURL(file));
+    }
+  };
+
   const startEditProfile = () => {
     setEditForm({
       nome_social: cliente?.nome_social || '',
       whatsapp: formatWhatsApp(cliente?.whatsapp || ''),
       endereco: cliente?.endereco || ''
     });
+    setAvatarFile(null);
+    setPreviewUrl(null);
     setEditingProfile(true);
   };
 
   const saveProfile = async () => {
     setSavingProfile(true);
     try {
+      let publicUrl = cliente?.foto_url || null;
+
+      // 1. Fazer upload da foto se existir
+      if (avatarFile) {
+        const fileExt = avatarFile.name.split('.').pop();
+        const fileName = `avatars/${user.id}_${Date.now()}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('fotos_servico')
+          .upload(fileName, avatarFile, { cacheControl: '3600', upsert: true });
+
+        if (uploadError) throw new Error('Erro ao fazer upload da foto: ' + uploadError.message);
+
+        const { data } = supabase.storage.from('fotos_servico').getPublicUrl(fileName);
+        publicUrl = data.publicUrl;
+      }
+
       const { error } = await supabase
         .from('clientes')
         .update({
           nome_social: editForm.nome_social || null,
           whatsapp: editForm.whatsapp.replace(/\D/g, ''),
-          endereco: editForm.endereco
+          endereco: editForm.endereco,
+          foto_url: publicUrl
         })
         .eq('id', user.id);
+        
       if (error) throw error;
+      
       setEditingProfile(false);
+      setAvatarFile(null);
+      setPreviewUrl(null);
       await fetchDados(user.id);
     } catch (error) {
       alert('Erro ao salvar perfil: ' + error.message);
@@ -460,11 +499,20 @@ const ClientDashboard = () => {
 
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px', flexWrap: 'wrap', gap: '20px' }}>
-          <div>
-            <h1 style={{ fontSize: '2.2rem', color: '#dc2743', margin: 0 }}>
-              Olá, {nomeExibicao.split(' ')[0] || 'Cliente'}! 👋
-            </h1>
-            <p style={{ color: '#aaa', margin: '5px 0 0 0' }}>Bem-vindo à sua área exclusiva Kadosh Auto Center</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            {cliente?.foto_url ? (
+              <img src={cliente.foto_url} alt="Foto de perfil" style={{ width: '60px', height: '60px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #dc2743' }} />
+            ) : (
+              <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: '#dc2743', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 'bold', border: '2px solid #dc2743', textTransform: 'uppercase' }}>
+                {nomeExibicao.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div>
+              <h1 style={{ fontSize: '2.2rem', color: '#dc2743', margin: 0 }}>
+                Olá, {nomeExibicao.split(' ')[0] || 'Cliente'}! 👋
+              </h1>
+              <p style={{ color: '#aaa', margin: '5px 0 0 0' }}>Bem-vindo à sua área exclusiva Kadosh Auto Center</p>
+            </div>
           </div>
           <div style={{ display: 'flex', gap: '10px' }}>
             {cliente?.is_admin && (
@@ -524,6 +572,24 @@ const ClientDashboard = () => {
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                <label>Foto de Perfil (Máx: 5MB)</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginTop: '5px' }}>
+                  {previewUrl || cliente?.foto_url ? (
+                    <img src={previewUrl || cliente.foto_url} alt="Preview" style={{ width: '60px', height: '60px', borderRadius: '50%', objectFit: 'cover', border: '1px solid #333' }} />
+                  ) : (
+                    <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: '#dc2743', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 'bold', border: '1px solid #333', textTransform: 'uppercase' }}>
+                      {nomeExibicao.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    style={{ background: '#111', color: '#fff', padding: '8px 12px', borderRadius: '8px', border: '1px solid #333', flex: 1, fontSize: '0.85rem' }}
+                  />
+                </div>
+              </div>
               <div className="form-group">
                 <label style={{ color: '#666' }}>Nome (não editável)</label>
                 <input type="text" value={cliente?.nome || ''} disabled style={{ opacity: 0.5, cursor: 'not-allowed' }} />

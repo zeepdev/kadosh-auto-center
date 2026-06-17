@@ -13,7 +13,7 @@ const Testimonials = () => {
     try {
       const { data, error } = await supabase
         .from('depoimentos')
-        .select('*')
+        .select('*, clientes(foto_url)')
         .eq('aprovado', true)
         .order('created_at', { ascending: false });
 
@@ -45,8 +45,12 @@ const Testimonials = () => {
               </div>
               <p className="testimonial-text">"{d.comentario}"</p>
               <div className="testimonial-footer">
-                <div className="testimonial-avatar">
-                  {d.nome.charAt(0).toUpperCase()}
+                <div className="testimonial-avatar" style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {d.clientes?.foto_url ? (
+                    <img src={d.clientes.foto_url} alt={d.nome} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    d.nome.charAt(0).toUpperCase()
+                  )}
                 </div>
                 <div>
                   <p className="testimonial-name">{d.nome}</p>

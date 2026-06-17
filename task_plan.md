@@ -58,6 +58,7 @@
    - Implementado suporte a **OAuth 2.0 (com Refresh Token)** para permitir uploads em contas pessoais do Gmail (evitando o erro `Service Accounts do not have storage quota` já que contas de serviço agora possuem cota zero para armazenamento próprio).
    - Adicionado o parâmetro `supportsAllDrives: true` para compatibilidade total com Drives Compartilhados.
 9. ✅ **Integração do Google reCAPTCHA v3**: Site Key instalada no `index.html` e scripts de token adicionados aos formulários públicos (`BudgetForm.jsx` e `RevisaoDetalhes.jsx`). Criado o endpoint `/api/verify-recaptcha` no backend para validar os envios usando a `RECAPTCHA_SECRET_KEY` (com bypass de segurança caso a chave não esteja configurada localmente, para não travar o desenvolvimento).
+10. ✅ **Foto de Perfil do Cliente e Depoimentos**: Desenvolvida a funcionalidade que permite aos clientes fazerem upload de suas próprias fotos de perfil (até 5MB) na área de edição de dados do painel do cliente (`ClientDashboard.jsx`), armazenando a foto no bucket público do Supabase. Modificada a listagem de depoimentos da página inicial (`Testimonials.jsx`) para buscar e exibir automaticamente as fotos reais dos autores (com fallback para a inicial estilizada do nome).
 
 ### 🟡 Média Prioridade
 1. ⏭️ **Reativar confirmação de e-mail** no Supabase com SMTP próprio + template customizado.

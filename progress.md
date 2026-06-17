@@ -441,3 +441,19 @@ Botão fica `disabled` se o cliente não tem nenhum veículo cadastrado, com tex
    - Se o reCAPTCHA falhar (score menor que 0.5), o formulário é travado e o usuário recebe um feedback de erro anti-spam. Caso o script seja bloqueado por adblock ou o servidor tenha problemas temporários, a validação é contornada de forma resiliente para não bloquear clientes legítimos.
 4. **Variáveis de Ambiente (`.env`)**:
    - Adicionados os placeholders para `RECAPTCHA_SECRET_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` e `GOOGLE_REFRESH_TOKEN` no arquivo de desenvolvimento.
+
+### 2026-06-17 — Foto de Perfil do Cliente e Depoimentos
+
+**Contexto**: O usuário solicitou que os clientes pudessem enviar sua própria foto de perfil (avatares de até 5MB) em suas contas e que estas fossem exibidas ao lado de seus depoimentos no carrossel de depoimentos do site.
+
+**Mudanças**:
+1. **Banco de Dados (Supabase)**:
+   - Identificada a necessidade de adicionar a coluna `foto_url TEXT` na tabela `clientes` do Supabase para armazenar a referência pública do avatar.
+2. **Painel do Cliente (`ClientDashboard.jsx`)**:
+   - Adicionados estados `avatarFile` e `previewUrl` para gerenciar a seleção e pré-visualização de imagem.
+   - Adicionado campo de upload de imagem para Foto de Perfil no modo de edição do perfil com validação limitando o arquivo a 5MB.
+   - Atualizada a função `saveProfile` para fazer o upload da foto selecionada para o bucket público `fotos_servico` do Supabase Storage no caminho `avatars/{user_id}_{timestamp}.{ext}`, obtendo a URL pública e salvando-a na coluna `foto_url` da tabela `clientes`.
+   - Renderizado o avatar circular do cliente ao lado da saudação "Olá, [Nome]!" no cabeçalho do painel do cliente, com fallback elegante (inicial do nome em círculo vermelho) se não houver foto.
+3. **Carrossel de Depoimentos (`Testimonials.jsx`)**:
+   - Modificada a consulta ao banco de dados no Supabase para buscar os depoimentos realizando um join na tabela de clientes: `.select('*, clientes(foto_url)')`.
+   - Atualizada a renderização dos cards de depoimento para exibir a foto do cliente caso ela exista, preservando o fallback original da letra inicial caso a foto não exista ou seja um depoimento anônimo.
