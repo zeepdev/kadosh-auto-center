@@ -906,14 +906,14 @@ const ClientDashboard = () => {
             e.preventDefault();
             const form = e.target;
             const comentario = form.comentario.value;
-            const estrelas = form.estrelas.value;
+            const estrelas = 5;
             
             try {
               const { error } = await supabase.from('depoimentos').insert([{
                 cliente_id: user.id,
                 nome: cliente?.nome_social || cliente?.nome || 'Cliente',
                 comentario,
-                estrelas: parseInt(estrelas),
+                estrelas: estrelas,
                 aprovado: false
               }]);
               if (error) throw error;
@@ -923,18 +923,6 @@ const ClientDashboard = () => {
               alert('Erro ao enviar depoimento: ' + err.message);
             }
           }}>
-            <div style={{ display: 'flex', gap: '20px', alignItems: 'center', marginBottom: '15px' }}>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', color: '#aaa' }}>Sua Nota</label>
-                <select name="estrelas" style={{ width: '100%', padding: '12px', background: '#111', color: '#fff', border: '1px solid #333', borderRadius: '8px' }}>
-                  <option value="5">⭐⭐⭐⭐⭐ (Excelente)</option>
-                  <option value="4">⭐⭐⭐⭐ (Muito Bom)</option>
-                  <option value="3">⭐⭐⭐ (Bom)</option>
-                  <option value="2">⭐⭐ (Regular)</option>
-                  <option value="1">⭐ (Ruim)</option>
-                </select>
-              </div>
-            </div>
             <div style={{ marginBottom: '15px' }}>
               <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', color: '#aaa' }}>Seu Comentário</label>
               <textarea 

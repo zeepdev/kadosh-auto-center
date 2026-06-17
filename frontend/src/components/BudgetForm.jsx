@@ -221,9 +221,9 @@ const BudgetForm = () => {
               target="_blank" 
               rel="noreferrer"
               className="btn" 
-              style={{ marginTop: '15px', background: '#25D366', display: 'inline-flex', alignItems: 'center', gap: '10px' }}
+              style={{ marginTop: '15px', background: '#25D366', display: 'inline-flex', alignItems: 'center', gap: '10px', textAlign: 'center' }}
             >
-              📱 Chamar no WhatsApp
+              📱 Fale com um mecânico especialista agora pelo WhatsApp
             </a>
             <p style={{ marginTop: '10px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>(62) 8152-9741</p>
           </div>
