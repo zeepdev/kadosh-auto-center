@@ -713,32 +713,42 @@ const AdminDashboard = () => {
                         <div style={{ fontSize: '0.8rem', color: item.dataAgendamento ? '#dc2743' : '#666' }}>🕒 {agendamentoFormatado}</div>
                       </td>
                       <td style={{ padding: '15px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                          <span style={{ color: '#888', fontSize: '0.85rem', fontWeight: 'bold' }}>R$</span>
+                        <div style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '6px', 
+                          background: 'rgba(255,255,255,0.03)', 
+                          padding: '6px 12px', 
+                          borderRadius: '8px', 
+                          border: '1px solid rgba(255,255,255,0.08)', 
+                          width: 'fit-content',
+                          transition: 'all 0.2s ease-in-out'
+                        }}>
+                          <span style={{ color: '#4ade80', fontSize: '0.85rem', fontWeight: 'bold' }}>R$</span>
                           <input 
                             key={item.id + '_' + (item.valor_total || 0)}
                             type="number" 
                             defaultValue={item.valor_total}
                             style={{ 
-                              width: '100px', 
-                              padding: '6px 10px', 
-                              borderRadius: '6px', 
-                              background: '#120707', 
+                              width: '75px', 
+                              background: 'transparent', 
                               color: '#4ade80', 
-                              border: '1px solid #333', 
+                              border: 'none', 
                               fontWeight: '800',
-                              fontSize: '0.95rem',
+                              fontSize: '1rem',
                               outline: 'none',
-                              transition: 'all 0.2s ease-in-out',
+                              textAlign: 'left',
                             }}
                             onFocus={(e) => {
-                              e.target.style.borderColor = '#4ade80';
-                              e.target.style.boxShadow = '0 0 8px rgba(74, 222, 128, 0.3)';
+                              e.currentTarget.parentElement.style.borderColor = '#4ade80';
+                              e.currentTarget.parentElement.style.background = 'rgba(74, 222, 128, 0.05)';
+                              e.currentTarget.parentElement.style.boxShadow = '0 0 8px rgba(74, 222, 128, 0.2)';
                             }}
                             onBlur={(e) => {
-                              e.target.style.borderColor = '#333';
-                              e.target.style.boxShadow = 'none';
-                              handleUpdateValor(item.id, e.target.value);
+                              e.currentTarget.parentElement.style.borderColor = 'rgba(255,255,255,0.08)';
+                              e.currentTarget.parentElement.style.background = 'rgba(255,255,255,0.03)';
+                              e.currentTarget.parentElement.style.boxShadow = 'none';
+                              handleUpdateValor(item.id, e.target.value || 0);
                             }}
                           />
                         </div>
@@ -748,16 +758,25 @@ const AdminDashboard = () => {
                           value={item.status} 
                           onChange={(e) => handleStatusChange(item.id, e.target.value)}
                           style={{ 
-                            padding: '8px', borderRadius: '4px', background: '#222', color: '#fff', 
-                            border: item.status === 'Finalizado' ? '1px solid #4ade80' : '1px solid #dc2743',
-                            fontSize: '0.85rem', width: '100%', marginBottom: '8px'
+                            padding: '8px 12px', 
+                            borderRadius: '8px', 
+                            background: '#150b0b', 
+                            color: item.status === 'Finalizado' ? '#4ade80' : item.status === 'Agendado' ? '#60a5fa' : '#ef4444', 
+                            border: `1px solid ${item.status === 'Finalizado' ? '#4ade80' : item.status === 'Agendado' ? '#3b82f6' : '#dc2743'}`,
+                            fontSize: '0.85rem', 
+                            width: '100%', 
+                            fontWeight: 'bold',
+                            marginBottom: '8px',
+                            cursor: 'pointer',
+                            outline: 'none',
+                            transition: 'all 0.2s'
                           }}
                         >
-                          <option value="Pendente">Pendente</option>
-                          <option value="Agendado">Agendado</option>
-                          <option value="Finalizado">Finalizado</option>
+                          <option value="Pendente" style={{ color: '#ef4444', background: '#111' }}>Pendente</option>
+                          <option value="Agendado" style={{ color: '#60a5fa', background: '#111' }}>Agendado</option>
+                          <option value="Finalizado" style={{ color: '#4ade80', background: '#111' }}>Finalizado</option>
                         </select>
-
+ 
                         {item.status !== 'Finalizado' && (() => {
                           const { passo, ponto } = parseProgresso(item.status, item.avaliacaoSite);
                           return (
@@ -773,7 +792,7 @@ const AdminDashboard = () => {
                                 <option value="2">2 - Manutenção 🚗⚙️</option>
                                 <option value="3">3 - Fase Final 🚗✨</option>
                               </select>
-
+ 
                               <label style={{ display: 'block', fontSize: '0.7rem', color: '#888', marginBottom: '4px' }}>Nome da Etapa</label>
                               <input 
                                 type="text" 
@@ -788,10 +807,102 @@ const AdminDashboard = () => {
                       </td>
                       <td style={{ padding: '15px' }}>
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                          <button onClick={() => setSelectedForUpdate(item)} style={{ background: '#3b82f6', color: '#fff', border: 'none', padding: '8px', borderRadius: '6px', cursor: 'pointer' }} title="Atualizar status com foto">📸</button>
-                          <button onClick={() => setSelectedClientForPDF(item)} style={{ background: '#dc2743', color: '#fff', border: 'none', padding: '8px', borderRadius: '6px', cursor: 'pointer' }} title="Gerar PDF">📄</button>
-                          <button onClick={() => setSelectedForInvoice(item)} style={{ background: '#10b981', color: '#fff', border: 'none', padding: '8px', borderRadius: '6px', cursor: 'pointer' }} title="Emitir NF">🧾</button>
-                          <button onClick={() => handleDeleteAtendimento(item.id)} style={{ background: 'transparent', color: '#f87171', border: '1px solid #f87171', padding: '8px', borderRadius: '6px', cursor: 'pointer' }} title="Apagar">🗑️</button>
+                          <button 
+                            onClick={() => setSelectedForUpdate(item)} 
+                            style={{ 
+                              background: 'rgba(59, 130, 246, 0.15)', 
+                              color: '#60a5fa', 
+                              border: '1px solid rgba(59, 130, 246, 0.3)', 
+                              padding: '8px 12px', 
+                              borderRadius: '8px', 
+                              cursor: 'pointer',
+                              fontSize: '1rem',
+                              transition: 'all 0.2s',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = '#3b82f6';
+                              e.currentTarget.style.color = '#fff';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)';
+                              e.currentTarget.style.color = '#60a5fa';
+                            }}
+                            title="Atualizar status com foto"
+                          >
+                            📸
+                          </button>
+                          <button 
+                            onClick={() => setSelectedClientForPDF(item)} 
+                            style={{ 
+                              background: 'rgba(220, 39, 67, 0.15)', 
+                              color: '#f87171', 
+                              border: '1px solid rgba(220, 39, 67, 0.3)', 
+                              padding: '8px 12px', 
+                              borderRadius: '8px', 
+                              cursor: 'pointer',
+                              fontSize: '1rem',
+                              transition: 'all 0.2s',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = '#dc2743';
+                              e.currentTarget.style.color = '#fff';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'rgba(220, 39, 67, 0.15)';
+                              e.currentTarget.style.color = '#f87171';
+                            }}
+                            title="Gerar PDF"
+                          >
+                            📄
+                          </button>
+                          <button 
+                            onClick={() => setSelectedForInvoice(item)} 
+                            style={{ 
+                              background: 'rgba(16, 185, 129, 0.15)', 
+                              color: '#34d399', 
+                              border: '1px solid rgba(16, 185, 129, 0.3)', 
+                              padding: '8px 12px', 
+                              borderRadius: '8px', 
+                              cursor: 'pointer',
+                              fontSize: '1rem',
+                              transition: 'all 0.2s',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = '#10b981';
+                              e.currentTarget.style.color = '#fff';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'rgba(16, 185, 129, 0.15)';
+                              e.currentTarget.style.color = '#34d399';
+                            }}
+                            title="Emitir NF"
+                          >
+                            🧾
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteAtendimento(item.id)} 
+                            style={{ 
+                              background: 'rgba(239, 68, 68, 0.05)', 
+                              color: '#ef4444', 
+                              border: '1px solid rgba(239, 68, 68, 0.2)', 
+                              padding: '8px 12px', 
+                              borderRadius: '8px', 
+                              cursor: 'pointer',
+                              fontSize: '1rem',
+                              transition: 'all 0.2s',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = '#ef4444';
+                              e.currentTarget.style.color = '#fff';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.05)';
+                              e.currentTarget.style.color = '#ef4444';
+                            }}
+                            title="Apagar"
+                          >
+                            🗑️
+                          </button>
                         </div>
                       </td>
                     </tr>
