@@ -241,8 +241,8 @@ const BudgetForm = () => {
               <input type="text" name="whatsapp" required value={formData.whatsapp} onChange={handleChange} />
             </div>
             <div className="form-group">
-              <label>Placa do Veículo *</label>
-              <input type="text" name="placa" required placeholder="AAA-0A00" value={formData.placa} onChange={handleChange} />
+              <label>Placa do Veículo (Opcional — agiliza muito o atendimento)</label>
+              <input type="text" name="placa" placeholder="AAA-0A00" value={formData.placa} onChange={handleChange} />
             </div>
           </div>
 

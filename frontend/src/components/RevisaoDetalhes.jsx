@@ -179,7 +179,7 @@ const RevisaoDetalhes = () => {
 
   const handleSolicitar = async (e) => {
     e.preventDefault();
-    if (!formData.nome || !formData.whatsapp || !formData.placa) {
+    if (!formData.nome || !formData.whatsapp) {
       alert('Por favor, preencha todos os campos obrigatórios (*).');
       return;
     }
@@ -248,7 +248,7 @@ const RevisaoDetalhes = () => {
       email: formData.email || '',
       whatsapp: formData.whatsapp.replace(/\D/g, ''),
       telefone: formData.whatsapp.replace(/\D/g, ''),
-      placa: formData.placa.toUpperCase(),
+      placa: (formData.placa || '').toUpperCase(),
       cep: '', // Garante campo cep preenchido para evitar restrições de coluna
       servicoDesejado: plano.nome,
       descricao: `Solicitação de revisão via site (${plano.nome})`,
@@ -529,12 +529,13 @@ const RevisaoDetalhes = () => {
             </div>
 
             <div className="form-group">
-              <label>Placa do Veículo *</label>
+              <label>Placa do Veículo (Opcional — agiliza muito o atendimento)</label>
               {user && veiculos.length > 0 ? (
                 <select 
                   value={formData.placa} 
                   onChange={e => setFormData(prev => ({ ...prev, placa: e.target.value }))}
                 >
+                  <option value="">Selecione um veículo (opcional)...</option>
                   {veiculos.map(v => (
                     <option key={v.id} value={v.placa}>
                       {v.placa} — {v.marca} {v.modelo} {v.is_principal ? '(principal)' : ''}
@@ -546,7 +547,6 @@ const RevisaoDetalhes = () => {
                   type="text" 
                   value={formData.placa} 
                   onChange={handlePlacaChange}
-                  required 
                   placeholder="AAA-0A00"
                   maxLength="8"
                 />
