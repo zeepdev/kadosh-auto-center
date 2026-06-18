@@ -215,15 +215,15 @@ const BudgetForm = () => {
             Nossa equipe entrará em contato rapidamente para confirmar.
           </p>
           <div className="glass" style={{ padding: '30px', display: 'inline-block' }}>
-            <h3 style={{ color: 'var(--accent-color)' }}>Fale Conosco Agora</h3>
+            <h3 style={{ color: 'var(--accent-color)' }}>Fale com um mecânico especialista agora pelo WhatsApp</h3>
             <a 
               href="https://wa.me/556281529741" 
               target="_blank" 
               rel="noreferrer"
               className="btn" 
-              style={{ marginTop: '15px', background: '#25D366', display: 'inline-flex', alignItems: 'center', gap: '10px', textAlign: 'center' }}
+              style={{ marginTop: '15px', background: '#25D366', display: 'inline-flex', alignItems: 'center', gap: '10px' }}
             >
-              📱 Fale com um mecânico especialista agora pelo WhatsApp
+              📱 Chamar no WhatsApp
             </a>
             <p style={{ marginTop: '10px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>(62) 8152-9741</p>
           </div>
