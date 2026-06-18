@@ -90,8 +90,8 @@ const ClientDashboard = () => {
   };
 
   const enviarServico = async () => {
-    if (!novoServico.placa || !novoServico.descricao) {
-      alert('Selecione um veículo e descreva o serviço.');
+    if (!novoServico.placa) {
+      alert('Selecione um veículo.');
       return;
     }
     if (novoServico.dataReserva && !novoServico.horaReserva) {
@@ -697,7 +697,7 @@ const ClientDashboard = () => {
               </div>
 
               <div className="form-group">
-                <label>Descrição do problema / serviço *</label>
+                <label>Descrição do problema / serviço</label>
                 <textarea
                   rows="3"
                   value={novoServico.descricao}

@@ -362,8 +362,8 @@ const BudgetForm = () => {
           )}
 
           <div className="form-group">
-            <label>Descrição do Problema / Serviço *</label>
-            <textarea name="descricao" rows="3" required value={formData.descricao} onChange={handleChange}></textarea>
+            <label>Descrição do Problema / Serviço</label>
+            <textarea name="descricao" rows="3" value={formData.descricao} onChange={handleChange}></textarea>
           </div>
 
           {formErrors && <div style={{ color: '#f87171', marginBottom: '15px', fontWeight: 'bold' }}>⚠️ {formErrors}</div>}
