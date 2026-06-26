@@ -254,8 +254,7 @@ const RevisaoDetalhes = () => {
       descricao: `Solicitação de revisão via site (${plano.nome})`,
       avaliacaoSite: '5',
       dataAgendamento,
-      status: 'Pendente',
-      cliente_id: user ? user.id : null // Garante explicitamente null ou UUID para RLS
+      ...(user && { cliente_id: user.id })
     };
 
     try {
