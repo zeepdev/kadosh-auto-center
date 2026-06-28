@@ -58,7 +58,7 @@ const CompleteRegistration = () => {
   };
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#0a0505', color: '#fff', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '40px 20px' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#0a0a0c', color: '#fff', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '40px 20px' }}>
       <form onSubmit={handleSubmit} className="glass" style={{ padding: '40px', maxWidth: '500px', width: '100%', borderRadius: '12px', border: '1px solid #e10600' }}>
         <h2 style={{ color: '#e10600', marginBottom: '10px', textAlign: 'center' }}>Complete seu Cadastro</h2>
         <p style={{ color: '#aaa', marginBottom: '30px', textAlign: 'center', lineHeight: '1.5' }}>

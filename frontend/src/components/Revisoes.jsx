@@ -10,7 +10,7 @@ const Revisoes = () => {
   const styles = {
     container: {
       minHeight: '100vh',
-      backgroundColor: '#0a0505',
+      backgroundColor: '#0a0a0c',
       color: '#fff',
       display: 'flex',
       flexDirection: 'column'
@@ -33,7 +33,7 @@ const Revisoes = () => {
       width: '100%',
       height: '100%',
       backgroundImage: `url('/images/pacotes-capa.png')`,
-      background: 'linear-gradient(135deg, rgba(20, 8, 8, 0.9) 0%, rgba(10, 5, 5, 0.95) 100%), url("/images/pacotes-capa.png")',
+      background: 'linear-gradient(135deg, rgba(12, 12, 15, 0.88) 0%, rgba(8, 8, 10, 0.95) 100%), url("/images/pacotes-capa.png")',
       backgroundSize: 'cover',
       backgroundPosition: 'center',
       zIndex: 1

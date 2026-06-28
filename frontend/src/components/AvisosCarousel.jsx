@@ -36,7 +36,7 @@ const AvisosCarousel = () => {
   if (avisos.length === 0) return null; // Se não tiver avisos, nem renderiza a sessão
 
   return (
-    <section style={{ padding: '0 20px', backgroundColor: '#0a0505' }}>
+    <section style={{ padding: '0 20px', backgroundColor: '#0a0a0c' }}>
       <div style={{ 
         width: '100%', 
         maxWidth: '1100px', 

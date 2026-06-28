@@ -326,15 +326,15 @@ const AdminDashboard = () => {
 
   if (checkingSession) {
     return (
-      <div style={{ minHeight: '100vh', backgroundColor: '#0a0505', color: '#fff', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-        <p style={{ color: '#aaa' }}>Verificando sessão...</p>
+      <div className="dash-page" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <p style={{ color: 'var(--text-muted)' }}>Verificando sessão...</p>
       </div>
     );
   }
 
   if (!isAuthenticated) {
     return (
-      <div style={{ minHeight: '100vh', backgroundColor: '#0a0505', color: '#fff', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+      <div className="dash-page" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
         <form onSubmit={handleLogin} className="glass" style={{ padding: '50px 40px', maxWidth: '400px', width: '100%' }}>
           <h2 style={{ color: '#e10600', marginBottom: '10px', textAlign: 'center' }}>Acesso Restrito</h2>
           <p style={{ color: '#aaa', marginBottom: '30px', textAlign: 'center' }}>Área exclusiva da Gestão Kadosh</p>
@@ -413,9 +413,9 @@ const AdminDashboard = () => {
   }, {});
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#0a0505', color: '#fff', padding: '40px 20px' }}>
-      <div className="container" style={{ maxWidth: '1200px', margin: '0 auto' }}>
-        
+    <div className="dash-page">
+      <div className="dash-wrap" style={{ maxWidth: '1200px' }}>
+
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px', flexWrap: 'wrap', gap: '20px' }}>
           <div>
             <h1 style={{ fontSize: '2.5rem', color: '#e10600', margin: 0 }}>Painel Kadosh</h1>
@@ -672,7 +672,7 @@ const AdminDashboard = () => {
           ) : activeTab !== 'depoimentos' && (
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead>
-                <tr style={{ background: '#1a0d0d', borderBottom: '2px solid #333' }}>
+                <tr style={{ background: 'var(--bg-elev)', borderBottom: '2px solid var(--hairline)' }}>
                   <th style={{ padding: '15px' }}>Prioridade</th>
                   <th style={{ padding: '15px' }}>Cliente / Veículo</th>
                   <th style={{ padding: '15px' }}>Serviço</th>

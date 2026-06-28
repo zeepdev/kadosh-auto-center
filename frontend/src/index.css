@@ -523,3 +523,54 @@ section {
   .nav-links { display: none; }
   .mobile-toggle { display: block; }
 }
+
+/* ============ DASHBOARDS / PÁGINAS INTERNAS ============ */
+.dash-page {
+  min-height: 100vh;
+  background: var(--bg-primary);
+  color: var(--text-main);
+  padding: 116px 20px 70px; /* topo livre da navbar fixa */
+}
+.dash-wrap { max-width: 1100px; margin: 0 auto; }
+
+/* Título de seção interna com barrinha vermelha */
+.panel-title {
+  font-family: 'Archivo', sans-serif;
+  font-weight: 800;
+  font-size: 1.15rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+}
+.panel-title::before {
+  content: '';
+  width: 4px;
+  height: 1.1em;
+  background: var(--accent-color);
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* Cartão sólido para painéis internos (mais contraste que glass) */
+.panel {
+  background: var(--bg-elev);
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+}
+
+/* Chip/badge genérico */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.chip-accent { background: var(--accent-soft); color: var(--accent-color); border: 1px solid rgba(225, 6, 0, 0.4); }

@@ -388,146 +388,111 @@ const ClientDashboard = () => {
     const activeServices = orcamentos.filter(item => item.status !== 'Finalizado');
     if (activeServices.length === 0) return null;
 
+    const si = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: 'round', strokeLinejoin: 'round' };
+    const StepIcon = ({ name }) => {
+      switch (name) {
+        case 'car': return <svg viewBox="0 0 24 24" width="20" height="20"><path {...si} d="M4 14l1.6-4.2A2 2 0 017.5 8.5h9a2 2 0 011.9 1.3L20 14M4 14h16M4 14v3M20 14v3" /><circle {...si} cx="7.5" cy="17" r="1.6" /><circle {...si} cx="16.5" cy="17" r="1.6" /></svg>;
+        case 'scan': return <svg viewBox="0 0 24 24" width="20" height="20"><circle {...si} cx="11" cy="11" r="6" /><path {...si} d="M20 20l-4-4" /></svg>;
+        case 'wrench': return <svg viewBox="0 0 24 24" width="20" height="20"><path {...si} d="M15 6a4 4 0 00-5.2 5.2L4 17v3h3l5.8-5.8A4 4 0 0018 9l-2.5 2.5-2-2L16 7" /></svg>;
+        case 'sliders': return <svg viewBox="0 0 24 24" width="20" height="20"><path {...si} d="M4 8h10M18 8h2M4 16h2M10 16h10" /><circle {...si} cx="16" cy="8" r="2" /><circle {...si} cx="8" cy="16" r="2" /></svg>;
+        case 'flag': return <svg viewBox="0 0 24 24" width="20" height="20"><path {...si} d="M6 21V4M6 4h11l-2 3.5L17 11H6" /></svg>;
+        default: return null;
+      }
+    };
+    const Check = () => <svg viewBox="0 0 24 24" width="20" height="20"><path {...si} strokeWidth="2.2" d="M5 12.5l4.5 4.5L19 7" /></svg>;
+
+    const steps = [
+      { label: 'Recebido', desc: 'Entrada na oficina', icon: 'car' },
+      { label: 'Diagnóstico', desc: 'Avaliação técnica', icon: 'scan' },
+      { label: 'Manutenção', desc: 'Reparos e trocas', icon: 'wrench' },
+      { label: 'Fase Final', desc: 'Ajustes e testes', icon: 'sliders' },
+      { label: 'Pronto', desc: 'Pronto para retirar', icon: 'flag' },
+    ];
+
     return (
       <div style={{ marginBottom: '35px' }}>
-        <h3 style={{ marginBottom: '15px', color: '#e10600', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          🔧 Progresso do Serviço em Tempo Real
-        </h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
+        <h3 className="panel-title" style={{ marginBottom: '18px' }}>Progresso do Serviço em Tempo Real</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
           {activeServices.map(item => {
             const { passo, ponto } = parseProgresso(item.status, item.avaliacaoSite);
-            
-            const steps = [
-              { label: 'Recebido', desc: 'Entrada na Oficina' },
-              { label: 'Diagnóstico', desc: 'Avaliação técnica' },
-              { label: 'Manutenção', desc: 'Reparos e Trocas' },
-              { label: 'Fase Final', desc: 'Ajustes e Testes' },
-              { label: 'Pronto', desc: 'Pronto para Retirar' }
-            ];
-
-            // Ícone de carro que muda com base no passo
-            let carIcon = '🚗💥'; // Passo 0: Quebrado
-            if (passo >= 1 && passo <= 3) {
-              carIcon = '🚗🔧'; // Passos 1-3: Sendo consertado
-            } else if (passo === 4) {
-              carIcon = '🚗✨'; // Passo 4: Arrrumado / Pronto
-            }
-
             return (
-              <div key={item.id} className="glass" style={{ padding: '25px', borderLeft: '4px solid #e10600' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px', marginBottom: '15px' }}>
+              <div key={item.id} className="prog-card">
+                <div className="prog-head">
                   <div>
-                    <h4 style={{ margin: 0, fontSize: '1.25rem', color: '#fff' }}>
-                      {item.servicoDesejado} - Placa: <span style={{ color: '#e10600', fontWeight: 'bold' }}>{item.placa}</span>
-                    </h4>
-                    <p style={{ margin: '5px 0 0 0', color: '#aaa', fontSize: '0.9rem' }}>
-                      {item.descricao}
-                    </p>
+                    <h4 className="prog-title">{item.servicoDesejado} <b>· {item.placa}</b></h4>
+                    {item.descricao && <p className="prog-sub">{item.descricao}</p>}
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <span style={{ 
-                      padding: '5px 12px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold',
-                      background: 'rgba(220, 39, 67, 0.15)', color: '#e10600', border: '1px solid #e10600'
-                    }}>
-                      Etapa Atual: {ponto}
-                    </span>
-                  </div>
+                  <span className="prog-chip"><span className="pdot" />{ponto}</span>
                 </div>
 
-                {/* Linha de Progresso Visual */}
-                <div style={{ position: 'relative', height: '70px', marginTop: '35px', display: 'flex', alignItems: 'center', padding: '0 15px' }}>
-                  {/* Linha Cinza de Fundo */}
-                  <div style={{ position: 'absolute', top: '50%', left: '15px', right: '15px', height: '4px', background: '#222', transform: 'translateY(-50%)', borderRadius: '2px', zIndex: 1 }}></div>
-                  
-                  {/* Linha Vermelha de Progresso */}
-                  <div style={{ 
-                    position: 'absolute', 
-                    top: '50%', 
-                    left: '15px', 
-                    width: `calc(${(passo / 4) * 100}% - ${passo === 0 ? 0 : 30}px)`, 
-                    height: '4px', 
-                    background: '#e10600', 
-                    transform: 'translateY(-50%)', 
-                    borderRadius: '2px', 
-                    zIndex: 2,
-                    transition: 'width 0.5s ease-out'
-                  }}></div>
-
-                  {/* Nodes de Etapa */}
+                <div className="stepper">
                   {steps.map((step, idx) => {
-                    const isCompleted = idx <= passo;
-                    const isActive = idx === passo;
+                    const done = idx < passo;
+                    const active = idx === passo;
+                    const cls = `pstep${idx <= passo ? ' reach' : ''}${done ? ' done' : ''}${active ? ' active' : ''}`;
                     return (
-                      <div 
-                        key={idx} 
-                        style={{ 
-                          position: 'absolute', 
-                          left: `${(idx / 4) * 100}%`, 
-                          transform: 'translateX(-50%)', 
-                          display: 'flex', 
-                          flexDirection: 'column', 
-                          alignItems: 'center',
-                          zIndex: 3 
-                        }}
-                      >
-                        {/* Indicador circular da etapa */}
-                        <div style={{ 
-                          width: '18px', 
-                          height: '18px', 
-                          borderRadius: '50%', 
-                          background: isActive ? '#e10600' : isCompleted ? '#e10600' : '#111', 
-                          border: isCompleted ? '2px solid #fff' : '2px solid #444',
-                          transition: 'all 0.3s ease',
-                          boxShadow: isActive ? '0 0 12px #e10600' : 'none'
-                        }}></div>
-                        
-                        {/* Rótulo da etapa */}
-                        <span style={{ 
-                          fontSize: '0.75rem', 
-                          color: isActive ? '#fff' : isCompleted ? '#aaa' : '#555', 
-                          marginTop: '8px', 
-                          fontWeight: isActive ? 'bold' : 'normal',
-                          whiteSpace: 'nowrap'
-                        }}>
-                          {step.label}
-                        </span>
+                      <div key={idx} className={cls}>
+                        <span className="pnode">{done ? <Check /> : <StepIcon name={step.icon} />}</span>
+                        <span className="plabel">{step.label}</span>
+                        <span className="pdesc">{step.desc}</span>
                       </div>
                     );
                   })}
-
-                  {/* Carro que Anda */}
-                  <div style={{ 
-                    position: 'absolute', 
-                    left: `${(passo / 4) * 100}%`, 
-                    transform: 'translate(-50%, -35px)', 
-                    fontSize: '1.8rem',
-                    zIndex: 4,
-                    transition: 'left 0.5s ease-out',
-                    pointerEvents: 'none',
-                    filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.6))'
-                  }}>
-                    {carIcon}
-                  </div>
                 </div>
               </div>
             );
           })}
         </div>
+
+        <style>{`
+          .prog-card { position: relative; overflow: hidden; background: var(--bg-elev); border: 1px solid var(--hairline); border-radius: 16px; padding: 26px 30px 30px; }
+          .prog-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--accent-color), transparent 65%); }
+          .prog-head { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 36px; }
+          .prog-title { margin: 0; font-family: 'Archivo', sans-serif; font-weight: 800; font-size: 1.15rem; color: #fff; }
+          .prog-title b { color: var(--accent-color); font-weight: 800; }
+          .prog-sub { margin: 6px 0 0; color: var(--text-muted); font-size: 0.9rem; }
+          .prog-chip { display: inline-flex; align-items: center; gap: 9px; padding: 8px 16px; border-radius: 30px; background: var(--accent-soft); border: 1px solid rgba(225,6,0,0.35); color: var(--accent-color); font-size: 0.78rem; font-weight: 700; letter-spacing: .3px; white-space: nowrap; }
+          .prog-chip .pdot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-color); animation: pdot 1.6s ease-out infinite; }
+          @keyframes pdot { 0% { box-shadow: 0 0 0 0 rgba(225,6,0,.5); } 100% { box-shadow: 0 0 0 7px rgba(225,6,0,0); } }
+
+          .stepper { display: flex; }
+          .pstep { flex: 1; position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; }
+          .pstep::before { content: ''; position: absolute; top: 21px; left: -50%; width: 100%; height: 3px; background: #26262c; border-radius: 2px; z-index: 0; transition: background .4s ease; }
+          .pstep:first-child::before { display: none; }
+          .pstep.reach::before { background: var(--accent-color); }
+          .pnode { position: relative; z-index: 1; width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--bg-primary); border: 2px solid #2c2c33; color: #5a5a64; transition: all .35s ease; }
+          .pstep.done .pnode { background: var(--accent-color); border-color: var(--accent-color); color: #fff; }
+          .pstep.active .pnode { color: var(--accent-color); border-color: var(--accent-color); box-shadow: 0 0 0 5px var(--accent-soft), 0 0 20px -2px var(--accent-glow); }
+          .pstep.active .pnode::after { content: ''; position: absolute; inset: -2px; border-radius: 50%; border: 2px solid var(--accent-color); animation: pring 1.9s ease-out infinite; }
+          @keyframes pring { 0% { transform: scale(1); opacity: .7; } 100% { transform: scale(1.55); opacity: 0; } }
+          .plabel { margin-top: 13px; font-size: 0.82rem; font-weight: 700; color: #7a7a82; transition: color .3s; }
+          .pstep.done .plabel, .pstep.active .plabel { color: #fff; }
+          .pdesc { font-size: 0.72rem; color: var(--text-dim); margin-top: 3px; }
+          @media (prefers-reduced-motion: reduce) { .pdot, .pstep.active .pnode::after { animation: none; } }
+          @media (max-width: 620px) {
+            .prog-card { padding: 22px 18px 24px; }
+            .pnode { width: 34px; height: 34px; }
+            .pnode svg { width: 16px; height: 16px; }
+            .pstep::before { top: 16px; }
+            .plabel { font-size: 0.68rem; margin-top: 9px; }
+            .pdesc { display: none; }
+          }
+        `}</style>
       </div>
     );
   };
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', backgroundColor: '#0a0505', color: '#fff', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-        <p style={{ fontSize: '1.2rem', color: '#aaa' }}>Carregando seus dados...</p>
+      <div className="dash-page" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <p style={{ fontSize: '1.2rem', color: 'var(--text-muted)' }}>Carregando seus dados...</p>
       </div>
     );
   }
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#0a0505', color: '#fff', padding: '40px 20px' }}>
-      <div className="container" style={{ maxWidth: '1100px', margin: '0 auto' }}>
+    <div className="dash-page">
+      <div className="dash-wrap">
 
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px', flexWrap: 'wrap', gap: '20px' }}>
@@ -558,7 +523,7 @@ const ClientDashboard = () => {
         {/* Cards de Info do Cliente */}
         <div className="glass" style={{ padding: '25px', marginBottom: '30px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-            <h3 style={{ color: '#e10600', margin: 0 }}>Seus Dados</h3>
+            <h3 className="panel-title">Seus Dados</h3>
             {!editingProfile ? (
               <button onClick={startEditProfile} style={{ background: 'transparent', border: '1px solid #e10600', color: '#e10600', padding: '6px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
                 ✏️ Editar
@@ -651,11 +616,11 @@ const ClientDashboard = () => {
         </div>
 
         {/* Solicitar Serviço */}
-        <div className="glass" style={{ padding: '25px', marginBottom: '30px', borderLeft: '4px solid #4ade80' }}>
+        <div className="glass" style={{ padding: '25px', marginBottom: '30px', borderLeft: '4px solid var(--accent-color)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
             <div>
-              <h3 style={{ margin: 0, color: '#4ade80' }}>🛠️ Solicitar Novo Serviço</h3>
-              <p style={{ color: '#aaa', margin: '5px 0 0 0', fontSize: '0.9rem' }}>
+              <h3 className="panel-title">🛠️ Solicitar Novo Serviço</h3>
+              <p style={{ color: 'var(--text-muted)', margin: '8px 0 0 0', fontSize: '0.9rem' }}>
                 Seus dados já estão salvos — só preencha o que precisa de fato.
               </p>
             </div>
@@ -664,7 +629,7 @@ const ClientDashboard = () => {
                 onClick={abrirSolicitar}
                 disabled={veiculos.length === 0}
                 className="btn"
-                style={{ background: '#4ade80', color: '#000', fontSize: '0.95rem', padding: '12px 24px' }}
+                style={{ fontSize: '0.95rem', padding: '12px 24px' }}
               >
                 {veiculos.length === 0 ? 'Cadastre um veículo primeiro' : '+ Solicitar Serviço'}
               </button>
@@ -727,7 +692,7 @@ const ClientDashboard = () => {
               </div>
 
               <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
-                <button onClick={enviarServico} disabled={enviandoServico} className="btn" style={{ background: '#4ade80', color: '#000' }}>
+                <button onClick={enviarServico} disabled={enviandoServico} className="btn">
                   {enviandoServico ? 'Enviando...' : 'Enviar Solicitação'}
                 </button>
                 <button onClick={() => setShowSolicitar(false)} disabled={enviandoServico} style={{ background: 'transparent', border: '1px solid #aaa', color: '#aaa', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer' }}>
@@ -755,7 +720,7 @@ const ClientDashboard = () => {
         {/* Veículos */}
         <div style={{ marginBottom: '30px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-            <h3>🚗 Meus Veículos</h3>
+            <h3 className="panel-title">🚗 Meus Veículos</h3>
             <button onClick={() => setShowAddVeiculo(!showAddVeiculo)} className="btn" style={{ fontSize: '0.85rem', padding: '10px 20px' }}>
               {showAddVeiculo ? 'Cancelar' : '+ Adicionar Veículo'}
             </button>
@@ -896,9 +861,9 @@ const ClientDashboard = () => {
         </div>
 
         {/* Deixar Depoimento */}
-        <div className="glass" style={{ padding: '25px', marginBottom: '30px', borderLeft: '4px solid #f59e0b' }}>
-          <h3 style={{ margin: 0, color: '#f59e0b' }}>⭐ Deixar um Depoimento</h3>
-          <p style={{ color: '#aaa', margin: '5px 0 20px 0', fontSize: '0.9rem' }}>
+        <div className="glass" style={{ padding: '25px', marginBottom: '30px', borderLeft: '4px solid var(--accent-color)' }}>
+          <h3 className="panel-title">⭐ Deixar um Depoimento</h3>
+          <p style={{ color: 'var(--text-muted)', margin: '8px 0 20px 0', fontSize: '0.9rem' }}>
             Sua opinião é fundamental para nós. Conte como foi sua experiência na Kadosh!
           </p>
           
@@ -934,20 +899,20 @@ const ClientDashboard = () => {
               />
               <p style={{ margin: '5px 0 0 0', fontSize: '0.75rem', color: '#666', fontStyle: 'italic' }}>* Seu depoimento passará por uma leve revisão gramatical para legibilidade antes de ser publicado no site.</p>
             </div>
-            <button type="submit" className="btn" style={{ background: '#f59e0b', color: '#000' }}>Enviar Depoimento</button>
+            <button type="submit" className="btn">Enviar Depoimento</button>
           </form>
         </div>
 
         {/* Histórico de Orçamentos */}
         <div>
-          <h3 style={{ marginBottom: '15px' }}>📋 Histórico de Serviços</h3>
+          <h3 className="panel-title" style={{ marginBottom: '15px' }}>📋 Histórico de Serviços</h3>
           <div className="glass" style={{ overflowX: 'auto', padding: '0', borderRadius: '12px' }}>
             {orcamentos.length === 0 ? (
               <p style={{ padding: '30px', textAlign: 'center', color: '#aaa' }}>Nenhum serviço encontrado para seus veículos.</p>
             ) : (
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead>
-                  <tr style={{ background: '#1a0d0d', borderBottom: '2px solid #333' }}>
+                  <tr style={{ background: 'var(--bg-elev)', borderBottom: '2px solid var(--hairline)' }}>
                     <th style={{ padding: '15px' }}>Prioridade</th>
                     <th style={{ padding: '15px' }}>Data</th>
                     <th style={{ padding: '15px' }}>Placa</th>
@@ -996,8 +961,8 @@ const ClientDashboard = () => {
         {/* Linha do Tempo (Atualizações com Fotos) */}
         {atualizacoes.length > 0 && (
           <div style={{ marginTop: '40px' }}>
-            <h3 style={{ marginBottom: '20px', color: '#e10600' }}>📸 Acompanhamento em Tempo Real</h3>
-            <p style={{ color: '#aaa', marginBottom: '20px' }}>Acompanhe o andamento do seu veículo na nossa oficina.</p>
+            <h3 className="panel-title" style={{ marginBottom: '20px' }}>📸 Acompanhamento em Tempo Real</h3>
+            <p style={{ color: 'var(--text-muted)', marginBottom: '20px' }}>Acompanhe o andamento do seu veículo na nossa oficina.</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               {atualizacoes.map(att => {
                 const orcamento = orcamentos.find(o => o.id === att.orcamento_id);

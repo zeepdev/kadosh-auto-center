@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
@@ -133,7 +133,7 @@ const InvoiceModal = ({ atendimento, onClose, onSuccess }) => {
             onClick={() => { onSuccess(); onClose(); }}
             style={{ 
               padding: '12px 30px', borderRadius: '8px', border: 'none', 
-              background: '#4ade80', color: '#0a0505', fontWeight: 'bold', cursor: 'pointer' 
+              background: '#4ade80', color: '#0a0a0c', fontWeight: 'bold', cursor: 'pointer' 
             }}
           >
             Fechar
@@ -244,7 +244,7 @@ const InvoiceModal = ({ atendimento, onClose, onSuccess }) => {
             disabled={loading}
             style={{ 
               width: '100%', padding: '15px', borderRadius: '8px', border: 'none', 
-              background: loading ? '#555' : '#4ade80', color: loading ? '#aaa' : '#0a0505', 
+              background: loading ? '#555' : '#4ade80', color: loading ? '#aaa' : '#0a0a0c', 
               fontWeight: 'bold', fontSize: '1rem', cursor: loading ? 'not-allowed' : 'pointer',
               display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px'
             }}

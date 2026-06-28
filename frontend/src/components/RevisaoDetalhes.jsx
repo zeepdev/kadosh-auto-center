@@ -299,7 +299,7 @@ const RevisaoDetalhes = () => {
 
   if (!plano) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0505', color: '#fff' }}>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0c', color: '#fff' }}>
         <div style={{ textAlign: 'center' }}>
           <h2>Revisão não encontrada.</h2>
           <Link to="/revisoes" className="btn" style={{ marginTop: '20px', display: 'inline-block' }}>Voltar às Revisões</Link>
@@ -311,7 +311,7 @@ const RevisaoDetalhes = () => {
   const styles = {
     container: {
       minHeight: '100vh',
-      backgroundColor: '#0a0505',
+      backgroundColor: '#0a0a0c',
       color: '#fff',
       display: 'flex',
       flexDirection: 'column',
