@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Link, useNavigate } from 'react-router-dom';
 import { translateError } from '../../lib/errorTranslations';
@@ -51,7 +51,7 @@ const Login = () => {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#0a0505', color: '#fff', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '40px 20px' }}>
       <form onSubmit={handleSubmit} className="glass" style={{ padding: '40px', maxWidth: '400px', width: '100%', borderRadius: '12px' }}>
-        <h2 style={{ color: '#dc2743', marginBottom: '10px', textAlign: 'center' }}>Login do Cliente</h2>
+        <h2 style={{ color: '#e10600', marginBottom: '10px', textAlign: 'center' }}>Login do Cliente</h2>
         <p style={{ color: '#aaa', marginBottom: '30px', textAlign: 'center' }}>Acesse sua área restrita.</p>
         
         <div className="form-group">
@@ -75,7 +75,7 @@ const Login = () => {
         </button>
 
         <p style={{ textAlign: 'center', marginTop: '20px', color: '#aaa' }}>
-          Não tem conta? <Link to="/cadastro" style={{ color: '#dc2743', fontWeight: 'bold' }}>Cadastre-se</Link>
+          Não tem conta? <Link to="/cadastro" style={{ color: '#e10600', fontWeight: 'bold' }}>Cadastre-se</Link>
         </p>
       </form>
     </div>

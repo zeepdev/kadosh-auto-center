@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 
 const AvisosCarousel = () => {
@@ -95,7 +95,7 @@ const AvisosCarousel = () => {
                     width: '10px',
                     height: '10px',
                     borderRadius: '50%',
-                    backgroundColor: index === currentIndex ? '#dc2743' : 'rgba(255,255,255,0.4)',
+                    backgroundColor: index === currentIndex ? '#e10600' : 'rgba(255,255,255,0.4)',
                     transition: 'background-color 0.3s ease',
                     cursor: 'pointer'
                   }}

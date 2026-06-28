@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { consultarPlaca } from '../../lib/placaApi';
 
 const ViewVehicleModal = ({ placa, onClose }) => {
@@ -38,7 +38,7 @@ const ViewVehicleModal = ({ placa, onClose }) => {
   };
 
   const SectionHeader = ({ icon, title }) => (
-    <h4 style={{ color: '#dc2743', margin: '20px 0 10px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+    <h4 style={{ color: '#e10600', margin: '20px 0 10px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
       {icon} {title}
     </h4>
   );
@@ -70,14 +70,14 @@ const ViewVehicleModal = ({ placa, onClose }) => {
           &times;
         </button>
 
-        <h2 style={{ color: '#dc2743', marginBottom: '5px', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.3rem' }}>
+        <h2 style={{ color: '#e10600', marginBottom: '5px', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.3rem' }}>
           🚘 Consulta de Veículo
         </h2>
         <p style={{ color: '#666', fontSize: '0.8rem', margin: '0 0 20px 0' }}>Dados em tempo real via API nacional</p>
 
         {loading ? (
           <div style={{ textAlign: 'center', padding: '50px 0' }}>
-            <div style={{ border: '4px solid rgba(255,255,255,0.1)', borderTop: '4px solid #dc2743', borderRadius: '50%', width: '45px', height: '45px', animation: 'spin 1s linear infinite', margin: '0 auto 15px' }}></div>
+            <div style={{ border: '4px solid rgba(255,255,255,0.1)', borderTop: '4px solid #e10600', borderRadius: '50%', width: '45px', height: '45px', animation: 'spin 1s linear infinite', margin: '0 auto 15px' }}></div>
             <p style={{ color: '#aaa' }}>Consultando base de dados nacional...</p>
             <p style={{ color: '#555', fontSize: '0.8rem' }}>Aguarde alguns segundos</p>
             <style>
@@ -241,7 +241,7 @@ const ViewVehicleModal = ({ placa, onClose }) => {
                   {fipeDados.length > 3 && (
                     <button
                       onClick={() => setFipeExpanded(!fipeExpanded)}
-                      style={{ width: '100%', padding: '10px', background: '#0a0a0a', border: 'none', color: '#dc2743', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' }}
+                      style={{ width: '100%', padding: '10px', background: '#0a0a0a', border: 'none', color: '#e10600', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' }}
                     >
                       {fipeExpanded ? '▲ Mostrar menos' : `▼ Ver todas as ${fipeDados.length} variações`}
                     </button>

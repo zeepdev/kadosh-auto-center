@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 
 const TvDashboard = () => {
@@ -39,7 +39,7 @@ const TvDashboard = () => {
   if (avisos.length === 0) {
     return (
       <div style={{ width: '100vw', height: '100vh', backgroundColor: '#000', color: '#fff', display: 'flex', justifyContent: 'center', alignItems: 'center', margin: 0, padding: 0 }}>
-        <h1 style={{ color: '#dc2743', fontFamily: 'sans-serif' }}>KADOSH AUTO CENTER</h1>
+        <h1 style={{ color: '#e10600', fontFamily: 'sans-serif' }}>KADOSH AUTO CENTER</h1>
         <p style={{ position: 'absolute', bottom: '20px', color: '#333' }}>Nenhum aviso cadastrado no momento.</p>
       </div>
     );
@@ -76,7 +76,7 @@ const TvDashboard = () => {
               width: '12px',
               height: '12px',
               borderRadius: '50%',
-              backgroundColor: index === currentIndex ? '#dc2743' : 'rgba(255,255,255,0.3)',
+              backgroundColor: index === currentIndex ? '#e10600' : 'rgba(255,255,255,0.3)',
               transition: 'background-color 0.5s ease'
             }}
           />

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { consultarPlaca } from '../lib/placaApi';
@@ -390,7 +390,7 @@ const ClientDashboard = () => {
 
     return (
       <div style={{ marginBottom: '35px' }}>
-        <h3 style={{ marginBottom: '15px', color: '#dc2743', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <h3 style={{ marginBottom: '15px', color: '#e10600', display: 'flex', alignItems: 'center', gap: '8px' }}>
           🔧 Progresso do Serviço em Tempo Real
         </h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
@@ -414,11 +414,11 @@ const ClientDashboard = () => {
             }
 
             return (
-              <div key={item.id} className="glass" style={{ padding: '25px', borderLeft: '4px solid #dc2743' }}>
+              <div key={item.id} className="glass" style={{ padding: '25px', borderLeft: '4px solid #e10600' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px', marginBottom: '15px' }}>
                   <div>
                     <h4 style={{ margin: 0, fontSize: '1.25rem', color: '#fff' }}>
-                      {item.servicoDesejado} - Placa: <span style={{ color: '#dc2743', fontWeight: 'bold' }}>{item.placa}</span>
+                      {item.servicoDesejado} - Placa: <span style={{ color: '#e10600', fontWeight: 'bold' }}>{item.placa}</span>
                     </h4>
                     <p style={{ margin: '5px 0 0 0', color: '#aaa', fontSize: '0.9rem' }}>
                       {item.descricao}
@@ -427,7 +427,7 @@ const ClientDashboard = () => {
                   <div style={{ textAlign: 'right' }}>
                     <span style={{ 
                       padding: '5px 12px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold',
-                      background: 'rgba(220, 39, 67, 0.15)', color: '#dc2743', border: '1px solid #dc2743'
+                      background: 'rgba(220, 39, 67, 0.15)', color: '#e10600', border: '1px solid #e10600'
                     }}>
                       Etapa Atual: {ponto}
                     </span>
@@ -446,7 +446,7 @@ const ClientDashboard = () => {
                     left: '15px', 
                     width: `calc(${(passo / 4) * 100}% - ${passo === 0 ? 0 : 30}px)`, 
                     height: '4px', 
-                    background: '#dc2743', 
+                    background: '#e10600', 
                     transform: 'translateY(-50%)', 
                     borderRadius: '2px', 
                     zIndex: 2,
@@ -475,10 +475,10 @@ const ClientDashboard = () => {
                           width: '18px', 
                           height: '18px', 
                           borderRadius: '50%', 
-                          background: isActive ? '#dc2743' : isCompleted ? '#dc2743' : '#111', 
+                          background: isActive ? '#e10600' : isCompleted ? '#e10600' : '#111', 
                           border: isCompleted ? '2px solid #fff' : '2px solid #444',
                           transition: 'all 0.3s ease',
-                          boxShadow: isActive ? '0 0 12px #dc2743' : 'none'
+                          boxShadow: isActive ? '0 0 12px #e10600' : 'none'
                         }}></div>
                         
                         {/* Rótulo da etapa */}
@@ -533,14 +533,14 @@ const ClientDashboard = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px', flexWrap: 'wrap', gap: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
             {cliente?.foto_url ? (
-              <img src={cliente.foto_url} alt="Foto de perfil" style={{ width: '60px', height: '60px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #dc2743' }} />
+              <img src={cliente.foto_url} alt="Foto de perfil" style={{ width: '60px', height: '60px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #e10600' }} />
             ) : (
-              <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: '#dc2743', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 'bold', border: '2px solid #dc2743', textTransform: 'uppercase' }}>
+              <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: '#e10600', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 'bold', border: '2px solid #e10600', textTransform: 'uppercase' }}>
                 {nomeExibicao.charAt(0).toUpperCase()}
               </div>
             )}
             <div>
-              <h1 style={{ fontSize: '2.2rem', color: '#dc2743', margin: 0 }}>
+              <h1 style={{ fontSize: '2.2rem', color: '#e10600', margin: 0 }}>
                 Olá, {nomeExibicao.split(' ')[0] || 'Cliente'}! 👋
               </h1>
               <p style={{ color: '#aaa', margin: '5px 0 0 0' }}>Bem-vindo à sua área exclusiva Kadosh Auto Center</p>
@@ -548,19 +548,19 @@ const ClientDashboard = () => {
           </div>
           <div style={{ display: 'flex', gap: '10px' }}>
             {cliente?.is_admin && (
-              <Link to="/admin" className="btn" style={{ background: '#dc2743', color: '#fff', fontSize: '0.85rem' }}>Painel Admin 👑</Link>
+              <Link to="/admin" className="btn" style={{ background: '#e10600', color: '#fff', fontSize: '0.85rem' }}>Painel Admin 👑</Link>
             )}
             <Link to="/" className="btn" style={{ background: '#333', fontSize: '0.85rem' }}>Voltar ao Site</Link>
-            <button onClick={handleLogout} className="btn" style={{ background: 'transparent', border: '1px solid #dc2743', color: '#dc2743', fontSize: '0.85rem' }}>Sair</button>
+            <button onClick={handleLogout} className="btn" style={{ background: 'transparent', border: '1px solid #e10600', color: '#e10600', fontSize: '0.85rem' }}>Sair</button>
           </div>
         </div>
 
         {/* Cards de Info do Cliente */}
         <div className="glass" style={{ padding: '25px', marginBottom: '30px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-            <h3 style={{ color: '#dc2743', margin: 0 }}>Seus Dados</h3>
+            <h3 style={{ color: '#e10600', margin: 0 }}>Seus Dados</h3>
             {!editingProfile ? (
-              <button onClick={startEditProfile} style={{ background: 'transparent', border: '1px solid #dc2743', color: '#dc2743', padding: '6px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
+              <button onClick={startEditProfile} style={{ background: 'transparent', border: '1px solid #e10600', color: '#e10600', padding: '6px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
                 ✏️ Editar
               </button>
             ) : (
@@ -610,7 +610,7 @@ const ClientDashboard = () => {
                   {previewUrl || cliente?.foto_url ? (
                     <img src={previewUrl || cliente.foto_url} alt="Preview" style={{ width: '60px', height: '60px', borderRadius: '50%', objectFit: 'cover', border: '1px solid #333' }} />
                   ) : (
-                    <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: '#dc2743', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 'bold', border: '1px solid #333', textTransform: 'uppercase' }}>
+                    <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: '#e10600', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 'bold', border: '1px solid #333', textTransform: 'uppercase' }}>
                       {nomeExibicao.charAt(0).toUpperCase()}
                     </div>
                   )}
@@ -763,7 +763,7 @@ const ClientDashboard = () => {
 
           {/* Form adicionar veículo */}
           {showAddVeiculo && (
-            <div className="glass" style={{ padding: '25px', marginBottom: '20px', borderLeft: '3px solid #dc2743' }}>
+            <div className="glass" style={{ padding: '25px', marginBottom: '20px', borderLeft: '3px solid #e10600' }}>
               <h4 style={{ marginBottom: '15px' }}>Novo Veículo</h4>
               <div className="form-row" style={{ alignItems: 'flex-end' }}>
                 <div className="form-group" style={{ flex: 2 }}>
@@ -871,9 +871,9 @@ const ClientDashboard = () => {
                 Nenhum veículo cadastrado. Clique em "+ Adicionar Veículo" acima.
               </div>
             ) : veiculos.map(v => (
-              <div key={v.id} className="glass" style={{ padding: '20px', borderTop: v.is_principal ? '3px solid #dc2743' : '3px solid #333', position: 'relative' }}>
+              <div key={v.id} className="glass" style={{ padding: '20px', borderTop: v.is_principal ? '3px solid #e10600' : '3px solid #333', position: 'relative' }}>
                 {v.is_principal && (
-                  <span style={{ position: 'absolute', top: '10px', right: '10px', background: '#dc2743', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>
+                  <span style={{ position: 'absolute', top: '10px', right: '10px', background: '#e10600', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>
                     PRINCIPAL
                   </span>
                 )}
@@ -980,7 +980,7 @@ const ClientDashboard = () => {
                           fontSize: '0.8rem',
                           fontWeight: 'bold',
                           background: item.status === 'Finalizado' ? 'rgba(74, 222, 128, 0.15)' : item.status === 'Agendado' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(220, 39, 67, 0.15)',
-                          color: item.status === 'Finalizado' ? '#4ade80' : item.status === 'Agendado' ? '#3b82f6' : '#dc2743'
+                          color: item.status === 'Finalizado' ? '#4ade80' : item.status === 'Agendado' ? '#3b82f6' : '#e10600'
                         }}>
                           {item.status || 'Pendente'}
                         </span>
@@ -996,13 +996,13 @@ const ClientDashboard = () => {
         {/* Linha do Tempo (Atualizações com Fotos) */}
         {atualizacoes.length > 0 && (
           <div style={{ marginTop: '40px' }}>
-            <h3 style={{ marginBottom: '20px', color: '#dc2743' }}>📸 Acompanhamento em Tempo Real</h3>
+            <h3 style={{ marginBottom: '20px', color: '#e10600' }}>📸 Acompanhamento em Tempo Real</h3>
             <p style={{ color: '#aaa', marginBottom: '20px' }}>Acompanhe o andamento do seu veículo na nossa oficina.</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               {atualizacoes.map(att => {
                 const orcamento = orcamentos.find(o => o.id === att.orcamento_id);
                 return (
-                  <div key={att.id} className="glass" style={{ padding: '20px', borderLeft: '4px solid #dc2743', display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+                  <div key={att.id} className="glass" style={{ padding: '20px', borderLeft: '4px solid #e10600', display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
                     {att.foto_url && (
                       <div style={{ flex: '1 1 200px', maxWidth: '300px' }}>
                         <a href={att.foto_url} target="_blank" rel="noreferrer">

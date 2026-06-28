@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { consultarPlaca } from '../../lib/placaApi';
 
@@ -106,7 +106,7 @@ const QuickRegisterModal = ({ onClose, onUserCreated }) => {
     <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '20px' }}>
       <div className="glass" style={{ width: '100%', maxWidth: '500px', padding: '30px', maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h2 style={{ margin: 0, color: '#dc2743' }}>Cadastro Rápido (Presencial)</h2>
+          <h2 style={{ margin: 0, color: '#e10600' }}>Cadastro Rápido (Presencial)</h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#aaa', fontSize: '1.5rem', cursor: 'pointer' }}>&times;</button>
         </div>
 

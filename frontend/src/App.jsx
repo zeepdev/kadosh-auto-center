@@ -17,6 +17,8 @@ import AvisosCarousel from './components/AvisosCarousel'
 import CafeComGraxa from './components/CafeComGraxa'
 import Revisoes from './components/Revisoes'
 import RevisaoDetalhes from './components/RevisaoDetalhes'
+import Stats from './components/Stats'
+import { OrcamentoBand, WhatsAppBand } from './components/CtaBands'
 
 import Navbar from './components/Navbar'
 import Testimonials from './components/Testimonials'
@@ -32,10 +34,13 @@ function App() {
             <div id="inicio"><Hero /></div>
             <AvisosCarousel />
             <div id="servicos"><Services /></div>
+            <OrcamentoBand />
+            <Stats />
+            <div id="contato"><AboutUs /></div>
             <div id="galeria"><Gallery /></div>
             <Testimonials />
             <div id="orcamento"><BudgetForm /></div>
-            <div id="contato"><AboutUs /></div>
+            <WhatsAppBand />
             <Footer theme="dark" />
           </>
         } />

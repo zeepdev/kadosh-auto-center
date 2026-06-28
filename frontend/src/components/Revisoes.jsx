@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+﻿import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Footer from './Footer';
 
@@ -52,7 +52,7 @@ const Revisoes = () => {
       textShadow: '2px 2px 4px rgba(0,0,0,0.5)'
     },
     highlight: {
-      color: '#dc2743'
+      color: '#e10600'
     },
     subtitle: {
       fontSize: '1.2rem',
@@ -99,7 +99,7 @@ const Revisoes = () => {
     cardBody: {
       padding: '30px',
       textAlign: 'center',
-      borderTop: '3px solid #dc2743',
+      borderTop: '3px solid #e10600',
       flexGrow: 1,
       display: 'flex',
       flexDirection: 'column',
@@ -131,7 +131,7 @@ const Revisoes = () => {
       display: 'inline-block',
       width: '100%',
       padding: '12px 0',
-      background: '#dc2743',
+      background: '#e10600',
       color: '#fff',
       borderRadius: '8px',
       fontWeight: 'bold',
@@ -167,7 +167,7 @@ const Revisoes = () => {
         <div style={styles.heroBg}></div>
         <div style={styles.heroContent}>
           <h1 style={styles.title}>REVISÕES <span style={styles.highlight}>KADOSH</span></h1>
-          <p style={styles.subtitle}>ESCOLHA A REVISÃO IDEAL PARA MANTER SEU CARRO <strong style={{color: '#dc2743'}}>SEMPRE EM DIA</strong>.</p>
+          <p style={styles.subtitle}>ESCOLHA A REVISÃO IDEAL PARA MANTER SEU CARRO <strong style={{color: '#e10600'}}>SEMPRE EM DIA</strong>.</p>
         </div>
       </header>
 

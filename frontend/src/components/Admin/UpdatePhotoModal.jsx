@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 
 const UpdatePhotoModal = ({ atendimento, onClose, onSuccess }) => {
@@ -75,7 +75,7 @@ const UpdatePhotoModal = ({ atendimento, onClose, onSuccess }) => {
           border: 'none', color: '#fff', fontSize: '1.5rem', cursor: 'pointer'
         }}>×</button>
 
-        <h3 style={{ color: '#dc2743', marginTop: 0 }}>Nova Atualização 📸</h3>
+        <h3 style={{ color: '#e10600', marginTop: 0 }}>Nova Atualização 📸</h3>
         <p style={{ color: '#aaa', fontSize: '0.9rem', marginBottom: '20px' }}>
           Veículo: {atendimento.placa} ({atendimento.nome})
         </p>

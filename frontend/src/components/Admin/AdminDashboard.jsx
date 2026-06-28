@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PDFGenerator from './PDFGenerator';
 import UpdatePhotoModal from './UpdatePhotoModal';
@@ -336,7 +336,7 @@ const AdminDashboard = () => {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: '#0a0505', color: '#fff', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
         <form onSubmit={handleLogin} className="glass" style={{ padding: '50px 40px', maxWidth: '400px', width: '100%' }}>
-          <h2 style={{ color: '#dc2743', marginBottom: '10px', textAlign: 'center' }}>Acesso Restrito</h2>
+          <h2 style={{ color: '#e10600', marginBottom: '10px', textAlign: 'center' }}>Acesso Restrito</h2>
           <p style={{ color: '#aaa', marginBottom: '30px', textAlign: 'center' }}>Área exclusiva da Gestão Kadosh</p>
 
           <div className="form-group">
@@ -418,12 +418,12 @@ const AdminDashboard = () => {
         
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px', flexWrap: 'wrap', gap: '20px' }}>
           <div>
-            <h1 style={{ fontSize: '2.5rem', color: '#dc2743', margin: 0 }}>Painel Kadosh</h1>
+            <h1 style={{ fontSize: '2.5rem', color: '#e10600', margin: 0 }}>Painel Kadosh</h1>
             <p style={{ color: '#aaa', margin: '5px 0 0 0' }}>Gerenciamento de Orçamentos e Agendamentos</p>
           </div>
           <div style={{ display: 'flex', gap: '15px' }}>
             <button onClick={() => setShowQuickRegister(true)} className="btn" style={{ background: '#10b981', color: '#fff', border: 'none' }}>+ Cadastrar Cliente</button>
-            <button onClick={handleLogout} className="btn" style={{ background: 'transparent', border: '1px solid #dc2743', color: '#dc2743' }}>Sair</button>
+            <button onClick={handleLogout} className="btn" style={{ background: 'transparent', border: '1px solid #e10600', color: '#e10600' }}>Sair</button>
             <Link to="/" className="btn" style={{ background: '#333' }}>Voltar ao Site</Link>
           </div>
         </div>
@@ -433,8 +433,8 @@ const AdminDashboard = () => {
             <h3 style={{ margin: 0, fontSize: '2rem', color: '#fff' }}>{totalAtendimentos}</h3>
             <p style={{ margin: '5px 0 0 0', color: '#aaa' }}>Total de Registros</p>
           </div>
-          <div className="glass" style={{ padding: '20px', textAlign: 'center', borderBottom: '3px solid #dc2743' }}>
-            <h3 style={{ margin: 0, fontSize: '2rem', color: '#dc2743' }}>{pendentes}</h3>
+          <div className="glass" style={{ padding: '20px', textAlign: 'center', borderBottom: '3px solid #e10600' }}>
+            <h3 style={{ margin: 0, fontSize: '2rem', color: '#e10600' }}>{pendentes}</h3>
             <p style={{ margin: '5px 0 0 0', color: '#aaa' }}>Pendentes</p>
           </div>
           <div className="glass" style={{ padding: '20px', textAlign: 'center', borderBottom: '3px solid #4ade80' }}>
@@ -455,7 +455,7 @@ const AdminDashboard = () => {
             onClick={() => setActiveTab('atendimentos')}
             style={{ 
               padding: '12px 24px', borderRadius: '8px', cursor: 'pointer', border: 'none',
-              background: activeTab === 'atendimentos' ? '#dc2743' : '#222',
+              background: activeTab === 'atendimentos' ? '#e10600' : '#222',
               color: '#fff', fontWeight: 'bold'
             }}
           >
@@ -874,7 +874,7 @@ const AdminDashboard = () => {
                               transition: 'all 0.2s',
                             }}
                             onMouseEnter={(e) => {
-                              e.currentTarget.style.background = '#dc2743';
+                              e.currentTarget.style.background = '#e10600';
                               e.currentTarget.style.color = '#fff';
                               e.currentTarget.style.transform = 'translateY(-2px)';
                             }}

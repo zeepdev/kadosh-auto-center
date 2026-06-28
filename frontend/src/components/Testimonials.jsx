@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 
 const Testimonials = () => {
@@ -33,8 +33,9 @@ const Testimonials = () => {
     <section id="depoimentos" className="testimonials-section">
       <div className="container">
         <div style={{ textAlign: 'center', marginBottom: '60px' }}>
-          <h2 style={{ fontSize: '2.5rem', color: '#dc2743', marginBottom: '10px' }}>O que dizem nossos clientes</h2>
-          <p style={{ color: '#aaa', marginBottom: '25px' }}>A satisfação de quem confia o seu veículo à Kadosh Auto Center.</p>
+          <span className="eyebrow" style={{ justifyContent: 'center' }}>Depoimentos</span>
+          <h2 className="section-title" style={{ marginBottom: '10px' }}>O que dizem nossos clientes</h2>
+          <p style={{ color: 'var(--text-muted)', marginBottom: '25px' }}>A satisfação de quem confia o seu veículo à Kadosh Auto Center.</p>
           
           {/* Google Reviews Badge */}
           <div style={{
@@ -69,7 +70,7 @@ const Testimonials = () => {
               target="_blank"
               rel="noreferrer"
               style={{
-                background: 'var(--accent-color, #dc2743)',
+                background: 'var(--accent-color, #e10600)',
                 color: '#fff',
                 textDecoration: 'none',
                 padding: '8px 16px',
@@ -122,7 +123,7 @@ const Testimonials = () => {
       <style>
         {`
           .testimonials-section {
-            background: linear-gradient(to bottom, #0a0505, #140808);
+            background: linear-gradient(to bottom, var(--bg-primary), var(--bg-secondary));
             padding: 100px 0;
           }
           .testimonials-grid {

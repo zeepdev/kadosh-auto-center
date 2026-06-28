@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { consultarPlaca } from '../../lib/placaApi';
 import { validarCPF } from '../../lib/cpf';
@@ -117,7 +117,7 @@ const Cadastro = () => {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#0a0505', color: '#fff', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '40px 20px' }}>
       <form onSubmit={handleSubmit} className="glass" style={{ padding: '40px', maxWidth: '600px', width: '100%', borderRadius: '12px' }}>
-        <h2 style={{ color: '#dc2743', marginBottom: '10px', textAlign: 'center' }}>Criar sua Conta</h2>
+        <h2 style={{ color: '#e10600', marginBottom: '10px', textAlign: 'center' }}>Criar sua Conta</h2>
         <p style={{ color: '#aaa', marginBottom: '30px', textAlign: 'center' }}>Cadastre-se e tenha controle total sobre os serviços do seu veículo.</p>
         
         <h3 style={{ borderBottom: '1px solid #333', paddingBottom: '10px', marginBottom: '20px' }}>Dados Pessoais</h3>
@@ -229,7 +229,7 @@ const Cadastro = () => {
         </button>
 
         <p style={{ textAlign: 'center', marginTop: '20px', color: '#aaa' }}>
-          Já possui conta? <Link to="/login" style={{ color: '#dc2743', fontWeight: 'bold' }}>Faça Login</Link>
+          Já possui conta? <Link to="/login" style={{ color: '#e10600', fontWeight: 'bold' }}>Faça Login</Link>
         </p>
       </form>
     </div>

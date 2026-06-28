@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { translateError } from '../../lib/errorTranslations';
@@ -59,8 +59,8 @@ const CompleteRegistration = () => {
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#0a0505', color: '#fff', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '40px 20px' }}>
-      <form onSubmit={handleSubmit} className="glass" style={{ padding: '40px', maxWidth: '500px', width: '100%', borderRadius: '12px', border: '1px solid #dc2743' }}>
-        <h2 style={{ color: '#dc2743', marginBottom: '10px', textAlign: 'center' }}>Complete seu Cadastro</h2>
+      <form onSubmit={handleSubmit} className="glass" style={{ padding: '40px', maxWidth: '500px', width: '100%', borderRadius: '12px', border: '1px solid #e10600' }}>
+        <h2 style={{ color: '#e10600', marginBottom: '10px', textAlign: 'center' }}>Complete seu Cadastro</h2>
         <p style={{ color: '#aaa', marginBottom: '30px', textAlign: 'center', lineHeight: '1.5' }}>
           Bem-vindo! Para garantir a segurança da sua conta e acompanhar seus serviços, por favor informe o seu <strong>E-mail real</strong> e crie uma <strong>Nova Senha</strong>.
         </p>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Document, Page, Text, View, StyleSheet, PDFDownloadLink, pdf } from '@react-pdf/renderer';
 import { OFICINA } from '../../config/oficina';
 import { supabase } from '../../lib/supabase';
@@ -9,7 +9,7 @@ const styles = StyleSheet.create({
   page: { padding: 30, fontSize: 10, fontFamily: 'Helvetica' },
   header: { flexDirection: 'row', justifyContent: 'space-between', borderBottom: '2px solid #1a365d', paddingBottom: 10, marginBottom: 15 },
   shopInfo: { width: '60%' },
-  shopName: { fontSize: 18, fontWeight: 'bold', color: '#dc2743', marginBottom: 2 },
+  shopName: { fontSize: 18, fontWeight: 'bold', color: '#e10600', marginBottom: 2 },
   shopSub: { fontSize: 9, color: '#666', marginBottom: 1 },
   docInfo: { width: '40%', textAlign: 'right' },
   title: { fontSize: 16, fontWeight: 'bold', marginBottom: 5, color: '#1a365d' },
@@ -396,7 +396,7 @@ const PDFGenerator = ({ initialData, onClose, onUpdateSuccess }) => {
       <div style={{ maxWidth: '800px', margin: '0 auto', backgroundColor: '#111', padding: '30px', borderRadius: '12px', color: '#fff' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #333', paddingBottom: '20px', marginBottom: '20px' }}>
           <h2>Montar Orçamento (PDF)</h2>
-          <button onClick={onClose} style={{ background: 'transparent', color: '#dc2743', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}>Fechar ✖</button>
+          <button onClick={onClose} style={{ background: 'transparent', color: '#e10600', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}>Fechar ✖</button>
         </div>
 
         {autoFillStatus === 'loading' && <p style={{ color: '#60a5fa', marginBottom: '15px' }}>🔍 Buscando dados do cliente cadastrado...</p>}
@@ -517,7 +517,7 @@ const PDFGenerator = ({ initialData, onClose, onUpdateSuccess }) => {
             onClick={handleGenerateAndDownload}
             disabled={downloading || driveStatus === 'loading'}
             style={{
-              backgroundColor: '#dc2743', color: '#fff', textDecoration: 'none', border: 'none',
+              backgroundColor: '#e10600', color: '#fff', textDecoration: 'none', border: 'none',
               padding: '15px 30px', borderRadius: '8px', fontSize: '1.2rem', fontWeight: 'bold',
               display: 'inline-block', transition: '0.2s', cursor: 'pointer',
               opacity: (downloading || driveStatus === 'loading') ? 0.7 : 1
