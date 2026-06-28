@@ -99,7 +99,7 @@ const CafeComGraxa = () => {
               fontSize: '1.1rem',
               boxShadow: '0 10px 20px rgba(59, 37, 22, 0.2)'
             }}>
-              🗓️ Próxima Edição: 20/06
+              🗓️ Próxima Edição
             </div>
             
             <a 
