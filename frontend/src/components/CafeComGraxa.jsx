@@ -77,10 +77,8 @@ const CafeComGraxa = () => {
         "/images/cafe-galeria-2-3.jpg",
         "/images/cafe-galeria-2-4.jpg",
         "/images/cafe-galeria-2-5.jpg",
-        "/images/cafe-galeria-2-6.jpg",
         "/images/cafe-galeria-2-7.jpg",
-        "/images/cafe-galeria-2-8.jpg",
-        "/images/cafe-galeria-2-9.jpg"
+        "/images/cafe-galeria-2-8.jpg"
       ]
     }
   ];
