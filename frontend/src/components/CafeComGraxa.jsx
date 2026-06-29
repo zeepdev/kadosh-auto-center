@@ -437,6 +437,21 @@ const CafeComGraxa = () => {
                 🤝 Patrocinar Evento
               </a>
             </div>
+
+            <div style={{
+              marginTop: '24px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              color: colors.primary,
+              fontWeight: '800',
+              fontFamily: 'Archivo',
+              fontSize: '0.9rem',
+              letterSpacing: '1px',
+              textTransform: 'uppercase'
+            }}>
+              <span>🗓️</span> Próxima Edição: Em breve
+            </div>
           </div>
 
           {/* Lado Direito: Foto Principal do Evento */}

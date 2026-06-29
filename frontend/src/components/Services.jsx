@@ -50,14 +50,7 @@ const Services = () => {
         ))}
       </div>
 
-      <Reveal style={{ textAlign: 'center', marginTop: '40px' }}>
-        <button
-          className="btn-ghost"
-          onClick={() => document.getElementById('orcamento')?.scrollIntoView({ behavior: 'smooth' })}
-        >
-          Solicitar Orçamento &nbsp;›
-        </button>
-      </Reveal>
+
     </section>
   );
 };
