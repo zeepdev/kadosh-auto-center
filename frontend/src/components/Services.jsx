@@ -31,26 +31,26 @@ const services = [
 
 const Services = () => {
   return (
-    <section className="container">
-      <Reveal style={{ textAlign: 'center' }}>
-        <span className="eyebrow" style={{ justifyContent: 'center' }}>Nossos Serviços</span>
-        <h2 className="section-title">Soluções completas<br />para o seu veículo</h2>
-        <p style={{ color: 'var(--text-muted)', marginTop: '14px' }}>
-          Tecnologia de ponta aliada à experiência dos nossos profissionais.
-        </p>
-      </Reveal>
+    <section style={{ paddingBottom: '90px' }}>
+      <div className="container">
+        <Reveal style={{ textAlign: 'center' }}>
+          <span className="eyebrow" style={{ justifyContent: 'center' }}>Nossos Serviços</span>
+          <h2 className="section-title">Soluções completas<br />para o seu veículo</h2>
+          <p style={{ color: 'var(--text-muted)', marginTop: '14px' }}>
+            Tecnologia de ponta aliada à experiência dos nossos profissionais.
+          </p>
+        </Reveal>
 
-      <div className="services-grid">
-        {services.map((srv, idx) => (
-          <Reveal key={srv.title} className="service-card shine" delay={idx * 90}>
-            <div className="service-icon">{Icons[srv.icon]}</div>
-            <h3>{srv.title}</h3>
-            <p style={{ color: 'var(--text-muted)', marginTop: '10px', fontSize: '0.9rem' }}>{srv.desc}</p>
-          </Reveal>
-        ))}
+        <div className="services-grid">
+          {services.map((srv, idx) => (
+            <Reveal key={srv.title} className="service-card shine" delay={idx * 90}>
+              <div className="service-icon">{Icons[srv.icon]}</div>
+              <h3>{srv.title}</h3>
+              <p style={{ color: 'var(--text-muted)', marginTop: '10px', fontSize: '0.9rem' }}>{srv.desc}</p>
+            </Reveal>
+          ))}
+        </div>
       </div>
-
-
     </section>
   );
 };
