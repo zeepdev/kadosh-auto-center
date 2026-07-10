@@ -782,36 +782,42 @@ app.post('/api/drive/upload', uploadMemory.single('pdf'), async (req, res) => {
 
     if (req.body.subFolder) {
       const subFolderName = req.body.subFolder;
-      console.log(`📂 [Drive] Buscando subpasta: ${subFolderName}`);
-      try {
-        const listResponse = await drive.files.list({
-          q: `name = '${subFolderName}' and mimeType = 'application/vnd.google-apps.folder' and '${folderId}' in parents and trashed = false`,
-          fields: 'files(id, name)',
-          spaces: 'drive',
-          supportsAllDrives: true,
-          includeItemsFromAllDrives: true,
-        });
-
-        const files = listResponse.data.files;
-        if (files && files.length > 0) {
-          targetFolderId = files[0].id;
-          console.log(`📂 [Drive] Subpasta encontrada: ${subFolderName} (ID: ${targetFolderId})`);
-        } else {
-          console.log(`📂 [Drive] Subpasta não encontrada. Criando nova pasta: ${subFolderName}`);
-          const createResponse = await drive.files.create({
-            requestBody: {
-              name: subFolderName,
-              mimeType: 'application/vnd.google-apps.folder',
-              parents: [folderId]
-            },
-            fields: 'id',
+      
+      if (subFolderName === 'FLUXO DE CAIXA' && process.env.GOOGLE_DRIVE_FLUXO_CAIXA_FOLDER_ID) {
+        targetFolderId = process.env.GOOGLE_DRIVE_FLUXO_CAIXA_FOLDER_ID;
+        console.log(`📂 [Drive] Utilizando ID da pasta Fluxo de Caixa configurado em env: ${targetFolderId}`);
+      } else {
+        console.log(`📂 [Drive] Buscando subpasta: ${subFolderName}`);
+        try {
+          const listResponse = await drive.files.list({
+            q: `name = '${subFolderName}' and mimeType = 'application/vnd.google-apps.folder' and '${folderId}' in parents and trashed = false`,
+            fields: 'files(id, name)',
+            spaces: 'drive',
             supportsAllDrives: true,
+            includeItemsFromAllDrives: true,
           });
-          targetFolderId = createResponse.data.id;
-          console.log(`📂 [Drive] Subpasta criada com sucesso (ID: ${targetFolderId})`);
+
+          const files = listResponse.data.files;
+          if (files && files.length > 0) {
+            targetFolderId = files[0].id;
+            console.log(`📂 [Drive] Subpasta encontrada: ${subFolderName} (ID: ${targetFolderId})`);
+          } else {
+            console.log(`📂 [Drive] Subpasta não encontrada. Criando nova pasta: ${subFolderName}`);
+            const createResponse = await drive.files.create({
+              requestBody: {
+                name: subFolderName,
+                mimeType: 'application/vnd.google-apps.folder',
+                parents: [folderId]
+              },
+              fields: 'id',
+              supportsAllDrives: true,
+            });
+            targetFolderId = createResponse.data.id;
+            console.log(`📂 [Drive] Subpasta criada com sucesso (ID: ${targetFolderId})`);
+          }
+        } catch (err) {
+          console.error(`❌ [Drive] Erro ao gerenciar subpasta '${subFolderName}':`, err.message);
         }
-      } catch (err) {
-        console.error(`❌ [Drive] Erro ao gerenciar subpasta '${subFolderName}':`, err.message);
       }
     }
 
