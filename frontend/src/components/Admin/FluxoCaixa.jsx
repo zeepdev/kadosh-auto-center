@@ -267,6 +267,16 @@ const FluxoCaixa = () => {
   // Salvar Fechamento Oficial
   const handleSave = async (e) => {
     e.preventDefault();
+    
+    if (!dataCaixa) {
+      alert('⚠️ Por favor, informe a Data do Fechamento.');
+      return;
+    }
+    if (fundoCaixaAnterior === '' || dinheiroEmpresaAnterior === '' || fundoReservaAnterior === '') {
+      alert('⚠️ Por favor, preencha todos os saldos anteriores do início do dia (caso esteja zerado, insira 0).');
+      return;
+    }
+
     if (saving) return;
 
     setSaving(true);
@@ -538,7 +548,6 @@ const FluxoCaixa = () => {
                     value={dataCaixa} 
                     onChange={(e) => setDataCaixa(e.target.value)} 
                     style={{ width: '100%', padding: '10px', background: '#0a0a0c', border: '1px solid #333', borderRadius: '8px', color: '#fff', marginTop: '5px' }}
-                    required
                   />
                 </div>
                 <div className="form-group">
@@ -561,7 +570,6 @@ const FluxoCaixa = () => {
                       type="number" step="0.01" value={fundoCaixaAnterior} 
                       onChange={(e) => setFundoCaixaAnterior(e.target.value)}
                       style={{ width: '100%', padding: '8px', background: '#0a0a0c', border: '1px solid #444', borderRadius: '6px', color: '#fff', marginTop: '4px' }}
-                      required
                     />
                   </div>
                   <div className="form-group">
@@ -570,7 +578,6 @@ const FluxoCaixa = () => {
                       type="number" step="0.01" value={dinheiroEmpresaAnterior} 
                       onChange={(e) => setDinheiroEmpresaAnterior(e.target.value)}
                       style={{ width: '100%', padding: '8px', background: '#0a0a0c', border: '1px solid #444', borderRadius: '6px', color: '#fff', marginTop: '4px' }}
-                      required
                     />
                   </div>
                   <div className="form-group">
@@ -579,7 +586,6 @@ const FluxoCaixa = () => {
                       type="number" step="0.01" value={fundoReservaAnterior} 
                       onChange={(e) => setFundoReservaAnterior(e.target.value)}
                       style={{ width: '100%', padding: '8px', background: '#0a0a0c', border: '1px solid #444', borderRadius: '6px', color: '#fff', marginTop: '4px' }}
-                      required
                     />
                   </div>
                 </div>
