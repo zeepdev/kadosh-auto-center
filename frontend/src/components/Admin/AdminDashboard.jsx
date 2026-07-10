@@ -1,10 +1,11 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PDFGenerator from './PDFGenerator';
 import UpdatePhotoModal from './UpdatePhotoModal';
 import ViewVehicleModal from './ViewVehicleModal';
 import InvoiceModal from './InvoiceModal';
 import QuickRegisterModal from './QuickRegisterModal';
+import FluxoCaixa from './FluxoCaixa';
 import { supabase } from '../../lib/supabase';
 import { calcularPrioridade, PRIORIDADES } from '../../lib/prioridade';
 
@@ -472,6 +473,16 @@ const AdminDashboard = () => {
             📅 Agenda Diária
           </button>
           <button 
+            onClick={() => setActiveTab('fluxo_caixa')}
+            style={{ 
+              padding: '12px 24px', borderRadius: '8px', cursor: 'pointer', border: 'none',
+              background: activeTab === 'fluxo_caixa' ? '#10b981' : '#222',
+              color: '#fff', fontWeight: 'bold'
+            }}
+          >
+            💵 Fluxo de Caixa
+          </button>
+          <button 
             onClick={() => setActiveTab('depoimentos')}
             style={{ 
               padding: '12px 24px', borderRadius: '8px', cursor: 'pointer', border: 'none',
@@ -615,6 +626,12 @@ const AdminDashboard = () => {
                 ))}
               </div>
             </div>
+          </div>
+        )}
+
+        {activeTab === 'fluxo_caixa' && (
+          <div className="glass" style={{ padding: '30px', marginBottom: '30px' }}>
+            <FluxoCaixa />
           </div>
         )}
 
