@@ -455,5 +455,33 @@ Botão fica `disabled` se o cliente não tem nenhum veículo cadastrado, com tex
    - Atualizada a função `saveProfile` para fazer o upload da foto selecionada para o bucket público `fotos_servico` do Supabase Storage no caminho `avatars/{user_id}_{timestamp}.{ext}`, obtendo a URL pública e salvando-a na coluna `foto_url` da tabela `clientes`.
    - Renderizado o avatar circular do cliente ao lado da saudação "Olá, [Nome]!" no cabeçalho do painel do cliente, com fallback elegante (inicial do nome em círculo vermelho) se não houver foto.
 3. **Carrossel de Depoimentos (`Testimonials.jsx`)**:
-   - Modificada a consulta ao banco de dados no Supabase para buscar os depoimentos realizando um join na tabela de clientes: `.select('*, clientes(foto_url)')`.
-   - Atualizada a renderização dos cards de depoimento para exibir a foto do cliente caso ela exista, preservando o fallback original da letra inicial caso a foto não exista ou seja um depoimento anônimo.
+    - Modificada a consulta ao banco de dados no Supabase para buscar os depoimentos realizando um join na tabela de clientes: `.select('*, clientes(foto_url)')`.
+    - Atualizada a renderização dos cards de depoimento para exibir a foto do cliente caso ela exista, preservando o fallback original da letra inicial caso a foto não exista ou seja um depoimento anônimo.
+
+### 2026-07-10 — Módulo de Fluxo de Caixa Diário e Consolidado
+
+**Contexto**: Implementação completa do controle e fechamento diário do fluxo de caixa com automação por contas, backup de rascunhos, histórico consolidado de 5 anos e envio organizado ao Google Drive.
+
+**Mudanças**:
+1. **Modelagem e Interface Diária (`FluxoCaixa.jsx`)**:
+   - Criação da sub-aba **Fechamento Diário** contendo a data do caixa, saldo anterior (detalhado por conta), entradas, saídas, valores finais declarados e observações.
+   - **Automação de Contas**:
+     - *Entradas*: Separadas as colunas de *Método de Pagamento* e *Para Onde Foi*. Selecionar "Dinheiro" trava automaticamente o destino como "Caixa da Empresa". Outros métodos permitem escolher entre "Mercado Pago KADOSH" e "Mercado Pago ROMANOS".
+     - *Saídas*: Coluna de seleção da conta de origem ("De Onde Saiu") entre "Mercado Pago KADOSH", "Mercado Pago ROMANOS" e "Caixa da Empresa".
+   - **Persistência de Rascunho**: O formulário é salvo em tempo real no `localStorage` sob a chave `kadosh_fluxo_caixa_draft` para evitar perda de dados.
+   - **Botão Novo Dia**: Reseta os lançamentos correntes com caixa zerado e herda os saldos finais declarados do fechamento anterior.
+   - **Remoção de Validação HTML5**: Retirada a obrigatoriedade nativa (`required`) dos inputs das listas para evitar que o navegador bloqueasse a submissão silenciosamente caso houvesse linhas vazias na tabela. A validação agora ocorre via JavaScript de forma controlada.
+
+2. **Relatório em PDF e Conciliação (`FluxoCaixaPDF.jsx`)**:
+   - Desenvolvido template do relatório diário em PDF com a tabela de **Conciliação de Contas** comparando o saldo inicial anterior, a movimentação líquida (entradas - saídas), o saldo esperado e o saldo final declarado para cada uma das 3 contas individualmente.
+   - Exibição de totais e métodos formatados profissionalmente.
+
+3. **Painel Consolidado de 5 Anos (`FluxoCaixa.jsx` - Aba Consolidado)**:
+   - Adicionada aba **Consolidado Mensal / Anual** com navegação por anos que calcula o somatório acumulado e exibe o desempenho com gráficos de barras horizontais em CSS.
+
+4. **Upload para Google Drive (`server.js`)**:
+   - Rota `/api/drive/upload` estendida com suporte ao parâmetro `subFolder`.
+   - Adicionado suporte à variável de ambiente `GOOGLE_DRIVE_FLUXO_CAIXA_FOLDER_ID` no Render, que permite o envio direto para o ID da pasta do Drive de Fluxo de Caixa (`1swePj9-0w7IIk70Xwxr49p7Fer4iwpEd`), contornando limitações de listagem de escopo da API Google OAuth 2.0.
+
+5. **Deploy**:
+   - Realizado deploy das alterações na Vercel (frontend) e no Render (backend) com sincronização em tempo real no branch `main` do GitHub.
