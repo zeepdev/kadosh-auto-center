@@ -259,6 +259,7 @@ const FluxoCaixa = () => {
     } catch (err) {
       console.error('Erro ao enviar para o Drive:', err);
       setDriveUploadStatus('error');
+      alert(`⚠️ Erro ao enviar para o Google Drive: ${err.message || err}`);
       setTimeout(() => setDriveUploadStatus('idle'), 5000);
     }
   };
@@ -298,8 +299,6 @@ const FluxoCaixa = () => {
         .insert([payload]);
 
       if (error) throw error;
-      
-      alert('Fechamento de caixa gravado com sucesso no banco de dados!');
 
       // 2. Gerar PDF e fazer upload automático para o Google Drive
       const doc = <FluxoCaixaPDF data={payload} />;
@@ -312,6 +311,8 @@ const FluxoCaixa = () => {
       // Atualizar histórico
       const updatedHistory = await fetchHistorico();
       resetForm(updatedHistory);
+      
+      alert('Fechamento de caixa gravado com sucesso!');
     } catch (err) {
       console.warn('Erro ao salvar no banco, salvando cópia local em localStorage:', err.message);
 
