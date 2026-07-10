@@ -267,11 +267,7 @@ const FluxoCaixa = () => {
   // Salvar Fechamento Oficial
   const handleSave = async (e) => {
     e.preventDefault();
-    alert('DEBUG 1: Botão clicado. Iniciando salvamento...');
-    if (saving) {
-      alert('DEBUG: Já está salvando (saving = true). Retornando.');
-      return;
-    }
+    if (saving) return;
 
     setSaving(true);
 
@@ -298,27 +294,18 @@ const FluxoCaixa = () => {
     };
 
     try {
-      alert('DEBUG 2: Enviando ao banco...');
       // 1. Salvar no Supabase
       const { error } = await supabase
         .from('fluxo_caixa')
         .insert([payload]);
 
-      if (error) {
-        alert('DEBUG Supabase ERROR: ' + error.message);
-        throw error;
-      }
-      
-      alert('DEBUG 3: Salvo no banco com sucesso. Iniciando PDF...');
+      if (error) throw error;
 
       // 2. Gerar PDF e fazer upload automático para o Google Drive
       const doc = <FluxoCaixaPDF data={payload} />;
-      alert('DEBUG 4: Chamando pdf(doc).toBlob()...');
       const blob = await pdf(doc).toBlob();
-      alert('DEBUG 5: PDF Blob gerado. Tamanho: ' + blob.size + ' bytes. Iniciando envio para o Drive...');
       await handleUploadPdfToDrive(payload, blob);
 
-      alert('DEBUG 6: Upload concluído. Limpando rascunhos...');
       // Limpar rascunho
       localStorage.removeItem('kadosh_fluxo_caixa_draft');
 
@@ -328,7 +315,6 @@ const FluxoCaixa = () => {
       
       alert('Fechamento de caixa gravado com sucesso!');
     } catch (err) {
-      alert('DEBUG CATCH: Ocorreu um erro no try: ' + err.message);
       console.warn('Erro ao salvar no banco, salvando cópia local em localStorage:', err.message);
 
       const localData = localStorage.getItem('kadosh_fluxo_caixa');
@@ -619,13 +605,11 @@ const FluxoCaixa = () => {
                       type="text" placeholder="Ex: Serviço Placa ABC" value={item.descricao} 
                       onChange={(e) => handleEntradaChange(index, 'descricao', e.target.value)}
                       style={{ width: '100%', padding: '8px', background: '#0a0a0c', border: '1px solid #333', borderRadius: '6px', color: '#fff' }}
-                      required
                     />
                     <input 
                       type="number" step="0.01" placeholder="Valor (R$)" value={item.valor} 
                       onChange={(e) => handleEntradaChange(index, 'valor', e.target.value)}
                       style={{ width: '100%', padding: '8px', background: '#0a0a0c', border: '1px solid #333', borderRadius: '6px', color: '#fff' }}
-                      required
                     />
                     <select 
                       value={item.metodo || 'PIX'} onChange={(e) => handleEntradaChange(index, 'metodo', e.target.value)}
@@ -679,13 +663,11 @@ const FluxoCaixa = () => {
                       type="text" placeholder="Ex: VT / Almoço" value={item.descricao} 
                       onChange={(e) => handleSaidaChange(index, 'descricao', e.target.value)}
                       style={{ width: '100%', padding: '8px', background: '#0a0a0c', border: '1px solid #333', borderRadius: '6px', color: '#fff' }}
-                      required
                     />
                     <input 
                       type="number" step="0.01" placeholder="Valor (R$)" value={item.valor} 
                       onChange={(e) => handleSaidaChange(index, 'valor', e.target.value)}
                       style={{ width: '100%', padding: '8px', background: '#0a0a0c', border: '1px solid #333', borderRadius: '6px', color: '#fff' }}
-                      required
                     />
                     <select 
                       value={item.conta} onChange={(e) => handleSaidaChange(index, 'conta', e.target.value)}
