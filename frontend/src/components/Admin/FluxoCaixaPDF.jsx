@@ -5,7 +5,7 @@ const styles = StyleSheet.create({
   page: {
     padding: 40,
     fontFamily: 'Helvetica',
-    fontSize: 10,
+    fontSize: 9,
     color: '#333333',
     backgroundColor: '#ffffff',
   },
@@ -65,7 +65,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   metaLabel: {
-    fontSize: 8,
+    fontSize: 7.5,
     color: '#666666',
     textTransform: 'uppercase',
   },
@@ -75,7 +75,7 @@ const styles = StyleSheet.create({
     color: '#111111',
   },
   sectionTitle: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: 'bold',
     color: '#111111',
     textTransform: 'uppercase',
@@ -83,10 +83,11 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3,
     borderLeftColor: '#e10600',
     paddingLeft: 6,
+    marginTop: 5,
   },
   table: {
     width: '100%',
-    marginBottom: 20,
+    marginBottom: 15,
     borderWidth: 1,
     borderColor: '#e9ecef',
     borderRadius: 4,
@@ -98,7 +99,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f1f3f5',
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef',
-    padding: 8,
+    padding: 6,
     fontWeight: 'bold',
   },
   tableRow: {
@@ -106,13 +107,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     borderBottomWidth: 1,
     borderBottomColor: '#f1f3f5',
-    padding: 8,
+    padding: 6,
   },
   colDesc: {
     flex: 2,
   },
   colConta: {
-    flex: 1,
+    flex: 1.2,
     textAlign: 'center',
   },
   colValor: {
@@ -124,11 +125,11 @@ const styles = StyleSheet.create({
     display: 'flex',
     flexDirection: 'row',
     backgroundColor: '#f8f9fa',
-    padding: 8,
+    padding: 6,
     fontWeight: 'bold',
   },
   totalLabel: {
-    flex: 3,
+    flex: 3.2,
     textAlign: 'right',
     color: '#495057',
   },
@@ -143,45 +144,23 @@ const styles = StyleSheet.create({
   outflowColor: {
     color: '#c92a2a',
   },
-  positionsSection: {
-    marginTop: 10,
-    padding: 15,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-    backgroundColor: '#fafafa',
-  },
-  posRow: {
-    display: 'flex',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 5,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f3f5',
-  },
-  posLabel: {
-    color: '#495057',
-  },
-  posValue: {
-    fontWeight: 'bold',
-  },
   summaryHeader: {
     backgroundColor: '#e10600',
     color: '#ffffff',
-    padding: 10,
+    padding: 8,
     borderRadius: 4,
     display: 'flex',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 15,
+    marginTop: 10,
   },
   summaryHeaderText: {
     fontWeight: 'bold',
-    fontSize: 12,
+    fontSize: 11,
   },
   notesSection: {
-    marginTop: 20,
+    marginTop: 15,
     padding: 10,
     backgroundColor: '#fffbeb',
     borderColor: '#fef3c7',
@@ -197,12 +176,12 @@ const styles = StyleSheet.create({
   },
   notesText: {
     color: '#78350f',
-    fontSize: 9,
+    fontSize: 8.5,
     lineHeight: 1.4,
   },
   footer: {
     position: 'absolute',
-    bottom: 30,
+    bottom: 25,
     left: 40,
     right: 40,
     textAlign: 'center',
@@ -210,7 +189,7 @@ const styles = StyleSheet.create({
     fontSize: 8,
     borderTopWidth: 1,
     borderTopColor: '#e9ecef',
-    paddingTop: 10,
+    paddingTop: 8,
   }
 });
 
@@ -240,6 +219,42 @@ export const FluxoCaixaPDF = ({ data }) => {
   const saldoFinalCalculado = caixaInicial + totalEntradas - totalSaidas;
   const saldoFisicoReal = fundoCaixa + dinheiroEmpresa + fundoReserva;
   const diferencaConciliacao = saldoFisicoReal - saldoFinalCalculado;
+
+  // Extrair saldos iniciais de observações
+  let fundoCaixaAnterior = 0;
+  let dinheiroEmpresaAnterior = 0;
+  let fundoReservaAnterior = 0;
+  let textoObservacoes = '';
+
+  if (data.observacoes) {
+    const trimmed = data.observacoes.trim();
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        fundoCaixaAnterior = parseFloat(parsed.fundo_caixa_anterior) || 0;
+        dinheiroEmpresaAnterior = parseFloat(parsed.dinheiro_empresa_anterior) || 0;
+        fundoReservaAnterior = parseFloat(parsed.fundo_reserva_anterior) || 0;
+        textoObservacoes = parsed.texto || '';
+      } catch (e) {
+        textoObservacoes = data.observacoes;
+      }
+    } else {
+      textoObservacoes = data.observacoes;
+    }
+  }
+
+  // Cálculos de movimentações por conta
+  const inflowsFundoCaixa = entradasList.filter(item => item.conta === 'Mercado Pago ROMANOS').reduce((acc, i) => acc + (parseFloat(i.valor) || 0), 0);
+  const inflowsDinheiro = entradasList.filter(item => item.conta === 'Dinheiro').reduce((acc, i) => acc + (parseFloat(i.valor) || 0), 0);
+  const inflowsFundoReserva = entradasList.filter(item => ['Mercado Pago KADOSH', 'PIX', 'Banco', 'Crédito', 'Débito'].includes(item.conta)).reduce((acc, i) => acc + (parseFloat(i.valor) || 0), 0);
+
+  const outflowsFundoCaixa = saidasList.filter(item => item.conta === 'Fundo de Caixa').reduce((acc, i) => acc + (parseFloat(i.valor) || 0), 0);
+  const outflowsDinheiro = saidasList.filter(item => item.conta === 'Dinheiro na Empresa').reduce((acc, i) => acc + (parseFloat(i.valor) || 0), 0);
+  const outflowsFundoReserva = saidasList.filter(item => item.conta === 'Fundo de Reserva').reduce((acc, i) => acc + (parseFloat(i.valor) || 0), 0);
+
+  const movFundoCaixa = inflowsFundoCaixa - outflowsFundoCaixa;
+  const movDinheiroEmpresa = inflowsDinheiro - outflowsDinheiro;
+  const movFundoReserva = inflowsFundoReserva - outflowsFundoReserva;
 
   return (
     <Document>
@@ -332,48 +347,63 @@ export const FluxoCaixaPDF = ({ data }) => {
         </View>
 
         {/* Saldos Físicos e Conciliação */}
-        <Text style={styles.sectionTitle}>Posições Financeiras Finais</Text>
-        <View style={styles.positionsSection}>
-          <View style={styles.posRow}>
-            <Text style={styles.posLabel}>Fundo de Caixa (Troco em mãos)</Text>
-            <Text style={styles.posValue}>{formatCurrency(data.fundo_caixa)}</Text>
+        <Text style={styles.sectionTitle}>Conciliação de Contas</Text>
+        <View style={styles.table}>
+          <View style={styles.tableHeader}>
+            <Text style={{ flex: 1.6, fontWeight: 'bold' }}>Conta</Text>
+            <Text style={{ flex: 1, textAlign: 'right', fontWeight: 'bold' }}>Anterior</Text>
+            <Text style={{ flex: 1, textAlign: 'right', fontWeight: 'bold' }}>Movimentado</Text>
+            <Text style={{ flex: 1, textAlign: 'right', fontWeight: 'bold' }}>Esperado</Text>
+            <Text style={{ flex: 1, textAlign: 'right', fontWeight: 'bold' }}>Declarado</Text>
           </View>
-          <View style={styles.posRow}>
-            <Text style={styles.posLabel}>Dinheiro na Empresa (Em cofre)</Text>
-            <Text style={styles.posValue}>{formatCurrency(data.dinheiro_empresa)}</Text>
+          
+          <View style={styles.tableRow}>
+            <Text style={{ flex: 1.6 }}>Fundo de Caixa (Romanos)</Text>
+            <Text style={{ flex: 1, textAlign: 'right' }}>{formatCurrency(fundoCaixaAnterior)}</Text>
+            <Text style={{ flex: 1, textAlign: 'right' }}>{movFundoCaixa >= 0 ? `+${formatCurrency(movFundoCaixa)}` : `-${formatCurrency(Math.abs(movFundoCaixa))}`}</Text>
+            <Text style={{ flex: 1, textAlign: 'right' }}>{formatCurrency(fundoCaixaAnterior + movFundoCaixa)}</Text>
+            <Text style={{ flex: 1, textAlign: 'right', fontWeight: 'bold' }}>{formatCurrency(fundoCaixa)}</Text>
           </View>
-          <View style={styles.posRow}>
-            <Text style={styles.posLabel}>Fundo de Reserva (Contas bancárias/outros)</Text>
-            <Text style={styles.posValue}>{formatCurrency(data.fundo_reserva)}</Text>
+
+          <View style={styles.tableRow}>
+            <Text style={{ flex: 1.6 }}>Dinheiro na Empresa (Cofre)</Text>
+            <Text style={{ flex: 1, textAlign: 'right' }}>{formatCurrency(dinheiroEmpresaAnterior)}</Text>
+            <Text style={{ flex: 1, textAlign: 'right' }}>{movDinheiroEmpresa >= 0 ? `+${formatCurrency(movDinheiroEmpresa)}` : `-${formatCurrency(Math.abs(movDinheiroEmpresa))}`}</Text>
+            <Text style={{ flex: 1, textAlign: 'right' }}>{formatCurrency(dinheiroEmpresaAnterior + movDinheiroEmpresa)}</Text>
+            <Text style={{ flex: 1, textAlign: 'right', fontWeight: 'bold' }}>{formatCurrency(dinheiroEmpresa)}</Text>
           </View>
-          <View style={[styles.posRow, { borderBottomWidth: 0, paddingTop: 10 }]}>
-            <Text style={[styles.posLabel, { fontWeight: 'bold', color: '#111111' }]}>Saldo Físico Real Declarado</Text>
-            <Text style={[styles.posValue, { fontSize: 11, color: '#111111' }]}>{formatCurrency(saldoFisicoReal)}</Text>
+
+          <View style={styles.tableRow}>
+            <Text style={{ flex: 1.6 }}>Fundo de Reserva (Kadosh/Bancos)</Text>
+            <Text style={{ flex: 1, textAlign: 'right' }}>{formatCurrency(fundoReservaAnterior)}</Text>
+            <Text style={{ flex: 1, textAlign: 'right' }}>{movFundoReserva >= 0 ? `+${formatCurrency(movFundoReserva)}` : `-${formatCurrency(Math.abs(movFundoReserva))}`}</Text>
+            <Text style={{ flex: 1, textAlign: 'right' }}>{formatCurrency(fundoReservaAnterior + movFundoReserva)}</Text>
+            <Text style={{ flex: 1, textAlign: 'right', fontWeight: 'bold' }}>{formatCurrency(fundoReserva)}</Text>
           </View>
         </View>
 
         {/* Resumo Consolidado com Status de Conciliação */}
         <View style={[styles.summaryHeader, { backgroundColor: Math.abs(diferencaConciliacao) < 0.01 ? '#2b8a3e' : '#e10600' }]}>
-          <Text style={styles.summaryHeaderText}>SALDO CONSOLIDADO DO DIA</Text>
+          <Text style={styles.summaryHeaderText}>SALDO CONSOLIDADO DECLARADO (REAL)</Text>
           <Text style={styles.summaryHeaderText}>{formatCurrency(saldoFisicoReal)}</Text>
         </View>
 
         {Math.abs(diferencaConciliacao) >= 0.01 && (
-          <View style={{ marginTop: 10, padding: 10, borderRadius: 4, borderWidth: 1, borderColor: '#f8d7da', backgroundColor: '#f8d7da', color: '#721c24' }}>
+          <View style={{ marginTop: 8, padding: 8, borderRadius: 4, borderWidth: 1, borderColor: '#f8d7da', backgroundColor: '#f8d7da', color: '#721c24' }}>
             <Text style={{ fontWeight: 'bold' }}>
               ⚠️ Divergência de Conciliação: {formatCurrency(diferencaConciliacao)}
             </Text>
-            <Text style={{ fontSize: 8, marginTop: 2 }}>
+            <Text style={{ fontSize: 7.5, marginTop: 2 }}>
               O saldo físico real declarado difere do saldo final calculado (Caixa Inicial + Entradas - Saídas = {formatCurrency(saldoFinalCalculado)}).
             </Text>
           </View>
         )}
 
         {/* Observações */}
-        {data.observacoes && (
+        {textoObservacoes && (
           <View style={styles.notesSection}>
             <Text style={styles.notesTitle}>Observações / Anotações do Dia</Text>
-            <Text style={styles.notesText}>{data.observacoes}</Text>
+            <Text style={styles.notesText}>{textoObservacoes}</Text>
           </View>
         )}
 
