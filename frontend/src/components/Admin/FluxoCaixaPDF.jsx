@@ -243,14 +243,14 @@ export const FluxoCaixaPDF = ({ data }) => {
     }
   }
 
-  // Cálculos de movimentações por conta
+  // Cálculos de movimentações por conta (ajustado para Mercado Pago ROMANOS, Mercado Pago KADOSH e Caixa da Empresa)
   const inflowsFundoCaixa = entradasList.filter(item => item.conta === 'Mercado Pago ROMANOS').reduce((acc, i) => acc + (parseFloat(i.valor) || 0), 0);
-  const inflowsDinheiro = entradasList.filter(item => item.conta === 'Dinheiro').reduce((acc, i) => acc + (parseFloat(i.valor) || 0), 0);
-  const inflowsFundoReserva = entradasList.filter(item => ['Mercado Pago KADOSH', 'PIX', 'Banco', 'Crédito', 'Débito'].includes(item.conta)).reduce((acc, i) => acc + (parseFloat(i.valor) || 0), 0);
+  const inflowsDinheiro = entradasList.filter(item => item.conta === 'Caixa da Empresa').reduce((acc, i) => acc + (parseFloat(i.valor) || 0), 0);
+  const inflowsFundoReserva = entradasList.filter(item => item.conta === 'Mercado Pago KADOSH').reduce((acc, i) => acc + (parseFloat(i.valor) || 0), 0);
 
-  const outflowsFundoCaixa = saidasList.filter(item => item.conta === 'Fundo de Caixa').reduce((acc, i) => acc + (parseFloat(i.valor) || 0), 0);
-  const outflowsDinheiro = saidasList.filter(item => item.conta === 'Dinheiro na Empresa').reduce((acc, i) => acc + (parseFloat(i.valor) || 0), 0);
-  const outflowsFundoReserva = saidasList.filter(item => item.conta === 'Fundo de Reserva').reduce((acc, i) => acc + (parseFloat(i.valor) || 0), 0);
+  const outflowsFundoCaixa = saidasList.filter(item => item.conta === 'Mercado Pago ROMANOS').reduce((acc, i) => acc + (parseFloat(i.valor) || 0), 0);
+  const outflowsDinheiro = saidasList.filter(item => item.conta === 'Caixa da Empresa').reduce((acc, i) => acc + (parseFloat(i.valor) || 0), 0);
+  const outflowsFundoReserva = saidasList.filter(item => item.conta === 'Mercado Pago KADOSH').reduce((acc, i) => acc + (parseFloat(i.valor) || 0), 0);
 
   const movFundoCaixa = inflowsFundoCaixa - outflowsFundoCaixa;
   const movDinheiroEmpresa = inflowsDinheiro - outflowsDinheiro;
@@ -297,7 +297,8 @@ export const FluxoCaixaPDF = ({ data }) => {
         <View style={styles.table}>
           <View style={styles.tableHeader}>
             <Text style={styles.colDesc}>Descrição</Text>
-            <Text style={styles.colConta}>Conta / Canal</Text>
+            <Text style={{ flex: 1, textAlign: 'center', fontWeight: 'bold' }}>Método</Text>
+            <Text style={styles.colConta}>Para Onde Foi</Text>
             <Text style={styles.colValor}>Valor</Text>
           </View>
           {entradasList.length === 0 ? (
@@ -308,13 +309,14 @@ export const FluxoCaixaPDF = ({ data }) => {
             entradasList.map((item, idx) => (
               <View key={idx} style={styles.tableRow}>
                 <Text style={styles.colDesc}>{item.descricao || 'Sem descrição'}</Text>
+                <Text style={{ flex: 1, textAlign: 'center' }}>{item.metodo || 'N/A'}</Text>
                 <Text style={styles.colConta}>{item.conta || 'N/A'}</Text>
                 <Text style={[styles.colValor, styles.inflowColor]}>{formatCurrency(item.valor)}</Text>
               </View>
             ))
           )}
           <View style={styles.rowTotal}>
-            <Text style={styles.totalLabel}>Subtotal de Entradas</Text>
+            <Text style={{ flex: 4.2, textAlign: 'right', color: '#495057' }}>Subtotal de Entradas</Text>
             <Text style={[styles.totalValue, styles.inflowColor]}>{formatCurrency(totalEntradas)}</Text>
           </View>
         </View>

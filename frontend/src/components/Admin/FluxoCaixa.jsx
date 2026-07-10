@@ -16,8 +16,8 @@ const FluxoCaixa = () => {
   const [fundoReservaAnterior, setFundoReservaAnterior] = useState('0');
 
   // Listas de lançamentos
-  const [entradas, setEntradas] = useState([{ descricao: '', valor: '', conta: 'PIX' }]);
-  const [saidas, setSaidas] = useState([{ descricao: '', valor: '', conta: 'Dinheiro na Empresa' }]);
+  const [entradas, setEntradas] = useState([{ descricao: '', valor: '', metodo: 'PIX', conta: 'Mercado Pago KADOSH' }]);
+  const [saidas, setSaidas] = useState([{ descricao: '', valor: '', conta: 'Caixa da Empresa' }]);
 
   // Valores Finais Declarados (Fim do Dia)
   const [fundoCaixaFinal, setFundoCaixaFinal] = useState('');
@@ -118,23 +118,23 @@ const FluxoCaixa = () => {
     .reduce((acc, item) => acc + (parseFloat(item.valor) || 0), 0);
 
   const inflowDinheiro = entradas
-    .filter(item => item.conta === 'Dinheiro')
+    .filter(item => item.conta === 'Caixa da Empresa')
     .reduce((acc, item) => acc + (parseFloat(item.valor) || 0), 0);
 
   const inflowReserva = entradas
-    .filter(item => ['Mercado Pago KADOSH', 'PIX', 'Banco', 'Cartão Crédito', 'Cartão Débito'].includes(item.conta))
+    .filter(item => item.conta === 'Mercado Pago KADOSH')
     .reduce((acc, item) => acc + (parseFloat(item.valor) || 0), 0);
 
   const outflowFundoCaixa = saidas
-    .filter(item => item.conta === 'Fundo de Caixa')
+    .filter(item => item.conta === 'Mercado Pago ROMANOS')
     .reduce((acc, item) => acc + (parseFloat(item.valor) || 0), 0);
 
   const outflowDinheiro = saidas
-    .filter(item => item.conta === 'Dinheiro na Empresa')
+    .filter(item => item.conta === 'Caixa da Empresa')
     .reduce((acc, item) => acc + (parseFloat(item.valor) || 0), 0);
 
   const outflowReserva = saidas
-    .filter(item => item.conta === 'Fundo de Reserva')
+    .filter(item => item.conta === 'Mercado Pago KADOSH')
     .reduce((acc, item) => acc + (parseFloat(item.valor) || 0), 0);
 
   // Valores Esperados (Anterior + Entrada - Saída)
@@ -165,7 +165,7 @@ const FluxoCaixa = () => {
 
   // Funções para manipular a lista de entradas
   const handleAddEntrada = () => {
-    setEntradas([...entradas, { descricao: '', valor: '', conta: 'PIX' }]);
+    setEntradas([...entradas, { descricao: '', valor: '', metodo: 'PIX', conta: 'Mercado Pago KADOSH' }]);
   };
 
   const handleRemoveEntrada = (index) => {
@@ -177,12 +177,17 @@ const FluxoCaixa = () => {
   const handleEntradaChange = (index, field, value) => {
     const list = [...entradas];
     list[index][field] = value;
+    if (field === 'metodo' && value === 'Dinheiro') {
+      list[index].conta = 'Caixa da Empresa';
+    } else if (field === 'metodo' && list[index].conta === 'Caixa da Empresa' && value !== 'Dinheiro') {
+      list[index].conta = 'Mercado Pago KADOSH';
+    }
     setEntradas(list);
   };
 
   // Funções para manipular a lista de saídas
   const handleAddSaida = () => {
-    setSaidas([...saidas, { descricao: '', valor: '', conta: 'Dinheiro na Empresa' }]);
+    setSaidas([...saidas, { descricao: '', valor: '', conta: 'Caixa da Empresa' }]);
   };
 
   const handleRemoveSaida = (index) => {
@@ -220,8 +225,8 @@ const FluxoCaixa = () => {
 
     // Resetar campos
     setDataCaixa(new Date().toISOString().split('T')[0]);
-    setEntradas([{ descricao: '', valor: '', conta: 'PIX' }]);
-    setSaidas([{ descricao: '', valor: '', conta: 'Dinheiro na Empresa' }]);
+    setEntradas([{ descricao: '', valor: '', metodo: 'PIX', conta: 'Mercado Pago KADOSH' }]);
+    setSaidas([{ descricao: '', valor: '', conta: 'Caixa da Empresa' }]);
     setFundoCaixaFinal('');
     setDinheiroEmpresaFinal('');
     setFundoReservaFinal('');
@@ -360,8 +365,8 @@ const FluxoCaixa = () => {
     setDinheiroEmpresaFinal('');
     setFundoReservaFinal('');
     setObservacoes('');
-    setEntradas([{ descricao: '', valor: '', conta: 'PIX' }]);
-    setSaidas([{ descricao: '', valor: '', conta: 'Dinheiro na Empresa' }]);
+    setEntradas([{ descricao: '', valor: '', metodo: 'PIX', conta: 'Mercado Pago KADOSH' }]);
+    setSaidas([{ descricao: '', valor: '', conta: 'Caixa da Empresa' }]);
   };
 
   // Excluir registro do histórico
@@ -593,7 +598,7 @@ const FluxoCaixa = () => {
                 </div>
                 
                 {entradas.map((item, index) => (
-                  <div key={index} style={{ display: 'grid', gridTemplateColumns: '1.4fr 0.9fr 1.3fr 40px', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
+                  <div key={index} style={{ display: 'grid', gridTemplateColumns: '1.4fr 0.8fr 1fr 1.2fr 40px', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
                     <input 
                       type="text" placeholder="Ex: Serviço Placa ABC" value={item.descricao} 
                       onChange={(e) => handleEntradaChange(index, 'descricao', e.target.value)}
@@ -607,16 +612,23 @@ const FluxoCaixa = () => {
                       required
                     />
                     <select 
-                      value={item.conta} onChange={(e) => handleEntradaChange(index, 'conta', e.target.value)}
+                      value={item.metodo || 'PIX'} onChange={(e) => handleEntradaChange(index, 'metodo', e.target.value)}
                       style={{ width: '100%', padding: '8px', background: '#0a0a0c', border: '1px solid #333', borderRadius: '6px', color: '#fff' }}
                     >
-                      <option value="PIX">PIX (Reserva)</option>
-                      <option value="Mercado Pago KADOSH">Mercado Pago KADOSH (Reserva)</option>
-                      <option value="Mercado Pago ROMANOS">Mercado Pago ROMANOS (Caixa)</option>
-                      <option value="Dinheiro">Dinheiro (Empresa/Cofre)</option>
-                      <option value="Cartão Crédito">Cartão Crédito (Reserva)</option>
-                      <option value="Cartão Débito">Cartão Débito (Reserva)</option>
-                      <option value="Banco">Banco (Reserva)</option>
+                      <option value="PIX">PIX</option>
+                      <option value="Dinheiro">Dinheiro</option>
+                      <option value="Cartão Crédito">Cartão Crédito</option>
+                      <option value="Cartão Débito">Cartão Débito</option>
+                      <option value="Banco">Banco/Transf.</option>
+                    </select>
+                    <select 
+                      value={item.conta} onChange={(e) => handleEntradaChange(index, 'conta', e.target.value)}
+                      disabled={item.metodo === 'Dinheiro'}
+                      style={{ width: '100%', padding: '8px', background: item.metodo === 'Dinheiro' ? '#222' : '#0a0a0c', border: '1px solid #333', borderRadius: '6px', color: item.metodo === 'Dinheiro' ? '#888' : '#fff' }}
+                    >
+                      <option value="Mercado Pago KADOSH">Mercado Pago KADOSH</option>
+                      <option value="Mercado Pago ROMANOS">Mercado Pago ROMANOS</option>
+                      <option value="Caixa da Empresa">Caixa da Empresa</option>
                     </select>
                     <button 
                       type="button" onClick={() => handleRemoveEntrada(index)} disabled={entradas.length === 1}
@@ -663,9 +675,9 @@ const FluxoCaixa = () => {
                       value={item.conta} onChange={(e) => handleSaidaChange(index, 'conta', e.target.value)}
                       style={{ width: '100%', padding: '8px', background: '#0a0a0c', border: '1px solid #333', borderRadius: '6px', color: '#fff' }}
                     >
-                      <option value="Fundo de Caixa">Fundo de Caixa (Romanos)</option>
-                      <option value="Dinheiro na Empresa">Dinheiro na Empresa (Cofre)</option>
-                      <option value="Fundo de Reserva">Fundo de Reserva (Kadosh/Banco)</option>
+                      <option value="Mercado Pago KADOSH">Mercado Pago KADOSH</option>
+                      <option value="Mercado Pago ROMANOS">Mercado Pago ROMANOS</option>
+                      <option value="Caixa da Empresa">Caixa da Empresa</option>
                     </select>
                     <button 
                       type="button" onClick={() => handleRemoveSaida(index)} disabled={saidas.length === 1}
@@ -738,7 +750,7 @@ const FluxoCaixa = () => {
               {/* Botões de Ação */}
               <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
                 <button type="submit" className="btn" style={{ flex: 1, background: '#10b981', minWidth: '150px' }} disabled={saving}>
-                  {saving ? 'Gravando Fechamento...' : '💾 Salvar Fechamento (Supabase/Local)'}
+                  {saving ? 'Gravando Fechamento...' : '💾 Salvar Fechamento'}
                 </button>
                 <button 
                   type="button" 
