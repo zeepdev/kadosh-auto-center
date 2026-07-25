@@ -11,11 +11,16 @@ CREATE TABLE IF NOT EXISTS public.mecanicos (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Habilitar RLS na tabela de mecânicos
+-- Habilitar RLS na tabela de mecânicos com política completa de permissão
 ALTER TABLE public.mecanicos ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Permitir tudo para usuários autenticados em mecanicos" ON public.mecanicos
-  FOR ALL TO authenticated USING (true);
+DROP POLICY IF EXISTS "Permitir tudo para usuários autenticados em mecanicos" ON public.mecanicos;
+DROP POLICY IF EXISTS "Permitir tudo em mecanicos" ON public.mecanicos;
+
+CREATE POLICY "Permitir tudo em mecanicos" ON public.mecanicos
+  FOR ALL
+  USING (true)
+  WITH CHECK (true);
 
 -- 2. Novas colunas na tabela de Orçamentos
 ALTER TABLE public.orcamentos
