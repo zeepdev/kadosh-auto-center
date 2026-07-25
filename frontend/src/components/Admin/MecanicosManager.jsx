@@ -150,6 +150,18 @@ const MecanicosManager = () => {
     return dateStr;
   };
 
+  const handleDeleteMecanico = async (id, nome) => {
+    if (!window.confirm(`Tem certeza que deseja remover o mecânico "${nome}"?`)) return;
+    try {
+      const { error } = await supabase.from('mecanicos').delete().eq('id', id);
+      if (error) throw error;
+      alert('Mecânico removido com sucesso!');
+      fetchMecanicos();
+    } catch (err) {
+      alert('Erro ao excluir mecânico: ' + err.message);
+    }
+  };
+
   return (
     <div style={{ color: '#fff' }}>
       
@@ -407,13 +419,23 @@ const MecanicosManager = () => {
                       <span style={{ fontSize: '0.72rem', padding: '3px 8px', borderRadius: '4px', background: m.ativo !== false ? '#10b98120' : '#ef444420', color: m.ativo !== false ? '#10b981' : '#ef4444', border: `1px solid ${m.ativo !== false ? '#10b981' : '#ef4444'}` }}>
                         {m.ativo !== false ? 'Ativo' : 'Inativo'}
                       </span>
-                      <button 
-                        type="button" 
-                        onClick={() => handleEditClick(m)}
-                        style={{ background: 'transparent', border: '1px solid #555', color: '#ccc', padding: '5px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem' }}
-                      >
-                        ✏️ Editar
-                      </button>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button 
+                          type="button" 
+                          onClick={() => handleEditClick(m)}
+                          style={{ background: '#222', border: '1px solid #444', color: '#ccc', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem' }}
+                        >
+                          ✏️ Editar
+                        </button>
+                        <button 
+                          type="button" 
+                          onClick={() => handleDeleteMecanico(m.id, m.nome)}
+                          style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid #ef4444', color: '#ef4444', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}
+                          title="Remover Mecânico"
+                        >
+                          🗑️ Remover
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
