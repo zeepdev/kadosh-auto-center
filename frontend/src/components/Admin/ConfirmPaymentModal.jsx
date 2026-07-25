@@ -89,17 +89,17 @@ const ConfirmPaymentModal = ({ atendimento, onClose, onPaymentConfirmed }) => {
   };
 
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '20px' }}>
-      <div className="glass" style={{ width: '100%', maxWidth: '500px', padding: '25px', borderRadius: '12px' }}>
+    <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(8, 8, 12, 0.95)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000, padding: '20px' }}>
+      <div style={{ width: '100%', maxWidth: '500px', backgroundColor: '#141418', border: '1px solid #2a2a35', borderRadius: '14px', padding: '25px', boxShadow: '0 25px 60px rgba(0,0,0,0.95)', color: '#fff' }}>
         
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '1px solid #333', paddingBottom: '10px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '1px solid #22222a', paddingBottom: '10px' }}>
           <h3 style={{ margin: 0, color: '#4ade80', fontSize: '1.2rem' }}>💲 Confirmar Pagamento (Dar Baixa)</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#aaa', fontSize: '1.5rem', cursor: 'pointer' }}>&times;</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#aaa', fontSize: '1.6rem', cursor: 'pointer' }}>&times;</button>
         </div>
 
         {erro && <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid #ef4444', color: '#ef4444', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '0.85rem' }}>{erro}</div>}
 
-        <div style={{ background: '#16161a', padding: '12px 15px', borderRadius: '8px', border: '1px solid #333', marginBottom: '18px', fontSize: '0.9rem' }}>
+        <div style={{ background: '#1a1a20', padding: '14px', borderRadius: '8px', border: '1px solid #2a2a35', marginBottom: '18px', fontSize: '0.9rem' }}>
           <p style={{ margin: '0 0 5px 0', color: '#fff', fontWeight: 'bold' }}>
             Orçamento #{atendimento.id} - {atendimento.nome || 'Cliente Balcão'}
           </p>
@@ -161,7 +161,7 @@ const ConfirmPaymentModal = ({ atendimento, onClose, onPaymentConfirmed }) => {
             <button type="submit" disabled={salvando} className="btn" style={{ flex: 1, background: '#10b981', color: '#fff', fontWeight: 'bold', padding: '12px' }}>
               {salvando ? 'Gravando Baixa...' : '✅ Confirmar e Lançar no Caixa'}
             </button>
-            <button type="button" onClick={onClose} className="btn" style={{ background: '#333', color: '#ccc', padding: '12px 15px' }}>
+            <button type="button" onClick={onClose} className="btn" style={{ background: '#222', color: '#ccc', padding: '12px 15px' }}>
               Cancelar
             </button>
           </div>

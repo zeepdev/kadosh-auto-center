@@ -7,6 +7,7 @@ const MecanicosManager = () => {
   // Mecânicos
   const [mecanicos, setMecanicos] = useState([]);
   const [loadingMecanicos, setLoadingMecanicos] = useState(false);
+  const [showForm, setShowForm] = useState(false);
   
   // Form de Mecânico
   const [editingId, setEditingId] = useState(null);
@@ -97,7 +98,7 @@ const MecanicosManager = () => {
       if (editingId) {
         const { error } = await supabase.from('mecanicos').update(payload).eq('id', editingId);
         if (error) throw error;
-        alert('Mecânico atualizado!');
+        alert('Mecânico atualizado com sucesso!');
       } else {
         const { error } = await supabase.from('mecanicos').insert([payload]);
         if (error) throw error;
@@ -105,6 +106,7 @@ const MecanicosManager = () => {
       }
 
       resetForm();
+      setShowForm(false);
       fetchMecanicos();
     } catch (err) {
       alert('Erro ao salvar mecânico: ' + err.message);
@@ -120,6 +122,7 @@ const MecanicosManager = () => {
     setCpfPix(m.cpf_pix || '');
     setEspecialidade(m.especialidade || '');
     setAtivo(m.ativo !== false);
+    setShowForm(true);
   };
 
   const resetForm = () => {
@@ -150,33 +153,50 @@ const MecanicosManager = () => {
   return (
     <div style={{ color: '#fff' }}>
       
-      {/* Sub-Abas */}
-      <div style={{ display: 'flex', gap: '15px', borderBottom: '1px solid #333', paddingBottom: '12px', marginBottom: '25px' }}>
-        <button 
-          onClick={() => setSubTab('comissoes')}
-          style={{ 
-            background: 'transparent', border: 'none', color: subTab === 'comissoes' ? '#f59e0b' : '#888',
-            fontSize: '1.1rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px'
-          }}
-        >
-          💰 Relatório de Comissões
-        </button>
-        <button 
-          onClick={() => setSubTab('cadastro')}
-          style={{ 
-            background: 'transparent', border: 'none', color: subTab === 'cadastro' ? '#f59e0b' : '#888',
-            fontSize: '1.1rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px'
-          }}
-        >
-          👨‍🔧 Cadastro de Mecânicos
-        </button>
+      {/* Sub-Abas e Botão de Adicionar */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #22222a', paddingBottom: '15px', marginBottom: '25px', flexWrap: 'wrap', gap: '15px' }}>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button 
+            onClick={() => setSubTab('comissoes')}
+            style={{ 
+              background: subTab === 'comissoes' ? '#f59e0b' : '#1c1c24', 
+              border: subTab === 'comissoes' ? '1px solid #f59e0b' : '1px solid #2a2a35',
+              color: subTab === 'comissoes' ? '#000' : '#ccc',
+              fontSize: '0.95rem', fontWeight: 'bold', cursor: 'pointer', padding: '10px 20px', borderRadius: '8px',
+              transition: 'all 0.2s'
+            }}
+          >
+            💰 Relatório de Comissões
+          </button>
+          <button 
+            onClick={() => setSubTab('cadastro')}
+            style={{ 
+              background: subTab === 'cadastro' ? '#f59e0b' : '#1c1c24', 
+              border: subTab === 'cadastro' ? '1px solid #f59e0b' : '1px solid #2a2a35',
+              color: subTab === 'cadastro' ? '#000' : '#ccc',
+              fontSize: '0.95rem', fontWeight: 'bold', cursor: 'pointer', padding: '10px 20px', borderRadius: '8px',
+              transition: 'all 0.2s'
+            }}
+          >
+            👨‍🔧 Cadastro de Mecânicos ({mecanicos.length})
+          </button>
+        </div>
+
+        {subTab === 'cadastro' && (
+          <button 
+            onClick={() => { resetForm(); setShowForm(!showForm); }}
+            style={{ background: '#10b981', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.9rem' }}
+          >
+            {showForm ? '✖ Fechar Formulário' : '+ Adicionar Mecânico'}
+          </button>
+        )}
       </div>
 
       {/* ABA 1: RELATÓRIO DE COMISSÕES */}
       {subTab === 'comissoes' && (
         <div>
           {/* Filtros */}
-          <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', alignItems: 'center', background: '#16161a', padding: '15px 20px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '25px' }}>
+          <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', alignItems: 'center', background: '#16161a', padding: '15px 20px', borderRadius: '10px', border: '1px solid #2a2a35', marginBottom: '25px' }}>
             <div style={{ flex: 1, minWidth: '200px' }}>
               <label style={{ display: 'block', fontSize: '0.8rem', color: '#aaa', marginBottom: '4px' }}>Mecânico</label>
               <select 
@@ -202,26 +222,26 @@ const MecanicosManager = () => {
             </div>
           </div>
 
-          {/* Cards de Resumo */}
+          {/* Cards de Resumo Solidos */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '30px' }}>
-            <div className="glass" style={{ padding: '20px', borderRadius: '12px', borderLeft: '4px solid #3b82f6' }}>
+            <div style={{ background: '#16161a', border: '1px solid #2a2a35', padding: '20px', borderRadius: '12px', borderLeft: '4px solid #3b82f6' }}>
               <span style={{ fontSize: '0.82rem', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Serviços Pagos</span>
               <h3 style={{ margin: '8px 0 0 0', fontSize: '1.8rem', color: '#3b82f6' }}>{orcamentosPagos.length}</h3>
             </div>
             
-            <div className="glass" style={{ padding: '20px', borderRadius: '12px', borderLeft: '4px solid #10b981' }}>
+            <div style={{ background: '#16161a', border: '1px solid #2a2a35', padding: '20px', borderRadius: '12px', borderLeft: '4px solid #10b981' }}>
               <span style={{ fontSize: '0.82rem', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Mão de Obra</span>
               <h3 style={{ margin: '8px 0 0 0', fontSize: '1.8rem', color: '#10b981' }}>{formatCurrency(totalMaoObra)}</h3>
             </div>
 
-            <div className="glass" style={{ padding: '20px', borderRadius: '12px', borderLeft: '4px solid #f59e0b' }}>
+            <div style={{ background: '#16161a', border: '1px solid #2a2a35', padding: '20px', borderRadius: '12px', borderLeft: '4px solid #f59e0b' }}>
               <span style={{ fontSize: '0.82rem', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Comissões a Pagar</span>
               <h3 style={{ margin: '8px 0 0 0', fontSize: '1.8rem', color: '#f59e0b' }}>{formatCurrency(totalComissao)}</h3>
             </div>
           </div>
 
-          {/* Tabela de Comissões */}
-          <div className="panel" style={{ padding: '20px', background: '#16161a', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+          {/* Tabela de Comissões Sólida */}
+          <div style={{ padding: '20px', background: '#16161a', borderRadius: '12px', border: '1px solid #2a2a35' }}>
             <h4 style={{ margin: '0 0 15px 0', color: '#fff', fontSize: '1.1rem' }}>Detalhamento das Comissões do Mês</h4>
             
             {loadingComissoes ? (
@@ -232,7 +252,7 @@ const MecanicosManager = () => {
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
                   <thead>
-                    <tr style={{ borderBottom: '1px solid #333', color: '#aaa' }}>
+                    <tr style={{ background: '#0f0f13', borderBottom: '2px solid #2a2a35', color: '#aaa' }}>
                       <th style={{ padding: '12px 10px' }}>Data Baixa</th>
                       <th style={{ padding: '12px 10px' }}>Orçamento</th>
                       <th style={{ padding: '12px 10px' }}>Cliente / Placa</th>
@@ -245,7 +265,7 @@ const MecanicosManager = () => {
                   </thead>
                   <tbody>
                     {orcamentosPagos.map((item, idx) => (
-                      <tr key={idx} style={{ borderBottom: '1px solid #222' }}>
+                      <tr key={idx} style={{ borderBottom: '1px solid #22222a' }}>
                         <td style={{ padding: '12px 10px', color: '#ccc' }}>{formatDate(item.data_pagamento)}</td>
                         <td style={{ padding: '12px 10px', fontWeight: 'bold', color: '#fff' }}>#{item.id}</td>
                         <td style={{ padding: '12px 10px' }}>
@@ -277,112 +297,120 @@ const MecanicosManager = () => {
 
       {/* ABA 2: CADASTRO DE MECÂNICOS */}
       {subTab === 'cadastro' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '30px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
           
-          {/* Formulário */}
-          <div className="panel" style={{ padding: '20px', background: '#16161a', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-            <h4 style={{ margin: '0 0 15px 0', color: '#fff', fontSize: '1.1rem' }}>
-              {editingId ? '✏️ Editar Mecânico' : '➕ Novo Mecânico'}
-            </h4>
-
-            <form onSubmit={handleSaveMecanico}>
-              <div className="form-group" style={{ marginBottom: '15px' }}>
-                <label style={{ color: '#ccc', fontSize: '0.85rem' }}>Nome Completo *</label>
-                <input 
-                  type="text" 
-                  required 
-                  value={nome} 
-                  onChange={e => setNome(e.target.value)} 
-                  placeholder="Ex: Carlos Silva"
-                  style={{ width: '100%', padding: '10px', background: '#0a0a0c', border: '1px solid #333', borderRadius: '8px', color: '#fff', marginTop: '4px' }}
-                />
+          {/* Formulário Solido quando Aberto */}
+          {(showForm || editingId) && (
+            <div style={{ padding: '24px', background: '#16161a', borderRadius: '12px', border: '1px solid #2a2a35' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                <h4 style={{ margin: 0, color: '#f59e0b', fontSize: '1.1rem' }}>
+                  {editingId ? '✏️ Editar Mecânico' : '➕ Novo Mecânico'}
+                </h4>
+                <button type="button" onClick={() => { resetForm(); setShowForm(false); }} style={{ background: 'none', border: 'none', color: '#aaa', fontSize: '1.2rem', cursor: 'pointer' }}>&times;</button>
               </div>
 
-              <div className="form-group" style={{ marginBottom: '15px' }}>
-                <label style={{ color: '#ccc', fontSize: '0.85rem' }}>WhatsApp / Celular</label>
-                <input 
-                  type="text" 
-                  value={whatsapp} 
-                  onChange={e => setWhatsapp(e.target.value)} 
-                  placeholder="(62) 99999-9999"
-                  style={{ width: '100%', padding: '10px', background: '#0a0a0c', border: '1px solid #333', borderRadius: '8px', color: '#fff', marginTop: '4px' }}
-                />
-              </div>
+              <form onSubmit={handleSaveMecanico}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
+                  <div className="form-group">
+                    <label style={{ color: '#ccc', fontSize: '0.85rem' }}>Nome Completo *</label>
+                    <input 
+                      type="text" 
+                      required 
+                      value={nome} 
+                      onChange={e => setNome(e.target.value)} 
+                      placeholder="Ex: Carlos Silva"
+                      style={{ width: '100%', padding: '10px', background: '#0a0a0c', border: '1px solid #333', borderRadius: '8px', color: '#fff', marginTop: '4px' }}
+                    />
+                  </div>
 
-              <div className="form-group" style={{ marginBottom: '15px' }}>
-                <label style={{ color: '#ccc', fontSize: '0.85rem' }}>Chave PIX / CPF</label>
-                <input 
-                  type="text" 
-                  value={cpfPix} 
-                  onChange={e => setCpfPix(e.target.value)} 
-                  placeholder="Para pagamento das comissões"
-                  style={{ width: '100%', padding: '10px', background: '#0a0a0c', border: '1px solid #333', borderRadius: '8px', color: '#fff', marginTop: '4px' }}
-                />
-              </div>
+                  <div className="form-group">
+                    <label style={{ color: '#ccc', fontSize: '0.85rem' }}>WhatsApp / Celular</label>
+                    <input 
+                      type="text" 
+                      value={whatsapp} 
+                      onChange={e => setWhatsapp(e.target.value)} 
+                      placeholder="(62) 99999-9999"
+                      style={{ width: '100%', padding: '10px', background: '#0a0a0c', border: '1px solid #333', borderRadius: '8px', color: '#fff', marginTop: '4px' }}
+                    />
+                  </div>
+                </div>
 
-              <div className="form-group" style={{ marginBottom: '15px' }}>
-                <label style={{ color: '#ccc', fontSize: '0.85rem' }}>Especialidade / Cargo</label>
-                <input 
-                  type="text" 
-                  value={especialidade} 
-                  onChange={e => setEspecialidade(e.target.value)} 
-                  placeholder="Ex: Mecânica Leve / Injeção"
-                  style={{ width: '100%', padding: '10px', background: '#0a0a0c', border: '1px solid #333', borderRadius: '8px', color: '#fff', marginTop: '4px' }}
-                />
-              </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
+                  <div className="form-group">
+                    <label style={{ color: '#ccc', fontSize: '0.85rem' }}>Chave PIX / CPF</label>
+                    <input 
+                      type="text" 
+                      value={cpfPix} 
+                      onChange={e => setCpfPix(e.target.value)} 
+                      placeholder="Para pagamento das comissões"
+                      style={{ width: '100%', padding: '10px', background: '#0a0a0c', border: '1px solid #333', borderRadius: '8px', color: '#fff', marginTop: '4px' }}
+                    />
+                  </div>
 
-              <div className="form-group" style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#ccc', fontSize: '0.85rem', cursor: 'pointer' }}>
-                  <input 
-                    type="checkbox" 
-                    checked={ativo} 
-                    onChange={e => setAtivo(e.target.checked)} 
-                  />
-                  Mecânico Ativo na Oficina
-                </label>
-              </div>
+                  <div className="form-group">
+                    <label style={{ color: '#ccc', fontSize: '0.85rem' }}>Especialidade / Cargo</label>
+                    <input 
+                      type="text" 
+                      value={especialidade} 
+                      onChange={e => setEspecialidade(e.target.value)} 
+                      placeholder="Ex: Mecânica Leve / Injeção"
+                      style={{ width: '100%', padding: '10px', background: '#0a0a0c', border: '1px solid #333', borderRadius: '8px', color: '#fff', marginTop: '4px' }}
+                    />
+                  </div>
+                </div>
 
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button type="submit" disabled={savingMecanico} className="btn" style={{ flex: 1, background: '#f59e0b', color: '#fff', fontWeight: 'bold' }}>
-                  {savingMecanico ? 'Salvando...' : editingId ? 'Atualizar Mecânico' : 'Salvar Mecânico'}
-                </button>
-                {editingId && (
-                  <button type="button" onClick={resetForm} className="btn" style={{ background: '#333', color: '#ccc' }}>
+                <div className="form-group" style={{ marginBottom: '20px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#ccc', fontSize: '0.85rem', cursor: 'pointer' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={ativo} 
+                      onChange={e => setAtivo(e.target.checked)} 
+                    />
+                    Mecânico Ativo na Oficina
+                  </label>
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button type="submit" disabled={savingMecanico} className="btn" style={{ flex: 1, background: '#f59e0b', color: '#fff', fontWeight: 'bold', padding: '10px' }}>
+                    {savingMecanico ? 'Salvando...' : editingId ? 'Atualizar Mecânico' : 'Salvar Mecânico'}
+                  </button>
+                  <button type="button" onClick={() => { resetForm(); setShowForm(false); }} className="btn" style={{ background: '#333', color: '#ccc', padding: '10px 20px' }}>
                     Cancelar
                   </button>
-                )}
-              </div>
-            </form>
-          </div>
+                </div>
+              </form>
+            </div>
+          )}
 
           {/* Lista de Mecânicos */}
-          <div className="panel" style={{ padding: '20px', background: '#16161a', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div style={{ padding: '20px', background: '#16161a', borderRadius: '12px', border: '1px solid #2a2a35' }}>
             <h4 style={{ margin: '0 0 15px 0', color: '#fff', fontSize: '1.1rem' }}>Mecânicos Cadastrados ({mecanicos.length})</h4>
             
             {loadingMecanicos ? (
               <p style={{ color: '#aaa' }}>Carregando mecânicos...</p>
             ) : mecanicos.length === 0 ? (
-              <p style={{ color: '#888' }}>Nenhum mecânico cadastrado ainda.</p>
+              <p style={{ color: '#888' }}>Nenhum mecânico cadastrado ainda. Clique em "+ Adicionar Mecânico" acima para cadastrar.</p>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '15px' }}>
                 {mecanicos.map(m => (
-                  <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 15px', background: '#0a0a0c', borderRadius: '8px', border: '1px solid #333' }}>
+                  <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px', background: '#0a0a0c', borderRadius: '10px', border: '1px solid #2a2a35' }}>
                     <div>
-                      <span style={{ fontWeight: 'bold', color: '#fff', display: 'block' }}>{m.nome}</span>
-                      <span style={{ fontSize: '0.8rem', color: '#888' }}>
-                        {m.especialidade || 'Mecânico Generalista'} {m.whatsapp ? `• ${m.whatsapp}` : ''}
+                      <span style={{ fontWeight: 'bold', color: '#fff', fontSize: '1rem', display: 'block' }}>{m.nome}</span>
+                      <span style={{ fontSize: '0.8rem', color: '#aaa', display: 'block', marginTop: '2px' }}>
+                        {m.especialidade || 'Mecânico Generalista'}
                       </span>
-                      {m.cpf_pix && <span style={{ fontSize: '0.75rem', color: '#aaa', display: 'block', marginTop: '2px' }}>PIX: {m.cpf_pix}</span>}
+                      {m.whatsapp && <span style={{ fontSize: '0.78rem', color: '#4ade80', display: 'block', marginTop: '2px' }}>📱 {m.whatsapp}</span>}
+                      {m.cpf_pix && <span style={{ fontSize: '0.75rem', color: '#888', display: 'block', marginTop: '2px' }}>PIX: {m.cpf_pix}</span>}
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{ fontSize: '0.75rem', padding: '3px 8px', borderRadius: '4px', background: m.ativo !== false ? '#10b98120' : '#ef444420', color: m.ativo !== false ? '#10b981' : '#ef4444', border: `1px solid ${m.ativo !== false ? '#10b981' : '#ef4444'}` }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+                      <span style={{ fontSize: '0.72rem', padding: '3px 8px', borderRadius: '4px', background: m.ativo !== false ? '#10b98120' : '#ef444420', color: m.ativo !== false ? '#10b981' : '#ef4444', border: `1px solid ${m.ativo !== false ? '#10b981' : '#ef4444'}` }}>
                         {m.ativo !== false ? 'Ativo' : 'Inativo'}
                       </span>
                       <button 
                         type="button" 
                         onClick={() => handleEditClick(m)}
-                        style={{ background: 'transparent', border: '1px solid #555', color: '#ccc', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
+                        style={{ background: 'transparent', border: '1px solid #555', color: '#ccc', padding: '5px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem' }}
                       >
                         ✏️ Editar
                       </button>
