@@ -5,6 +5,9 @@ import UpdatePhotoModal from './UpdatePhotoModal';
 import ViewVehicleModal from './ViewVehicleModal';
 import InvoiceModal from './InvoiceModal';
 import QuickRegisterModal from './QuickRegisterModal';
+import DirectBudgetModal from './DirectBudgetModal';
+import ConfirmPaymentModal from './ConfirmPaymentModal';
+import MecanicosManager from './MecanicosManager';
 import FluxoCaixa from './FluxoCaixa';
 import { supabase } from '../../lib/supabase';
 import { calcularPrioridade, PRIORIDADES } from '../../lib/prioridade';
@@ -49,8 +52,10 @@ const AdminDashboard = () => {
   const [selectedForUpdate, setSelectedForUpdate] = useState(null);
   const [selectedPlacaForView, setSelectedPlacaForView] = useState(null);
   const [selectedForInvoice, setSelectedForInvoice] = useState(null);
+  const [selectedForPayment, setSelectedForPayment] = useState(null);
+  const [showDirectBudget, setShowDirectBudget] = useState(false);
   const [depoimentos, setDepoimentos] = useState([]);
-  const [activeTab, setActiveTab] = useState('atendimentos'); // 'atendimentos', 'financeiro', 'depoimentos'
+  const [activeTab, setActiveTab] = useState('atendimentos'); // 'atendimentos', 'agenda', 'fluxo_caixa', 'mecanicos', 'depoimentos'
   const [showQuickRegister, setShowQuickRegister] = useState(false);
 
   // Ao montar, verifica se já existe sessão Supabase válida e se o usuário é admin.
@@ -422,7 +427,8 @@ const AdminDashboard = () => {
             <h1 style={{ fontSize: '2.5rem', color: '#e10600', margin: 0 }}>Painel Kadosh</h1>
             <p style={{ color: '#aaa', margin: '5px 0 0 0' }}>Gerenciamento de Orçamentos e Agendamentos</p>
           </div>
-          <div style={{ display: 'flex', gap: '15px' }}>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            <button onClick={() => setShowDirectBudget(true)} className="btn" style={{ background: '#e10600', color: '#fff', border: 'none', fontWeight: 'bold' }}>+ Novo Orçamento Direto</button>
             <button onClick={() => setShowQuickRegister(true)} className="btn" style={{ background: '#10b981', color: '#fff', border: 'none' }}>+ Cadastrar Cliente</button>
             <button onClick={handleLogout} className="btn" style={{ background: 'transparent', border: '1px solid #e10600', color: '#e10600' }}>Sair</button>
             <Link to="/" className="btn" style={{ background: '#333' }}>Voltar ao Site</Link>
@@ -451,7 +457,7 @@ const AdminDashboard = () => {
         </div>
 
         {/* Abas do Painel */}
-        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
           <button 
             onClick={() => setActiveTab('atendimentos')}
             style={{ 
@@ -483,14 +489,24 @@ const AdminDashboard = () => {
             💵 Fluxo de Caixa
           </button>
           <button 
-            onClick={() => setActiveTab('depoimentos')}
+            onClick={() => setActiveTab('mecanicos')}
             style={{ 
               padding: '12px 24px', borderRadius: '8px', cursor: 'pointer', border: 'none',
-              background: activeTab === 'depoimentos' ? '#f59e0b' : '#222',
+              background: activeTab === 'mecanicos' ? '#f59e0b' : '#222',
               color: '#fff', fontWeight: 'bold'
             }}
           >
-            ⭐ Moderar Depoimentos
+            👨‍🔧 Mecânicos & Comissões
+          </button>
+          <button 
+            onClick={() => setActiveTab('depoimentos')}
+            style={{ 
+              padding: '12px 24px', borderRadius: '8px', cursor: 'pointer', border: 'none',
+              background: activeTab === 'depoimentos' ? '#8b5cf6' : '#222',
+              color: '#fff', fontWeight: 'bold'
+            }}
+          >
+            ⭐ Depoimentos
           </button>
         </div>
 
@@ -635,6 +651,12 @@ const AdminDashboard = () => {
           </div>
         )}
 
+        {activeTab === 'mecanicos' && (
+          <div className="glass" style={{ padding: '30px', marginBottom: '30px' }}>
+            <MecanicosManager />
+          </div>
+        )}
+
         {activeTab === 'depoimentos' && (
           <div className="glass" style={{ padding: '30px', marginBottom: '30px' }}>
             <h3 style={{ color: '#f59e0b', marginBottom: '20px' }}>⭐ Moderação de Depoimentos</h3>
@@ -686,21 +708,22 @@ const AdminDashboard = () => {
         <div className="glass" style={{ overflowX: 'auto', padding: '0', borderRadius: '12px' }}>
           {loading ? (
             <p style={{ padding: '30px', textAlign: 'center' }}>Carregando dados...</p>
-          ) : activeTab !== 'depoimentos' && (
+          ) : (activeTab === 'atendimentos' || activeTab === 'agenda') && (
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead>
                 <tr style={{ background: 'var(--bg-elev)', borderBottom: '2px solid var(--hairline)' }}>
                   <th style={{ padding: '15px' }}>Prioridade</th>
                   <th style={{ padding: '15px' }}>Cliente / Veículo</th>
-                  <th style={{ padding: '15px' }}>Serviço</th>
+                  <th style={{ padding: '15px' }}>Serviço / Mecânico</th>
                   <th style={{ padding: '15px' }}>Valor (R$)</th>
+                  <th style={{ padding: '15px' }}>Pagamento</th>
                   <th style={{ padding: '15px' }}>Status</th>
                   <th style={{ padding: '15px' }}>Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredData.length === 0 ? (
-                  <tr><td colSpan="6" style={{ padding: '20px', textAlign: 'center' }}>Nenhum registro encontrado.</td></tr>
+                  <tr><td colSpan="7" style={{ padding: '20px', textAlign: 'center' }}>Nenhum registro encontrado.</td></tr>
                 ) : filteredData.map(item => {
                   const agendamentoFormatado = item.dataAgendamento ? (item.dataAgendamento.includes('Fora') ? item.dataAgendamento : new Date(item.dataAgendamento).toLocaleString('pt-BR').slice(0, 16)) : 'Apenas Orçamento';
 
@@ -737,6 +760,11 @@ const AdminDashboard = () => {
                       </td>
                       <td style={{ padding: '20px 15px' }}>
                         <div style={{ fontWeight: '600', color: '#fff', fontSize: '0.95rem', marginBottom: '4px' }}>{item.servicoDesejado}</div>
+                        {item.mecanico_nome && (
+                          <div style={{ fontSize: '0.78rem', color: '#f59e0b', margin: '2px 0 4px 0', fontWeight: '600' }}>
+                            👨‍🔧 {item.mecanico_nome} (Comissão: R$ {(parseFloat(item.valor_comissao) || 0).toFixed(2)})
+                          </div>
+                        )}
                         <div style={{ fontSize: '0.8rem', color: item.dataAgendamento ? '#ef4444' : '#666', display: 'flex', alignItems: 'center', gap: '4px' }}>
                           <span>🕒</span>
                           <span>{agendamentoFormatado}</span>
@@ -782,6 +810,27 @@ const AdminDashboard = () => {
                             }}
                           />
                         </div>
+                      </td>
+                      <td style={{ padding: '20px 15px' }}>
+                        {item.pago ? (
+                          <div>
+                            <span style={{ background: '#10b98120', color: '#10b981', border: '1px solid #10b981', padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 'bold', display: 'inline-block' }}>
+                              🟢 Pago
+                            </span>
+                            {item.metodo_pagamento && (
+                              <span style={{ display: 'block', fontSize: '0.72rem', color: '#aaa', marginTop: '3px' }}>
+                                {item.metodo_pagamento} • {item.conta_destino || ''}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <button 
+                            onClick={() => setSelectedForPayment(item)}
+                            style={{ background: 'rgba(245, 158, 11, 0.15)', border: '1px solid #f59e0b', color: '#f59e0b', padding: '6px 12px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                          >
+                            💲 Dar Baixa
+                          </button>
+                        )}
                       </td>
                       <td style={{ padding: '20px 15px', minWidth: '200px' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -1017,6 +1066,25 @@ const AdminDashboard = () => {
           onClose={() => setShowQuickRegister(false)}
           onUserCreated={() => {
             setShowQuickRegister(false);
+          }}
+        />
+      )}
+
+      {showDirectBudget && (
+        <DirectBudgetModal 
+          onClose={() => setShowDirectBudget(false)}
+          onBudgetCreated={() => {
+            fetchAtendimentos();
+          }}
+        />
+      )}
+
+      {selectedForPayment && (
+        <ConfirmPaymentModal 
+          atendimento={selectedForPayment}
+          onClose={() => setSelectedForPayment(null)}
+          onPaymentConfirmed={() => {
+            fetchAtendimentos();
           }}
         />
       )}
