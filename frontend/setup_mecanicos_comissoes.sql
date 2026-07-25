@@ -1,4 +1,4 @@
--- Script para criar a tabela de Mecânicos e estender Orçamentos com Comissões e Pagamentos no Supabase
+-- Script para criar a tabela de Mecânicos e garantir TODAS as colunas em Orçamentos no Supabase
 
 -- 1. Tabela de Mecânicos
 CREATE TABLE IF NOT EXISTS public.mecanicos (
@@ -22,8 +22,9 @@ CREATE POLICY "Permitir tudo em mecanicos" ON public.mecanicos
   USING (true)
   WITH CHECK (true);
 
--- 2. Novas colunas na tabela de Orçamentos
+-- 2. Garantir todas as colunas necessárias na tabela de Orçamentos
 ALTER TABLE public.orcamentos
+  ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'Pendente',
   ADD COLUMN IF NOT EXISTS mecanico_id UUID REFERENCES public.mecanicos(id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS mecanico_nome TEXT,
   ADD COLUMN IF NOT EXISTS valor_pecas NUMERIC DEFAULT 0,
