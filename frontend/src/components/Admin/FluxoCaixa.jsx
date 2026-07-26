@@ -34,6 +34,8 @@ const FluxoCaixa = () => {
 
   // Consolidado
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [expandedMonth, setExpandedMonth] = useState(null);
+  const [expandedDayItems, setExpandedDayItems] = useState({});
 
   // Carregar histórico e rascunho no mount
   useEffect(() => {
@@ -446,7 +448,8 @@ const FluxoCaixa = () => {
       totalPIX: 0,
       totalMPKadosh: 0,
       totalMPRomanos: 0,
-      totalOutros: 0
+      totalOutros: 0,
+      fechamentos: []
     }));
 
     let anoEntradas = 0;
@@ -457,6 +460,7 @@ const FluxoCaixa = () => {
       const date = new Date(fechamento.data + 'T00:00:00');
       if (date.getFullYear() === selectedYear) {
         const mIdx = date.getMonth();
+        monthsData[mIdx].fechamentos.push(fechamento);
         const entList = fechamento.entradas || [];
         const saiList = fechamento.saidas || [];
 
@@ -922,34 +926,194 @@ const FluxoCaixa = () => {
             {monthsData.map(m => {
               const pEnt = (m.entradas / maxMonthValue) * 100;
               const pSai = (m.saidas / maxMonthValue) * 100;
+              const isMonthExpanded = expandedMonth === m.monthIndex;
 
               return (
-                <div key={m.monthIndex} className="glass" style={{ padding: '20px', display: 'grid', gridTemplateColumns: '1.2fr 3fr 1.5fr', gap: '20px', alignItems: 'center' }}>
-                  
-                  {/* Nome do Mês */}
-                  <div>
-                    <h5 style={{ margin: 0, fontSize: '1.1rem', color: '#fff' }}>{m.monthName}</h5>
-                    <span style={{ fontSize: '0.75rem', color: '#888' }}>{selectedYear}</span>
+                <div 
+                  key={m.monthIndex} 
+                  style={{ 
+                    background: isMonthExpanded ? '#141418' : '#16161a',
+                    border: isMonthExpanded ? '1px solid #3b82f6' : '1px solid #2a2a35',
+                    borderRadius: '12px',
+                    overflow: 'hidden',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  {/* Cabeçalho do Mês (Clicável) */}
+                  <div 
+                    onClick={() => setExpandedMonth(isMonthExpanded ? null : m.monthIndex)}
+                    style={{ 
+                      padding: '20px', 
+                      display: 'grid', 
+                      gridTemplateColumns: '1.4fr 3fr 1.5fr 30px', 
+                      gap: '15px', 
+                      alignItems: 'center',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {/* Nome do Mês e Contador */}
+                    <div>
+                      <h5 style={{ margin: 0, fontSize: '1.1rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {m.monthName}
+                        <span style={{ 
+                          fontSize: '0.72rem', 
+                          padding: '2px 8px', 
+                          borderRadius: '10px', 
+                          background: m.fechamentos.length > 0 ? '#3b82f620' : '#222', 
+                          color: m.fechamentos.length > 0 ? '#60a5fa' : '#777', 
+                          border: `1px solid ${m.fechamentos.length > 0 ? '#3b82f640' : '#333'}` 
+                        }}>
+                          {m.fechamentos.length} {m.fechamentos.length === 1 ? 'fechamento' : 'fechamentos'}
+                        </span>
+                      </h5>
+                      <span style={{ fontSize: '0.75rem', color: '#888' }}>{selectedYear} • Clique para ver fechamentos</span>
+                    </div>
+
+                    {/* Gráfico Linear Proporcional */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ width: '100%', height: '8px', background: '#222', borderRadius: '4px', overflow: 'hidden' }}>
+                        <div style={{ width: `${pEnt}%`, height: '100%', background: '#10b981', borderRadius: '4px' }} />
+                      </div>
+                      <div style={{ width: '100%', height: '8px', background: '#222', borderRadius: '4px', overflow: 'hidden' }}>
+                        <div style={{ width: `${pSai}%`, height: '100%', background: '#ef4444', borderRadius: '4px' }} />
+                      </div>
+                    </div>
+
+                    {/* Totais Finanças */}
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 'bold' }}>+{formatCurrency(m.entradas)}</div>
+                      <div style={{ fontSize: '0.85rem', color: '#ef4444', marginTop: '2px' }}>-{formatCurrency(m.saidas)}</div>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 'bold', marginTop: '4px', color: m.saldo >= 0 ? '#3b82f6' : '#ef4444' }}>
+                        {formatCurrency(m.saldo)}
+                      </div>
+                    </div>
+
+                    {/* Seta Indicadora */}
+                    <div style={{ textAlign: 'center', fontSize: '1rem', color: '#888' }}>
+                      {isMonthExpanded ? '▼' : '▶'}
+                    </div>
                   </div>
 
-                  {/* Gráfico Linear Proporcional */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <div style={{ width: '100%', height: '8px', background: '#222', borderRadius: '4px', overflow: 'hidden' }}>
-                      <div style={{ width: `${pEnt}%`, height: '100%', background: '#10b981', borderRadius: '4px' }} />
-                    </div>
-                    <div style={{ width: '100%', height: '8px', background: '#222', borderRadius: '4px', overflow: 'hidden' }}>
-                      <div style={{ width: `${pSai}%`, height: '100%', background: '#ef4444', borderRadius: '4px' }} />
-                    </div>
-                  </div>
+                  {/* Painel Expandido dos Fechamentos do Mês */}
+                  {isMonthExpanded && (
+                    <div style={{ background: '#0d0d10', padding: '20px', borderTop: '1px solid #2a2a35' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                        <h5 style={{ margin: 0, color: '#60a5fa', fontSize: '0.95rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          📋 Relatório de Fechamentos de {m.monthName} ({selectedYear})
+                        </h5>
+                        <span style={{ fontSize: '0.78rem', color: '#aaa' }}>
+                          Análise individual e exclusão de lançamentos incorretos/testes
+                        </span>
+                      </div>
 
-                  {/* Totais Finanças */}
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 'bold' }}>+{formatCurrency(m.entradas)}</div>
-                    <div style={{ fontSize: '0.85rem', color: '#ef4444', marginTop: '2px' }}>-{formatCurrency(m.saidas)}</div>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 'bold', marginTop: '4px', color: m.saldo >= 0 ? '#3b82f6' : '#f59e0b' }}>
-                      {formatCurrency(m.saldo)}
+                      {m.fechamentos.length === 0 ? (
+                        <p style={{ color: '#888', fontStyle: 'italic', fontSize: '0.9rem', margin: 0, padding: '15px 0' }}>
+                          Nenhum fechamento diário foi registrado neste mês.
+                        </p>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          {m.fechamentos.sort((a,b) => b.data.localeCompare(a.data)).map(item => {
+                            const tEnt = item.entradas?.reduce((a, c) => a + (parseFloat(c.valor) || 0), 0) || 0;
+                            const tSai = item.saidas?.reduce((a, c) => a + (parseFloat(c.valor) || 0), 0) || 0;
+                            const sReal = (item.fundo_caixa || 0) + (item.dinheiro_empresa || 0) + (item.fundo_reserva || 0);
+                            const saldoLiquidoDia = tEnt - tSai;
+                            const isItemExpanded = expandedDayItems[item.id];
+
+                            const [year, month, day] = item.data.split('-');
+                            const formattedD = `${day}/${month}/${year}`;
+
+                            return (
+                              <div key={item.id} style={{ background: '#16161a', border: '1px solid #2a2a35', borderRadius: '8px', overflow: 'hidden' }}>
+                                
+                                {/* Linha Resumo do Dia */}
+                                <div style={{ padding: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                                  <div>
+                                    <div style={{ fontWeight: 'bold', fontSize: '0.95rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                      📅 {formattedD}
+                                      <span style={{ fontSize: '0.75rem', color: saldoLiquidoDia >= 0 ? '#10b981' : '#ef4444', background: saldoLiquidoDia >= 0 ? '#10b98115' : '#ef444415', padding: '2px 8px', borderRadius: '4px', border: `1px solid ${saldoLiquidoDia >= 0 ? '#10b981' : '#ef4444'}` }}>
+                                        Líquido: {formatCurrency(saldoLiquidoDia)}
+                                      </span>
+                                    </div>
+
+                                    <div style={{ fontSize: '0.82rem', color: '#aaa', marginTop: '6px', display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+                                      <span>Entradas: <strong style={{ color: '#10b981' }}>+{formatCurrency(tEnt)}</strong></span>
+                                      <span>Saídas: <strong style={{ color: '#ef4444' }}>-{formatCurrency(tSai)}</strong></span>
+                                      <span>Declarado Físico: <strong style={{ color: '#f59e0b' }}>{formatCurrency(sReal)}</strong></span>
+                                    </div>
+                                  </div>
+
+                                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                    <button 
+                                      type="button"
+                                      onClick={() => setExpandedDayItems(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
+                                      style={{ padding: '6px 12px', background: '#222', border: '1px solid #444', color: '#ccc', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}
+                                    >
+                                      {isItemExpanded ? '▲ Ocultar Itens' : '👁️ Ver Lançamentos'}
+                                    </button>
+                                    <button 
+                                      type="button"
+                                      onClick={() => handleGeneratePDFManual(item)}
+                                      style={{ padding: '6px 12px', background: '#3b82f6', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#fff', fontSize: '0.8rem', fontWeight: 'bold' }}
+                                    >
+                                      📄 PDF
+                                    </button>
+                                    <button 
+                                      type="button"
+                                      onClick={() => handleDelete(item.id)}
+                                      style={{ padding: '6px 12px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid #ef4444', borderRadius: '6px', cursor: 'pointer', color: '#ef4444', fontSize: '0.8rem', fontWeight: 'bold' }}
+                                      title="Excluir este fechamento"
+                                    >
+                                      🗑️ Excluir
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Detalhe Interno dos Lançamentos do Dia */}
+                                {isItemExpanded && (
+                                  <div style={{ padding: '15px', background: '#0a0a0c', borderTop: '1px solid #22222a' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                                      
+                                      {/* Entradas */}
+                                      <div>
+                                        <h6 style={{ margin: '0 0 8px 0', color: '#10b981', fontSize: '0.85rem' }}>🟢 Entradas do Dia</h6>
+                                        {(!item.entradas || item.entradas.length === 0) ? (
+                                          <span style={{ fontSize: '0.78rem', color: '#666' }}>Sem entradas digitadas.</span>
+                                        ) : (
+                                          item.entradas.map((ent, eIdx) => (
+                                            <div key={eIdx} style={{ fontSize: '0.8rem', color: '#ccc', borderBottom: '1px dashed #222', padding: '4px 0', display: 'flex', justifyContent: 'space-between' }}>
+                                              <span>{ent.descricao || 'Sem descrição'} <span style={{ fontSize: '0.7rem', color: '#888' }}>({ent.metodo} • {ent.conta})</span></span>
+                                              <strong style={{ color: '#10b981' }}>+{formatCurrency(ent.valor)}</strong>
+                                            </div>
+                                          ))
+                                        )}
+                                      </div>
+
+                                      {/* Saídas */}
+                                      <div>
+                                        <h6 style={{ margin: '0 0 8px 0', color: '#ef4444', fontSize: '0.85rem' }}>🔴 Saídas do Dia</h6>
+                                        {(!item.saidas || item.saidas.length === 0) ? (
+                                          <span style={{ fontSize: '0.78rem', color: '#666' }}>Sem saídas digitadas.</span>
+                                        ) : (
+                                          item.saidas.map((sai, sIdx) => (
+                                            <div key={sIdx} style={{ fontSize: '0.8rem', color: '#ccc', borderBottom: '1px dashed #222', padding: '4px 0', display: 'flex', justifyContent: 'space-between' }}>
+                                              <span>{sai.descricao || 'Sem descrição'} <span style={{ fontSize: '0.7rem', color: '#888' }}>({sai.conta})</span></span>
+                                              <strong style={{ color: '#ef4444' }}>-{formatCurrency(sai.valor)}</strong>
+                                            </div>
+                                          ))
+                                        )}
+                                      </div>
+
+                                    </div>
+                                  </div>
+                                )}
+
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
-                  </div>
+                  )}
 
                 </div>
               );
