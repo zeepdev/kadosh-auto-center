@@ -582,15 +582,18 @@ const FluxoCaixa = () => {
     alert('Novo dia de caixa iniciado!');
   };
 
-  // Upload do PDF gerado para o Google Drive
-  const handleUploadPdfToDrive = async (closingPayload, pdfBlob) => {
+  // Upload manual do PDF gerado para o Google Drive
+  const handleManualUploadDrive = async (closingData) => {
     setDriveUploadStatus('loading');
     try {
+      const doc = <FluxoCaixaPDF data={closingData} />;
+      const blob = await pdf(doc).toBlob();
+
       const formData = new FormData();
-      const filename = `Fechamento_Caixa_${closingPayload.data}.pdf`;
-      formData.append('pdf', pdfBlob, filename);
+      const filename = `Fechamento_Caixa_${closingData.data}.pdf`;
+      formData.append('pdf', blob, filename);
       formData.append('fileName', filename);
-      formData.append('subFolder', 'FLUXO DE CAIXA'); // Organiza na pasta de Fluxo de Caixa
+      formData.append('subFolder', 'FLUXO DE CAIXA');
 
       const baseUrl = import.meta.env.VITE_API_URL || '';
       const response = await fetch(`${baseUrl}/api/drive/upload`, {
@@ -602,6 +605,7 @@ const FluxoCaixa = () => {
       if (!result.success) throw new Error(result.error);
 
       setDriveUploadStatus('success');
+      alert(`✅ PDF do fechamento de ${closingData.data} foi enviado com sucesso para a pasta FLUXO DE CAIXA no Google Drive!`);
       setTimeout(() => setDriveUploadStatus('idle'), 5000);
     } catch (err) {
       console.error('Erro ao enviar para o Drive:', err);
@@ -611,7 +615,7 @@ const FluxoCaixa = () => {
     }
   };
 
-  // Salvar Fechamento Oficial
+  // Salvar Fechamento Oficial (Salva no banco/local SEM subir automaticamente pro Drive)
   const handleSave = async (e) => {
     e.preventDefault();
     
@@ -631,7 +635,6 @@ const FluxoCaixa = () => {
     const entradasValidas = entradas.filter(item => item.descricao && item.valor);
     const saidasValidas = saidas.filter(item => item.descricao && item.valor);
 
-    // Híbrido: serializa os saldos iniciais anteriores em JSON dentro das observações
     const obsJsonString = JSON.stringify({
       fundo_caixa_anterior: parseFloat(fundoCaixaAnterior) || 0,
       dinheiro_empresa_anterior: parseFloat(dinheiroEmpresaAnterior) || 0,
@@ -658,11 +661,6 @@ const FluxoCaixa = () => {
 
       if (error) throw error;
 
-      // 2. Gerar PDF e fazer upload automático para o Google Drive
-      const doc = <FluxoCaixaPDF data={payload} />;
-      const blob = await pdf(doc).toBlob();
-      await handleUploadPdfToDrive(payload, blob);
-
       // Limpar rascunho
       localStorage.removeItem('kadosh_fluxo_caixa_draft');
 
@@ -670,7 +668,7 @@ const FluxoCaixa = () => {
       const updatedHistory = await fetchHistorico();
       resetForm(updatedHistory);
       
-      alert('Fechamento de caixa gravado com sucesso!');
+      alert('Fechamento de caixa salvo com sucesso no sistema! Para enviar o PDF para o Google Drive, clique no botão "☁️ Enviar para o Drive".');
     } catch (err) {
       console.warn('Erro ao salvar no banco, salvando cópia local em localStorage:', err.message);
 
@@ -687,18 +685,8 @@ const FluxoCaixa = () => {
       localStorage.setItem('kadosh_fluxo_caixa', JSON.stringify(updated));
       setHistorico(updated);
 
-      // Tenta fazer upload do PDF mesmo salvando localmente
-      try {
-        const doc = <FluxoCaixaPDF data={payload} />;
-        const blob = await pdf(doc).toBlob();
-        await handleUploadPdfToDrive(payload, blob);
-      } catch (e) {
-        console.warn('Não foi possível gerar/subir o PDF local:', e);
-      }
-
-      // Limpar rascunho
       localStorage.removeItem('kadosh_fluxo_caixa_draft');
-      alert('Gravado localmente no navegador (localStorage).');
+      alert('Fechamento gravado localmente no navegador (localStorage). Para enviar o PDF para o Google Drive, clique no botão "☁️ Enviar para o Drive".');
       resetForm(updated);
     } finally {
       setSaving(false);
@@ -1111,9 +1099,9 @@ const FluxoCaixa = () => {
               </div>
 
               {/* Botões de Ação */}
-              <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
-                <button type="submit" className="btn" style={{ flex: 1, background: '#10b981', minWidth: '150px' }} disabled={saving}>
-                  {saving ? 'Gravando Fechamento...' : '💾 Salvar Fechamento'}
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                <button type="submit" className="btn" style={{ flex: 1.2, background: '#10b981', minWidth: '160px', fontWeight: 'bold' }} disabled={saving}>
+                  {saving ? 'Gravando...' : '💾 Salvar Fechamento'}
                 </button>
                 <button 
                   type="button" 
@@ -1132,9 +1120,31 @@ const FluxoCaixa = () => {
                       texto: observacoes
                     })
                   })} 
-                  className="btn" style={{ background: '#3b82f6' }}
+                  className="btn" style={{ background: '#3b82f6', fontWeight: 'bold' }}
                 >
                   📄 Baixar PDF Local
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => handleManualUploadDrive({
+                    data: dataCaixa,
+                    caixa_inicial: caixaInicial,
+                    fundo_caixa: valCaixaFinal,
+                    dinheiro_empresa: valDinheiroFinal,
+                    fundo_reserva: valReservaFinal,
+                    entradas: entradas.filter(i => i.descricao && i.valor),
+                    saidas: saidas.filter(i => i.descricao && i.valor),
+                    observacoes: JSON.stringify({
+                      fundo_caixa_anterior: parseFloat(fundoCaixaAnterior) || 0,
+                      dinheiro_empresa_anterior: parseFloat(dinheiroEmpresaAnterior) || 0,
+                      fundo_reserva_anterior: parseFloat(fundoReservaAnterior) || 0,
+                      texto: observacoes
+                    })
+                  })} 
+                  className="btn" style={{ background: '#f59e0b', color: '#000', fontWeight: 'bold' }}
+                  disabled={driveUploadStatus === 'loading'}
+                >
+                  {driveUploadStatus === 'loading' ? '⏳ Enviando...' : '☁️ Enviar para o Drive'}
                 </button>
               </div>
 
@@ -1213,9 +1223,17 @@ const FluxoCaixa = () => {
                         <div style={{ display: 'flex', gap: '5px' }}>
                           <button 
                             onClick={() => handleGeneratePDFManual(item)}
-                            style={{ padding: '6px 10px', background: '#3b82f6', border: 'none', borderRadius: '4px', cursor: 'pointer', color: '#fff', fontSize: '0.75rem' }}
+                            style={{ padding: '6px 10px', background: '#3b82f6', border: 'none', borderRadius: '4px', cursor: 'pointer', color: '#fff', fontSize: '0.75rem', fontWeight: 'bold' }}
+                            title="Baixar PDF localmente"
                           >
                             📄 PDF
+                          </button>
+                          <button 
+                            onClick={() => handleManualUploadDrive(item)}
+                            style={{ padding: '6px 10px', background: '#f59e0b', border: 'none', borderRadius: '4px', cursor: 'pointer', color: '#000', fontWeight: 'bold', fontSize: '0.75rem' }}
+                            title="Enviar PDF para o Google Drive"
+                          >
+                            ☁️ Drive
                           </button>
                           <button 
                             onClick={() => handleDelete(item.id)}
@@ -1427,8 +1445,17 @@ const FluxoCaixa = () => {
                                       type="button"
                                       onClick={() => handleGeneratePDFManual(item)}
                                       style={{ padding: '6px 12px', background: '#3b82f6', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#fff', fontSize: '0.8rem', fontWeight: 'bold' }}
+                                      title="Baixar PDF localmente"
                                     >
                                       📄 PDF
+                                    </button>
+                                    <button 
+                                      type="button"
+                                      onClick={() => handleManualUploadDrive(item)}
+                                      style={{ padding: '6px 12px', background: '#f59e0b', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#000', fontSize: '0.8rem', fontWeight: 'bold' }}
+                                      title="Enviar PDF para o Google Drive"
+                                    >
+                                      ☁️ Drive
                                     </button>
                                     <button 
                                       type="button"
