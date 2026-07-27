@@ -40,11 +40,114 @@ const FluxoCaixa = () => {
   // Carregar histórico e rascunho no mount
   useEffect(() => {
     const init = async () => {
-      await fetchHistorico();
+      const hData = await fetchHistorico();
       loadDraft();
+
+      const hoje = new Date().toISOString().split('T')[0];
+      const draftStr = localStorage.getItem('kadosh_fluxo_caixa_draft');
+      if (!draftStr) {
+        applyPreviousClosureBalances(hoje, hData);
+      }
+      syncPaidBudgets(hoje);
     };
     init();
   }, []);
+
+  // Buscar o último fechamento do dia anterior para preencher os saldos anteriores
+  const applyPreviousClosureBalances = (targetDate, historyList = historico) => {
+    if (!historyList || historyList.length === 0) return;
+
+    const sorted = [...historyList].sort((a, b) => b.data.localeCompare(a.data));
+    const prevClosure = sorted.find(item => item.data < targetDate) || sorted[0];
+
+    if (prevClosure) {
+      setFundoCaixaAnterior((prevClosure.fundo_caixa || 0).toString());
+      setDinheiroEmpresaAnterior((prevClosure.dinheiro_empresa || 0).toString());
+      setFundoReservaAnterior((prevClosure.fundo_reserva || 0).toString());
+    }
+  };
+
+  // Sincronizar orçamentos pagos do Supabase para a data informada
+  const syncPaidBudgets = async (targetDate) => {
+    try {
+      const { data: paidBudgets, error } = await supabase
+        .from('orcamentos')
+        .select('*')
+        .eq('pago', true);
+
+      if (error || !paidBudgets) return;
+
+      const matching = paidBudgets.filter(b => b.data_pagamento === targetDate);
+      if (matching.length === 0) return;
+
+      setEntradas(currentEntradas => {
+        let updated = [...currentEntradas];
+
+        matching.forEach(b => {
+          const desc = `Orçamento #${b.id} - ${b.nome || 'Cliente Balcão'} (${b.placa || 'Sem placa'})`;
+          const exists = updated.some(e => e.descricao && e.descricao.includes(`Orçamento #${b.id}`));
+
+          if (!exists) {
+            const newEntry = {
+              descricao: desc,
+              valor: (parseFloat(b.valor_total) || 0).toString(),
+              metodo: b.metodo_pagamento || 'PIX',
+              conta: b.conta_destino || 'Mercado Pago KADOSH'
+            };
+
+            if (updated.length === 1 && !updated[0].descricao && !updated[0].valor) {
+              updated = [newEntry];
+            } else {
+              updated = [newEntry, ...updated];
+            }
+          }
+        });
+
+        return updated;
+      });
+    } catch (err) {
+      console.warn('Erro ao sincronizar orçamentos pagos do Supabase:', err);
+    }
+  };
+
+  // Listener em tempo real para pagamentos de orçamentos (disparado pelo ConfirmPaymentModal)
+  useEffect(() => {
+    const handleBudgetPaidEvent = (event) => {
+      const detail = event.detail;
+      if (!detail) return;
+
+      const pDate = detail.data_pagamento || new Date().toISOString().split('T')[0];
+      if (pDate === dataCaixa) {
+        setEntradas(current => {
+          const desc = detail.descricao || `Orçamento #${detail.budget_id} - ${detail.nome || 'Cliente Balcão'} (${detail.placa || 'Sem placa'})`;
+          const exists = current.some(e => e.descricao && e.descricao.includes(`Orçamento #${detail.budget_id}`));
+          if (exists) return current;
+
+          const newEntry = {
+            descricao: desc,
+            valor: (detail.valor || 0).toString(),
+            metodo: detail.metodo || 'PIX',
+            conta: detail.conta || 'Mercado Pago KADOSH'
+          };
+
+          if (current.length === 1 && !current[0].descricao && !current[0].valor) {
+            return [newEntry];
+          }
+          return [newEntry, ...current];
+        });
+      }
+    };
+
+    window.addEventListener('kadosh_budget_paid', handleBudgetPaidEvent);
+    return () => window.removeEventListener('kadosh_budget_paid', handleBudgetPaidEvent);
+  }, [dataCaixa]);
+
+  // Tratar alteração na data do caixa
+  const handleDateChange = (newDate) => {
+    setDataCaixa(newDate);
+    applyPreviousClosureBalances(newDate, historico);
+    syncPaidBudgets(newDate);
+  };
 
   const fetchHistorico = async () => {
     setLoading(true);
@@ -550,13 +653,13 @@ const FluxoCaixa = () => {
                   <input 
                     type="date" 
                     value={dataCaixa} 
-                    onChange={(e) => setDataCaixa(e.target.value)} 
+                    onChange={(e) => handleDateChange(e.target.value)} 
                     style={{ width: '100%', padding: '10px', background: '#0a0a0c', border: '1px solid #333', borderRadius: '8px', color: '#fff', marginTop: '5px' }}
                   />
                 </div>
                 <div className="form-group">
                   <label style={{ color: '#aaa', fontSize: '0.8rem' }}>Caixa Inicial Consolidado (Esperado)</label>
-                  <div style={{ padding: '11px', background: '#222', border: '1px solid #333', borderRadius: '8px', color: '#ccc', fontWeight: 'bold', marginTop: '5px', fontSize: '0.95rem' }}>
+                  <div style={{ padding: '11px', background: '#222', border: '1px solid #333', borderRadius: '8px', color: '#10b981', fontWeight: 'bold', marginTop: '5px', fontSize: '0.95rem' }}>
                     {formatCurrency(caixaInicial)}
                   </div>
                 </div>
@@ -564,9 +667,19 @@ const FluxoCaixa = () => {
 
               {/* Detalhamento Saldo Anterior */}
               <div style={{ padding: '15px', background: '#1c1c22', borderRadius: '8px', marginBottom: '25px', border: '1px solid #333' }}>
-                <h5 style={{ margin: '0 0 10px 0', color: '#ccc', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  💵 Saldos Anteriores (Início do Dia)
-                </h5>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+                  <h5 style={{ margin: 0, color: '#ccc', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    💵 Saldos Anteriores (Início do Dia)
+                  </h5>
+                  <button 
+                    type="button"
+                    onClick={() => applyPreviousClosureBalances(dataCaixa, historico)}
+                    style={{ background: 'rgba(59,130,246,0.15)', border: '1px solid #3b82f6', color: '#3b82f6', padding: '4px 10px', borderRadius: '4px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 'bold' }}
+                    title="Herda automaticamente os saldos do último dia fechado"
+                  >
+                    🔄 Puxar do Último Fechamento
+                  </button>
+                </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px' }}>
                   <div className="form-group">
                     <label style={{ color: '#999', fontSize: '0.75rem' }}>Fundo de Caixa (Romanos)</label>

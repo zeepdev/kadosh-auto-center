@@ -67,6 +67,11 @@ const ConfirmPaymentModal = ({ atendimento, onClose, onPaymentConfirmed }) => {
         }
 
         localStorage.setItem('kadosh_fluxo_caixa_draft', JSON.stringify(draft));
+        
+        // Disparar evento global para atualizar o Fluxo de Caixa se estiver aberto na tela
+        window.dispatchEvent(new CustomEvent('kadosh_budget_paid', { 
+          detail: { ...novaEntrada, data_pagamento: hoje, budget_id: atendimento.id } 
+        }));
       } catch (errDraft) {
         console.warn('Erro ao atualizar rascunho do fluxo de caixa:', errDraft);
       }
