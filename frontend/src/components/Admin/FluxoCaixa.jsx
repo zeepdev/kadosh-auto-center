@@ -3,6 +3,248 @@ import { supabase } from '../../lib/supabase';
 import { pdf } from '@react-pdf/renderer';
 import { FluxoCaixaPDF } from './FluxoCaixaPDF';
 
+// Sub-componente do Gráfico Anual Animado
+const AnnualBarChart = ({ monthsData, selectedYear, maxMonthValue, formatCurrency, onSelectMonth, expandedMonth }) => {
+  const [hoveredMonth, setHoveredMonth] = useState(null);
+
+  return (
+    <div style={{ background: '#111116', border: '1px solid #2a2a35', borderRadius: '12px', padding: '20px', marginBottom: '30px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
+        <div>
+          <h4 style={{ margin: 0, color: '#fff', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            📈 Gráfico Anual de Desempenho ({selectedYear})
+          </h4>
+          <span style={{ fontSize: '0.78rem', color: '#888' }}>
+            Comparativo mês a mês. Passe o mouse para detalhes ou clique em um mês para abrir os dias.
+          </span>
+        </div>
+
+        {/* Legenda */}
+        <div style={{ display: 'flex', gap: '15px', alignItems: 'center', fontSize: '0.8rem' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#10b981', fontWeight: 'bold' }}>
+            <span style={{ width: '12px', height: '12px', borderRadius: '3px', background: 'linear-gradient(180deg, #10b981 0%, #059669 100%)' }} />
+            Entradas
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ef4444', fontWeight: 'bold' }}>
+            <span style={{ width: '12px', height: '12px', borderRadius: '3px', background: 'linear-gradient(180deg, #ef4444 0%, #b91c1c 100%)' }} />
+            Saídas
+          </span>
+        </div>
+      </div>
+
+      {/* Área do Gráfico */}
+      <div style={{ position: 'relative', height: '210px', display: 'flex', alignItems: 'flex-end', gap: '8px', paddingBottom: '28px', borderBottom: '1px solid #2a2a35' }}>
+        
+        {/* Linhas de Grade Embutidas */}
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: '28px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', pointerEvents: 'none' }}>
+          <div style={{ borderTop: '1px dashed #22222a', width: '100%' }} />
+          <div style={{ borderTop: '1px dashed #22222a', width: '100%' }} />
+          <div style={{ borderTop: '1px dashed #22222a', width: '100%' }} />
+        </div>
+
+        {monthsData.map((m) => {
+          const isExpanded = expandedMonth === m.monthIndex;
+          const isHovered = hoveredMonth === m.monthIndex;
+
+          const entPct = maxMonthValue > 0 ? Math.min(100, Math.max(m.entradas > 0 ? 6 : 0, (m.entradas / maxMonthValue) * 100)) : 0;
+          const saiPct = maxMonthValue > 0 ? Math.min(100, Math.max(m.saidas > 0 ? 6 : 0, (m.saidas / maxMonthValue) * 100)) : 0;
+
+          return (
+            <div 
+              key={m.monthIndex}
+              onClick={() => onSelectMonth(m.monthIndex)}
+              onMouseEnter={() => setHoveredMonth(m.monthIndex)}
+              onMouseLeave={() => setHoveredMonth(null)}
+              style={{
+                flex: 1,
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'flex-end',
+                alignItems: 'center',
+                cursor: 'pointer',
+                position: 'relative',
+                borderRadius: '6px',
+                background: isExpanded ? 'rgba(59, 130, 246, 0.12)' : isHovered ? 'rgba(255, 255, 255, 0.04)' : 'transparent',
+                border: isExpanded ? '1px solid #3b82f6' : '1px solid transparent',
+                transition: 'all 0.2s ease',
+                padding: '4px'
+              }}
+            >
+              {/* Tooltip Flutuante */}
+              {isHovered && (
+                <div style={{
+                  position: 'absolute',
+                  bottom: '105%',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  background: '#0a0a0e',
+                  border: '1px solid #3b82f6',
+                  borderRadius: '8px',
+                  padding: '8px 12px',
+                  whiteSpace: 'nowrap',
+                  zIndex: 25,
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.8)',
+                  pointerEvents: 'none'
+                }}>
+                  <div style={{ fontWeight: 'bold', color: '#fff', fontSize: '0.82rem', marginBottom: '4px' }}>
+                    {m.monthName} ({selectedYear})
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#10b981' }}>Entradas: +{formatCurrency(m.entradas)}</div>
+                  <div style={{ fontSize: '0.75rem', color: '#ef4444' }}>Saídas: -{formatCurrency(m.saidas)}</div>
+                  <div style={{ fontSize: '0.78rem', color: m.saldo >= 0 ? '#3b82f6' : '#ef4444', fontWeight: 'bold', marginTop: '2px' }}>
+                    Saldo: {formatCurrency(m.saldo)}
+                  </div>
+                </div>
+              )}
+
+              {/* Barras do Mês */}
+              <div style={{ display: 'flex', gap: '3px', alignItems: 'flex-end', width: '100%', height: '100%' }}>
+                <div 
+                  style={{
+                    flex: 1,
+                    height: `${entPct}%`,
+                    background: 'linear-gradient(180deg, #10b981 0%, #059669 100%)',
+                    borderRadius: '4px 4px 0 0',
+                    transition: 'height 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+                    boxShadow: isHovered ? '0 0 8px rgba(16, 185, 129, 0.4)' : 'none'
+                  }} 
+                />
+                <div 
+                  style={{
+                    flex: 1,
+                    height: `${saiPct}%`,
+                    background: 'linear-gradient(180deg, #ef4444 0%, #b91c1c 100%)',
+                    borderRadius: '4px 4px 0 0',
+                    transition: 'height 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+                    boxShadow: isHovered ? '0 0 8px rgba(239, 68, 68, 0.4)' : 'none'
+                  }} 
+                />
+              </div>
+
+              {/* Rótulo Mês Eixo X */}
+              <span style={{ 
+                position: 'absolute', 
+                bottom: '-24px', 
+                fontSize: '0.72rem', 
+                color: isExpanded ? '#60a5fa' : isHovered ? '#fff' : '#aaa', 
+                fontWeight: isExpanded || isHovered ? 'bold' : 'normal' 
+              }}>
+                {m.monthName.substring(0, 3)}
+              </span>
+
+            </div>
+          );
+        })}
+
+      </div>
+    </div>
+  );
+};
+
+// Sub-componente do Gráfico Diário Animado
+const DailyBarChart = ({ fechamentos, selectedYear, monthIndex, formatCurrency }) => {
+  const [hoveredDay, setHoveredDay] = useState(null);
+
+  const daysInMonth = new Date(selectedYear, monthIndex + 1, 0).getDate();
+  const monthStr = (monthIndex + 1).toString().padStart(2, '0');
+
+  const dailyData = Array.from({ length: daysInMonth }, (_, i) => {
+    const dayNum = i + 1;
+    const dayStr = dayNum.toString().padStart(2, '0');
+    const dateStr = `${selectedYear}-${monthStr}-${dayStr}`;
+
+    const closure = fechamentos.find(f => f.data === dateStr);
+    const ent = closure?.entradas?.reduce((a, c) => a + (parseFloat(c.valor) || 0), 0) || 0;
+    const sai = closure?.saidas?.reduce((a, c) => a + (parseFloat(c.valor) || 0), 0) || 0;
+
+    return {
+      day: dayNum,
+      dateStr,
+      entradas: ent,
+      saidas: sai,
+      saldo: ent - sai,
+      hasClosure: !!closure
+    };
+  });
+
+  const maxVal = Math.max(...dailyData.map(d => Math.max(d.entradas, d.saidas)), 1);
+
+  return (
+    <div style={{ background: '#0a0a0e', border: '1px solid #2a2a35', borderRadius: '10px', padding: '16px', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+        <h6 style={{ margin: 0, color: '#3b82f6', fontSize: '0.88rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          📊 Desempenho Diário (Dias 1 a {daysInMonth})
+        </h6>
+        <span style={{ fontSize: '0.75rem', color: '#777' }}>Passe o mouse sobre os dias para inspecionar</span>
+      </div>
+
+      <div style={{ position: 'relative', height: '140px', display: 'flex', alignItems: 'flex-end', gap: '3px', paddingBottom: '22px', borderBottom: '1px solid #22222a' }}>
+        {dailyData.map((d) => {
+          const isHovered = hoveredDay === d.day;
+          const entPct = maxVal > 0 ? Math.min(100, Math.max(d.entradas > 0 ? 8 : 0, (d.entradas / maxVal) * 100)) : 0;
+          const saiPct = maxVal > 0 ? Math.min(100, Math.max(d.saidas > 0 ? 8 : 0, (d.saidas / maxVal) * 100)) : 0;
+
+          return (
+            <div
+              key={d.day}
+              onMouseEnter={() => setHoveredDay(d.day)}
+              onMouseLeave={() => setHoveredDay(null)}
+              style={{
+                flex: 1,
+                height: '100%',
+                display: 'flex',
+                alignItems: 'flex-end',
+                justifyContent: 'center',
+                position: 'relative',
+                background: isHovered ? 'rgba(59, 130, 246, 0.12)' : 'transparent',
+                borderRadius: '3px',
+                cursor: 'pointer'
+              }}
+            >
+              {/* Tooltip Diário */}
+              {isHovered && (
+                <div style={{
+                  position: 'absolute',
+                  bottom: '105%',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  background: '#16161a',
+                  border: '1px solid #3b82f6',
+                  borderRadius: '6px',
+                  padding: '6px 10px',
+                  whiteSpace: 'nowrap',
+                  zIndex: 25,
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.8)',
+                  pointerEvents: 'none'
+                }}>
+                  <div style={{ fontWeight: 'bold', color: '#fff', fontSize: '0.78rem' }}>Dia {d.day}/{monthStr}/{selectedYear}</div>
+                  <div style={{ fontSize: '0.72rem', color: '#10b981' }}>+{formatCurrency(d.entradas)}</div>
+                  <div style={{ fontSize: '0.72rem', color: '#ef4444' }}>-{formatCurrency(d.saidas)}</div>
+                  <div style={{ fontSize: '0.75rem', color: d.saldo >= 0 ? '#3b82f6' : '#ef4444', fontWeight: 'bold' }}>
+                    Saldo: {formatCurrency(d.saldo)}
+                  </div>
+                </div>
+              )}
+
+              {/* Barras do Dia */}
+              <div style={{ display: 'flex', gap: '1px', alignItems: 'flex-end', width: '100%', height: '100%' }}>
+                <div style={{ flex: 1, height: `${entPct}%`, background: '#10b981', borderRadius: '2px 2px 0 0', transition: 'height 0.4s' }} />
+                <div style={{ flex: 1, height: `${saiPct}%`, background: '#ef4444', borderRadius: '2px 2px 0 0', transition: 'height 0.4s' }} />
+              </div>
+
+              {/* Número do Dia Eixo X */}
+              <span style={{ position: 'absolute', bottom: '-20px', fontSize: '0.65rem', color: d.hasClosure ? '#fff' : '#555', fontWeight: d.hasClosure ? 'bold' : 'normal' }}>
+                {d.day}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 const FluxoCaixa = () => {
   // Sub-abas do Fluxo de Caixa: 'diario' ou 'consolidado'
   const [subTab, setSubTab] = useState('diario');
@@ -1032,6 +1274,16 @@ const FluxoCaixa = () => {
             </div>
           </div>
 
+          {/* Gráfico Anual Animado de Entradas e Saídas */}
+          <AnnualBarChart 
+            monthsData={monthsData}
+            selectedYear={selectedYear}
+            maxMonthValue={maxMonthValue}
+            formatCurrency={formatCurrency}
+            onSelectMonth={(mIdx) => setExpandedMonth(expandedMonth === mIdx ? null : mIdx)}
+            expandedMonth={expandedMonth}
+          />
+
           {/* Tabela Mensal do Ano Selecionado */}
           <h4 style={{ color: '#fff', fontSize: '1.1rem', marginBottom: '15px', borderBottom: '1px solid #333', paddingBottom: '8px' }}>Movimentação Mês a Mês</h4>
           
@@ -1118,6 +1370,14 @@ const FluxoCaixa = () => {
                           Análise individual e exclusão de lançamentos incorretos/testes
                         </span>
                       </div>
+
+                      {/* Gráfico Animado Dia a Dia do Mês */}
+                      <DailyBarChart 
+                        fechamentos={m.fechamentos}
+                        selectedYear={selectedYear}
+                        monthIndex={m.monthIndex}
+                        formatCurrency={formatCurrency}
+                      />
 
                       {m.fechamentos.length === 0 ? (
                         <p style={{ color: '#888', fontStyle: 'italic', fontSize: '0.9rem', margin: 0, padding: '15px 0' }}>
