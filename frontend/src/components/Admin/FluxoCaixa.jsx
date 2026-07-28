@@ -416,8 +416,54 @@ const FluxoCaixa = () => {
     }
   };
 
-  // Carregar rascunho do localStorage
-  const loadDraft = () => {
+  // Inscrição no Supabase Realtime para sincronização em tempo real entre todos os dispositivos
+  useEffect(() => {
+    const channel = supabase
+      .channel('kadosh_realtime_cashflow')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orcamentos' }, () => {
+        syncPaidBudgets(dataCaixa);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fluxo_caixa' }, () => {
+        fetchHistorico();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fluxo_caixa_draft' }, () => {
+        loadDraft();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [dataCaixa]);
+
+  // Carregar rascunho (primeiro online do Supabase, depois fallback local)
+  const loadDraft = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('fluxo_caixa_draft')
+        .select('*')
+        .eq('id', 'current_draft')
+        .maybeSingle();
+
+      if (!error && data) {
+        if (data.data_caixa) setDataCaixa(data.data_caixa);
+        if (data.fundo_caixa_anterior !== undefined) setFundoCaixaAnterior(data.fundo_caixa_anterior.toString());
+        if (data.dinheiro_empresa_anterior !== undefined) setDinheiroEmpresaAnterior(data.dinheiro_empresa_anterior.toString());
+        if (data.fundo_reserva_anterior !== undefined) setFundoReservaAnterior(data.fundo_reserva_anterior.toString());
+        if (data.entradas && Array.isArray(data.entradas)) setEntradas(data.entradas);
+        if (data.saidas && Array.isArray(data.saidas)) setSaidas(data.saidas);
+        if (data.fundo_caixa_final !== undefined) setFundoCaixaFinal(data.fundo_caixa_final.toString());
+        if (data.dinheiro_empresa_final !== undefined) setDinheiroEmpresaFinal(data.dinheiro_empresa_final.toString());
+        if (data.fundo_reserva_final !== undefined) setFundoReservaFinal(data.fundo_reserva_final.toString());
+        if (data.observacoes) setObservacoes(data.observacoes);
+        console.log('✅ Rascunho online do Fluxo de Caixa sincronizado do Supabase!');
+        return;
+      }
+    } catch (errOnline) {
+      console.warn('Rascunho online indisponível. Carregando rascunho local:', errOnline);
+    }
+
+    // Fallback para localStorage
     const draftStr = localStorage.getItem('kadosh_fluxo_caixa_draft');
     if (draftStr) {
       try {
@@ -432,14 +478,13 @@ const FluxoCaixa = () => {
         if (draft.dinheiroEmpresaFinal !== undefined) setDinheiroEmpresaFinal(draft.dinheiroEmpresaFinal);
         if (draft.fundoReservaFinal !== undefined) setFundoReservaFinal(draft.fundoReservaFinal);
         if (draft.observacoes) setObservacoes(draft.observacoes);
-        console.log('✅ Rascunho carregado com sucesso!');
       } catch (e) {
-        console.error('Erro ao ler rascunho:', e);
+        console.error('Erro ao ler rascunho local:', e);
       }
     }
   };
 
-  // Salvar rascunho sempre que houver modificações nos campos
+  // Salvar rascunho (local e online) sempre que houver modificações nos campos
   useEffect(() => {
     const draft = {
       dataCaixa,
@@ -454,6 +499,32 @@ const FluxoCaixa = () => {
       observacoes
     };
     localStorage.setItem('kadosh_fluxo_caixa_draft', JSON.stringify(draft));
+
+    // Salvar rascunho online no Supabase com debounce
+    const timer = setTimeout(async () => {
+      try {
+        await supabase
+          .from('fluxo_caixa_draft')
+          .upsert([{
+            id: 'current_draft',
+            data_caixa: dataCaixa,
+            fundo_caixa_anterior: parseFloat(fundoCaixaAnterior) || 0,
+            dinheiro_empresa_anterior: parseFloat(dinheiroEmpresaAnterior) || 0,
+            fundo_reserva_anterior: parseFloat(fundoReservaAnterior) || 0,
+            entradas,
+            saidas,
+            fundo_caixa_final: parseFloat(fundoCaixaFinal) || 0,
+            dinheiro_empresa_final: parseFloat(dinheiroEmpresaFinal) || 0,
+            fundo_reserva_final: parseFloat(fundoReservaFinal) || 0,
+            observacoes,
+            updated_at: new Date().toISOString()
+          }]);
+      } catch (errSupabase) {
+        // Silencioso se a tabela ainda não existir no Supabase
+      }
+    }, 800);
+
+    return () => clearTimeout(timer);
   }, [
     dataCaixa, fundoCaixaAnterior, dinheiroEmpresaAnterior, fundoReservaAnterior,
     entradas, saidas, fundoCaixaFinal, dinheiroEmpresaFinal, fundoReservaFinal, observacoes

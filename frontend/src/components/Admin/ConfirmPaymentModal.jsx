@@ -68,6 +68,20 @@ const ConfirmPaymentModal = ({ atendimento, onClose, onPaymentConfirmed }) => {
 
         localStorage.setItem('kadosh_fluxo_caixa_draft', JSON.stringify(draft));
         
+        // Tenta sincronizar também na tabela online 'fluxo_caixa_draft' no Supabase
+        try {
+          await supabase
+            .from('fluxo_caixa_draft')
+            .upsert([{
+              id: 'current_draft',
+              data_caixa: hoje,
+              entradas: draft.entradas,
+              updated_at: new Date().toISOString()
+            }]);
+        } catch (eOnline) {
+          console.warn('Draft online não salvo no Supabase:', eOnline);
+        }
+
         // Disparar evento global para atualizar o Fluxo de Caixa se estiver aberto na tela
         window.dispatchEvent(new CustomEvent('kadosh_budget_paid', { 
           detail: { ...novaEntrada, data_pagamento: hoje, budget_id: atendimento.id } 
