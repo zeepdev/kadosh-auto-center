@@ -26,6 +26,20 @@ const MecanicosManager = () => {
 
   useEffect(() => {
     fetchMecanicos();
+
+    const channel = supabase
+      .channel('mecanicos_realtime_channel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'mecanicos' }, () => {
+        fetchMecanicos();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orcamentos' }, () => {
+        fetchComissoes();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   useEffect(() => {

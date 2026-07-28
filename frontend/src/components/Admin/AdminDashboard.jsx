@@ -28,6 +28,17 @@ const LogsSistemaView = () => {
 
   useEffect(() => {
     loadLogs();
+
+    const channel = supabase
+      .channel('logs_sistema_realtime_channel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'logs_sistema' }, () => {
+        loadLogs();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const filtered = logs.filter(l => {
@@ -279,6 +290,23 @@ const AdminDashboard = () => {
       fetchAtendimentos();
       fetchAvisos();
       fetchDepoimentos();
+
+      const channel = supabase
+        .channel('admin_dashboard_realtime_channel')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'orcamentos' }, () => {
+          fetchAtendimentos();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'depoimentos' }, () => {
+          fetchDepoimentos();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'avisos' }, () => {
+          fetchAvisos();
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
   }, [isAuthenticated]);
 
