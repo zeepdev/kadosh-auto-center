@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { pdf } from '@react-pdf/renderer';
 import { FluxoCaixaPDF } from './FluxoCaixaPDF';
+import { registrarLog } from '../../services/logService';
 
 // Sub-componente do Gráfico Anual Animado
 const AnnualBarChart = ({ monthsData, selectedYear, maxMonthValue, formatCurrency, onSelectMonth, expandedMonth }) => {
@@ -735,6 +736,14 @@ const FluxoCaixa = () => {
       // Limpar rascunho
       localStorage.removeItem('kadosh_fluxo_caixa_draft');
 
+      // Registrar Log no Sistema
+      registrarLog({
+        acao: 'FECHAMENTO_CAIXA',
+        modulo: 'Fluxo de Caixa',
+        detalhes: `Fechamento de caixa gravado para o dia ${dataCaixa}. Fundo: R$ ${valCaixaFinal}, Empresa: R$ ${valDinheiroFinal}, Reserva: R$ ${valReservaFinal}. Total Entradas: R$ ${totalEntradas}, Saídas: R$ ${totalSaidas}.`,
+        metadata: { data: dataCaixa, entradas: totalEntradas, saidas: totalSaidas, saldo_real: saldoFisicoReal }
+      });
+
       // Atualizar histórico
       const updatedHistory = await fetchHistorico();
       resetForm(updatedHistory);
@@ -791,6 +800,8 @@ const FluxoCaixa = () => {
   const handleDelete = async (id) => {
     if (!window.confirm('Excluir este fechamento permanentemente?')) return;
 
+    const targetItem = historico.find(i => i.id === id);
+
     try {
       const { error } = await supabase
         .from('fluxo_caixa')
@@ -798,6 +809,14 @@ const FluxoCaixa = () => {
         .eq('id', id);
 
       if (error) throw error;
+
+      registrarLog({
+        acao: 'EXCLUSAO',
+        modulo: 'Fluxo de Caixa',
+        detalhes: `Fechamento de caixa do dia ${targetItem?.data || id} foi excluído.`,
+        metadata: { id, data: targetItem?.data }
+      });
+
       alert('Registro excluído do banco de dados.');
       fetchHistorico();
     } catch (err) {

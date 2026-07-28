@@ -11,6 +11,120 @@ import MecanicosManager from './MecanicosManager';
 import FluxoCaixa from './FluxoCaixa';
 import { supabase } from '../../lib/supabase';
 import { calcularPrioridade, PRIORIDADES } from '../../lib/prioridade';
+import { registrarLog, fetchLogs } from '../../services/logService';
+
+const LogsSistemaView = () => {
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [filterModulo, setFilterModulo] = useState('TODOS');
+
+  const loadLogs = async () => {
+    setLoading(true);
+    const data = await fetchLogs(200);
+    setLogs(data);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadLogs();
+  }, []);
+
+  const filtered = logs.filter(l => {
+    const matchSearch = l.detalhes?.toLowerCase().includes(search.toLowerCase()) || l.usuario?.toLowerCase().includes(search.toLowerCase());
+    const matchModulo = filterModulo === 'TODOS' || l.modulo === filterModulo;
+    return matchSearch && matchModulo;
+  });
+
+  const getActionBadge = (acao) => {
+    switch (acao) {
+      case 'EXCLUSAO': return { bg: '#ef444422', color: '#ef4444', label: '🗑️ EXCLUSÃO' };
+      case 'PAGAMENTO': return { bg: '#10b98122', color: '#10b981', label: '💵 PAGAMENTO' };
+      case 'CRIACAO': return { bg: '#3b82f622', color: '#3b82f6', label: '✨ CRIAÇÃO' };
+      case 'STATUS_ALTERADO': return { bg: '#f59e0b22', color: '#f59e0b', label: '🔄 STATUS' };
+      case 'EDICAO': return { bg: '#8b5cf622', color: '#8b5cf6', label: '✏️ EDIÇÃO' };
+      case 'FECHAMENTO_CAIXA': return { bg: '#10b98122', color: '#10b981', label: '📊 FECHAMENTO' };
+      default: return { bg: '#333', color: '#aaa', label: acao };
+    }
+  };
+
+  return (
+    <div className="glass" style={{ padding: '30px', marginBottom: '30px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px' }}>
+        <div>
+          <h3 style={{ margin: 0, color: '#f59e0b', fontSize: '1.4rem' }}>📜 Histórico e Logs de Sistema</h3>
+          <p style={{ margin: '5px 0 0 0', color: '#aaa', fontSize: '0.85rem' }}>
+            Registro de auditoria: acompanhe todas as exclusões, pagamentos, baixas e alterações feitas.
+          </p>
+        </div>
+        <button onClick={loadLogs} className="btn" style={{ background: '#222', border: '1px solid #444', color: '#fff' }}>
+          🔄 Atualizar Logs
+        </button>
+      </div>
+
+      {/* Filtros */}
+      <div style={{ display: 'flex', gap: '15px', marginBottom: '20px', flexWrap: 'wrap' }}>
+        <input 
+          type="text" 
+          placeholder="Pesquisar por detalhes, ID ou usuário..." 
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ flex: 1, padding: '10px 15px', background: '#0a0a0c', border: '1px solid #333', borderRadius: '8px', color: '#fff' }}
+        />
+        <select 
+          value={filterModulo} 
+          onChange={(e) => setFilterModulo(e.target.value)}
+          style={{ padding: '10px 15px', background: '#0a0a0c', border: '1px solid #333', borderRadius: '8px', color: '#fff', fontWeight: 'bold' }}
+        >
+          <option value="TODOS">Todos os Módulos</option>
+          <option value="Orçamentos">Orçamentos</option>
+          <option value="Orçamentos / Fluxo de Caixa">Pagamentos / Baixas</option>
+          <option value="Fluxo de Caixa">Fluxo de Caixa</option>
+          <option value="Mecânicos">Mecânicos</option>
+        </select>
+      </div>
+
+      {/* Tabela de Logs */}
+      {loading ? (
+        <p style={{ color: '#aaa', padding: '20px', textAlign: 'center' }}>Carregando histórico de auditoria...</p>
+      ) : filtered.length === 0 ? (
+        <p style={{ color: '#666', padding: '20px', textAlign: 'center' }}>Nenhum log encontrado para os filtros selecionados.</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '500px', overflowY: 'auto' }}>
+          {filtered.map(log => {
+            const badge = getActionBadge(log.acao);
+            const dateStr = log.created_at ? new Date(log.created_at).toLocaleString('pt-BR') : '';
+
+            return (
+              <div 
+                key={log.id} 
+                style={{ 
+                  padding: '14px', background: '#121216', border: '1px solid #22222a', borderRadius: '8px',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '15px', flexWrap: 'wrap'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+                  <span style={{ padding: '4px 10px', background: badge.bg, color: badge.color, borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase' }}>
+                    {badge.label}
+                  </span>
+                  <div>
+                    <div style={{ color: '#fff', fontSize: '0.9rem', fontWeight: '500' }}>{log.detalhes}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#777', marginTop: '3px' }}>
+                      Módulo: <span style={{ color: '#aaa' }}>{log.modulo}</span> • Usuário: <span style={{ color: '#aaa' }}>{log.usuario}</span>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ fontSize: '0.8rem', color: '#666', fontWeight: 'bold' }}>
+                  🕒 {dateStr}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const parseProgresso = (status, avaliacaoSite) => {
   if (status === 'Finalizado') {
@@ -238,12 +352,21 @@ const AdminDashboard = () => {
 
   const handleStatusChange = async (id, newStatus) => {
     try {
+      const itemToUpdate = atendimentos.find(a => a.id === id);
       const { error } = await supabase
         .from('orcamentos')
         .update({ status: newStatus })
         .eq('id', id);
 
       if (error) throw error;
+
+      registrarLog({
+        acao: 'STATUS_ALTERADO',
+        modulo: 'Orçamentos',
+        detalhes: `Status do Orçamento #${id} (${itemToUpdate?.nome || 'Cliente'}) alterado de "${itemToUpdate?.status || 'Pendente'}" para "${newStatus}".`,
+        metadata: { id, oldStatus: itemToUpdate?.status, newStatus }
+      });
+
       fetchAtendimentos();
     } catch (error) {
       console.error('Erro ao atualizar status', error);
@@ -269,10 +392,19 @@ const AdminDashboard = () => {
   };
 
   const handleDeleteAtendimento = async (id) => {
-    if (!window.confirm('Tem certeza que deseja apagar este orçamento permanentemente?')) return;
+    const itemToDelete = atendimentos.find(a => a.id === id);
+    if (!window.confirm(`Tem certeza que deseja apagar o orçamento #${id} (${itemToDelete?.nome || 'Cliente'}) permanentemente?`)) return;
     try {
       const { error } = await supabase.from('orcamentos').delete().eq('id', id);
       if (error) throw error;
+
+      registrarLog({
+        acao: 'EXCLUSAO',
+        modulo: 'Orçamentos',
+        detalhes: `Orçamento #${id} de ${itemToDelete?.nome || 'Cliente'} (Placa: ${itemToDelete?.placa || 'Sem placa'}, Valor: R$ ${itemToDelete?.valor_total || 0}) foi excluído permanentemente.`,
+        metadata: { id, nome: itemToDelete?.nome, placa: itemToDelete?.placa, valor: itemToDelete?.valor_total }
+      });
+
       fetchAtendimentos();
     } catch (error) {
       console.error('Erro ao deletar', error);
@@ -508,6 +640,16 @@ const AdminDashboard = () => {
           >
             ⭐ Depoimentos
           </button>
+          <button 
+            onClick={() => setActiveTab('logs')}
+            style={{ 
+              padding: '12px 24px', borderRadius: '8px', cursor: 'pointer', border: 'none',
+              background: activeTab === 'logs' ? '#f59e0b' : '#222',
+              color: '#fff', fontWeight: 'bold'
+            }}
+          >
+            📜 Logs do Sistema
+          </button>
         </div>
 
         {activeTab === 'atendimentos' && (
@@ -704,6 +846,8 @@ const AdminDashboard = () => {
             )}
           </div>
         )}
+
+        {activeTab === 'logs' && <LogsSistemaView />}
 
         <div className="glass" style={{ overflowX: 'auto', padding: '0', borderRadius: '12px' }}>
           {loading ? (

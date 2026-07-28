@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { registrarLog } from '../../services/logService';
 
 const ConfirmPaymentModal = ({ atendimento, onClose, onPaymentConfirmed }) => {
   const [metodoPagamento, setMetodoPagamento] = useState('PIX');
@@ -81,6 +82,14 @@ const ConfirmPaymentModal = ({ atendimento, onClose, onPaymentConfirmed }) => {
         } catch (eOnline) {
           console.warn('Draft online não salvo no Supabase:', eOnline);
         }
+
+        // Registrar Log de Ação no Sistema
+        registrarLog({
+          acao: 'PAGAMENTO',
+          modulo: 'Orçamentos / Fluxo de Caixa',
+          detalhes: `Baixa dada no Orçamento #${atendimento.id} - ${atendimento.nome || 'Cliente Balcão'} (${atendimento.placa || 'Sem placa'}) no valor de R$ ${parseFloat(valorFinal || 0).toFixed(2)} via ${metodoPagamento} (${contaDestino}).`,
+          metadata: { budget_id: atendimento.id, valor: valorFinal, metodo: metodoPagamento, conta: contaDestino }
+        });
 
         // Disparar evento global para atualizar o Fluxo de Caixa se estiver aberto na tela
         window.dispatchEvent(new CustomEvent('kadosh_budget_paid', { 
