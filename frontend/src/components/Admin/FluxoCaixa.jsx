@@ -275,10 +275,12 @@ const FluxoCaixa = () => {
   const [saving, setSaving] = useState(false);
   const [driveUploadStatus, setDriveUploadStatus] = useState('idle'); // 'idle' | 'loading' | 'success' | 'error'
 
-  // Consolidado
+  // Consolidado e Modal de Histórico Completo
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [expandedMonth, setExpandedMonth] = useState(null);
   const [expandedDayItems, setExpandedDayItems] = useState({});
+  const [showFullHistoryModal, setShowFullHistoryModal] = useState(false);
+  const [searchHistoryModal, setSearchHistoryModal] = useState('');
 
   // Carregar histórico e rascunho no mount
   useEffect(() => {
@@ -1334,6 +1336,22 @@ const FluxoCaixa = () => {
                   })}
                 </div>
               )}
+
+              {/* Botão para abrir o Histórico Completo de Fechamentos */}
+              <button 
+                type="button"
+                onClick={() => setShowFullHistoryModal(true)}
+                style={{ 
+                  width: '100%', marginTop: '15px', padding: '10px 14px', 
+                  background: '#1a1a24', border: '1px solid #3b82f6', 
+                  color: '#60a5fa', borderRadius: '8px', fontWeight: 'bold', 
+                  cursor: 'pointer', fontSize: '0.85rem', display: 'flex', 
+                  alignItems: 'center', justifyContent: 'center', gap: '8px',
+                  boxShadow: '0 4px 12px rgba(59, 130, 246, 0.15)'
+                }}
+              >
+                📂 Ver Histórico Completo ({historico.length} Fechamentos)
+              </button>
             </div>
 
           </div>
@@ -1607,6 +1625,163 @@ const FluxoCaixa = () => {
             })}
           </div>
 
+        </div>
+      )}
+
+      {/* Modal Overlay do Histórico Completo de Fechamentos */}
+      {showFullHistoryModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(8px)',
+          display: 'flex', justifyContent: 'center', alignItems: 'center',
+          zIndex: 9999, padding: '20px'
+        }}>
+          <div className="glass" style={{
+            width: '100%', maxWidth: '900px', maxHeight: '90vh',
+            background: '#121216', border: '1px solid #333', borderRadius: '16px',
+            padding: '25px', display: 'flex', flexDirection: 'column', overflow: 'hidden'
+          }}>
+            {/* Header Modal */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #222', paddingBottom: '15px' }}>
+              <div>
+                <h3 style={{ margin: 0, color: '#60a5fa', fontSize: '1.3rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  📂 Histórico Completo de Fechamentos ({historico.length} registros)
+                </h3>
+                <p style={{ margin: '4px 0 0 0', color: '#aaa', fontSize: '0.85rem' }}>
+                  Consulte todos os fechamentos gravados, visualize lançamentos detalhados ou baixe/suba os PDFs.
+                </p>
+              </div>
+              <button 
+                onClick={() => setShowFullHistoryModal(false)}
+                style={{ background: '#222', border: '1px solid #444', color: '#fff', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', fontWeight: 'bold' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Campo de Pesquisa */}
+            <div style={{ marginBottom: '20px' }}>
+              <input 
+                type="text" 
+                placeholder="Pesquisar por data (ex: 03/08/2026 ou 2026-08)..." 
+                value={searchHistoryModal}
+                onChange={(e) => setSearchHistoryModal(e.target.value)}
+                style={{ width: '100%', padding: '12px 15px', background: '#0a0a0c', border: '1px solid #333', borderRadius: '8px', color: '#fff' }}
+              />
+            </div>
+
+            {/* Lista Filtrada */}
+            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', paddingRight: '5px' }}>
+              {historico
+                .filter(item => {
+                  if (!searchHistoryModal) return true;
+                  const [y, m, d] = item.data.split('-');
+                  const formattedStr = `${d}/${m}/${y}`;
+                  return item.data.includes(searchHistoryModal) || formattedStr.includes(searchHistoryModal);
+                })
+                .map(item => {
+                  const tEnt = item.entradas?.reduce((a, c) => a + (parseFloat(c.valor) || 0), 0) || 0;
+                  const tSai = item.saidas?.reduce((a, c) => a + (parseFloat(c.valor) || 0), 0) || 0;
+                  const sReal = (item.fundo_caixa || 0) + (item.dinheiro_empresa || 0) + (item.fundo_reserva || 0);
+                  const isItemExpanded = expandedDayItems[item.id];
+                  const [year, month, day] = item.data.split('-');
+                  const formattedD = `${day}/${month}/${year}`;
+
+                  return (
+                    <div key={item.id} style={{ background: '#18181f', border: '1px solid #2a2a35', borderRadius: '10px', overflow: 'hidden' }}>
+                      <div style={{ padding: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                        <div>
+                          <div style={{ fontWeight: 'bold', fontSize: '1rem', color: '#fff' }}>📅 Fechamento de {formattedD}</div>
+                          <div style={{ fontSize: '0.8rem', color: '#aaa', marginTop: '4px' }}>
+                            Entradas: <strong style={{ color: '#10b981' }}>+{formatCurrency(tEnt)}</strong> | 
+                            Saídas: <strong style={{ color: '#ef4444' }}>-{formatCurrency(tSai)}</strong> | 
+                            Saldo Declarado: <strong style={{ color: '#f59e0b' }}>{formatCurrency(sReal)}</strong>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <button 
+                            type="button"
+                            onClick={() => setExpandedDayItems(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
+                            style={{ padding: '6px 12px', background: '#222', border: '1px solid #444', color: '#ccc', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}
+                          >
+                            {isItemExpanded ? '▲ Ocultar Itens' : '👁️ Ver Lançamentos'}
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => handleGeneratePDFManual(item)}
+                            style={{ padding: '6px 12px', background: '#3b82f6', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#fff', fontSize: '0.8rem', fontWeight: 'bold' }}
+                            title="Baixar PDF localmente"
+                          >
+                            📄 PDF
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => handleManualUploadDrive(item)}
+                            style={{ padding: '6px 12px', background: '#f59e0b', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#000', fontSize: '0.8rem', fontWeight: 'bold' }}
+                            title="Enviar PDF para o Google Drive"
+                          >
+                            ☁️ Drive
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => handleDelete(item.id)}
+                            style={{ padding: '6px 12px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid #ef4444', borderRadius: '6px', cursor: 'pointer', color: '#ef4444', fontSize: '0.8rem', fontWeight: 'bold' }}
+                            title="Excluir este fechamento"
+                          >
+                            🗑️ Excluir
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Detalhes Expansíveis dos Lançamentos */}
+                      {isItemExpanded && (
+                        <div style={{ padding: '15px', background: '#0d0d10', borderTop: '1px solid #22222a' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                            <div>
+                              <h6 style={{ margin: '0 0 8px 0', color: '#10b981', fontSize: '0.85rem' }}>🟢 Entradas do Dia</h6>
+                              {(!item.entradas || item.entradas.length === 0) ? (
+                                <span style={{ fontSize: '0.78rem', color: '#666' }}>Sem entradas.</span>
+                              ) : (
+                                item.entradas.map((ent, eIdx) => (
+                                  <div key={eIdx} style={{ fontSize: '0.8rem', color: '#ccc', borderBottom: '1px dashed #222', padding: '4px 0', display: 'flex', justifyContent: 'space-between' }}>
+                                    <span>{ent.descricao || 'Sem descrição'} <span style={{ fontSize: '0.7rem', color: '#888' }}>({ent.metodo} • {ent.conta})</span></span>
+                                    <strong style={{ color: '#10b981' }}>+{formatCurrency(ent.valor)}</strong>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                            <div>
+                              <h6 style={{ margin: '0 0 8px 0', color: '#ef4444', fontSize: '0.85rem' }}>🔴 Saídas do Dia</h6>
+                              {(!item.saidas || item.saidas.length === 0) ? (
+                                <span style={{ fontSize: '0.78rem', color: '#666' }}>Sem saídas.</span>
+                              ) : (
+                                item.saidas.map((sai, sIdx) => (
+                                  <div key={sIdx} style={{ fontSize: '0.8rem', color: '#ccc', borderBottom: '1px dashed #222', padding: '4px 0', display: 'flex', justifyContent: 'space-between' }}>
+                                    <span>{sai.descricao || 'Sem descrição'} <span style={{ fontSize: '0.7rem', color: '#888' }}>({sai.conta})</span></span>
+                                    <strong style={{ color: '#ef4444' }}>-{formatCurrency(sai.valor)}</strong>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
+
+            {/* Footer Modal */}
+            <div style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid #222', textAlign: 'right' }}>
+              <button 
+                onClick={() => setShowFullHistoryModal(false)}
+                className="btn" style={{ background: '#333', color: '#fff' }}
+              >
+                Fechar Histórico
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
