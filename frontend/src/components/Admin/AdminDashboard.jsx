@@ -7,6 +7,7 @@ import InvoiceModal from './InvoiceModal';
 import QuickRegisterModal from './QuickRegisterModal';
 import DirectBudgetModal from './DirectBudgetModal';
 import ConfirmPaymentModal from './ConfirmPaymentModal';
+import EditBudgetModal from './EditBudgetModal';
 import MecanicosManager from './MecanicosManager';
 import FluxoCaixa from './FluxoCaixa';
 import { supabase } from '../../lib/supabase';
@@ -178,6 +179,7 @@ const AdminDashboard = () => {
   const [selectedPlacaForView, setSelectedPlacaForView] = useState(null);
   const [selectedForInvoice, setSelectedForInvoice] = useState(null);
   const [selectedForPayment, setSelectedForPayment] = useState(null);
+  const [selectedForEdit, setSelectedForEdit] = useState(null);
   const [showDirectBudget, setShowDirectBudget] = useState(false);
   const [depoimentos, setDepoimentos] = useState([]);
   const [activeTab, setActiveTab] = useState('atendimentos'); // 'atendimentos', 'agenda', 'fluxo_caixa', 'mecanicos', 'depoimentos'
@@ -1066,6 +1068,36 @@ const AdminDashboard = () => {
                       <td style={{ padding: '20px 15px' }}>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                           <button 
+                            onClick={() => setSelectedForEdit(item)} 
+                            style={{ 
+                              background: 'rgba(245, 158, 11, 0.08)', 
+                              color: '#f59e0b', 
+                              border: '1px solid rgba(245, 158, 11, 0.15)', 
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '50%', 
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              fontSize: '0.95rem',
+                              transition: 'all 0.2s',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = '#f59e0b';
+                              e.currentTarget.style.color = '#000';
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'rgba(245, 158, 11, 0.08)';
+                              e.currentTarget.style.color = '#f59e0b';
+                              e.currentTarget.style.transform = 'translateY(0)';
+                            }}
+                            title="Editar Orçamento / Mecânico / Comissão"
+                          >
+                            ✏️
+                          </button>
+                          <button 
                             onClick={() => setSelectedForUpdate(item)} 
                             style={{ 
                               background: 'rgba(59, 130, 246, 0.08)', 
@@ -1256,6 +1288,18 @@ const AdminDashboard = () => {
           atendimento={selectedForPayment}
           onClose={() => setSelectedForPayment(null)}
           onPaymentConfirmed={() => {
+            setSelectedForPayment(null);
+            fetchAtendimentos();
+          }}
+        />
+      )}
+
+      {selectedForEdit && (
+        <EditBudgetModal 
+          atendimento={selectedForEdit}
+          onClose={() => setSelectedForEdit(null)}
+          onSaveSuccess={() => {
+            setSelectedForEdit(null);
             fetchAtendimentos();
           }}
         />

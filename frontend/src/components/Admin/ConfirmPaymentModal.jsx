@@ -9,6 +9,12 @@ const ConfirmPaymentModal = ({ atendimento, onClose, onPaymentConfirmed }) => {
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
 
+  // Cálculo de Desconto em R$ e %
+  const subtotalOriginal = (parseFloat(atendimento.valor_total) || 0) || ((parseFloat(atendimento.valor_pecas) || 0) + (parseFloat(atendimento.valor_mao_obra) || 0));
+  const valPagoNum = parseFloat(valorFinal) || 0;
+  const descontoCalculado = subtotalOriginal > valPagoNum ? subtotalOriginal - valPagoNum : 0;
+  const porcentagemDesconto = subtotalOriginal > 0 && descontoCalculado > 0 ? ((descontoCalculado / subtotalOriginal) * 100) : 0;
+
   // Tratar alteração no Método para atualizar Conta padrão automaticamente
   const handleMetodoChange = (e) => {
     const val = e.target.value;
@@ -28,14 +34,16 @@ const ConfirmPaymentModal = ({ atendimento, onClose, onPaymentConfirmed }) => {
     const hoje = new Date().toISOString().split('T')[0];
 
     try {
-      // 1. Atualizar Orçamento no Supabase
+      // 1. Atualizar Orçamento no Supabase com valor pago e desconto
       const payload = {
         pago: true,
         status: 'Finalizado',
         data_pagamento: hoje,
         metodo_pagamento: metodoPagamento,
         conta_destino: contaDestino,
-        valor_total: parseFloat(valorFinal) || atendimento.valor_total || 0,
+        valor_total: valPagoNum,
+        valor_desconto: descontoCalculado,
+        porcentagem_desconto: porcentagemDesconto,
         avaliacaoSite: '4 | Serviço Concluído'
       };
 
@@ -144,7 +152,7 @@ const ConfirmPaymentModal = ({ atendimento, onClose, onPaymentConfirmed }) => {
         <form onSubmit={handleConfirm}>
           
           <div className="form-group" style={{ marginBottom: '15px' }}>
-            <label style={{ color: '#ccc', fontSize: '0.85rem' }}>Valor Pago (R$)</label>
+            <label style={{ color: '#ccc', fontSize: '0.85rem' }}>Valor Pago / Recebido (R$)</label>
             <input 
               type="number" step="0.01" 
               value={valorFinal} 
@@ -153,6 +161,16 @@ const ConfirmPaymentModal = ({ atendimento, onClose, onPaymentConfirmed }) => {
               required
             />
           </div>
+
+          {/* Destaque do Desconto Concedido */}
+          {descontoCalculado > 0 && (
+            <div style={{ background: '#10b98118', borderLeft: '4px solid #10b981', padding: '10px 12px', borderRadius: '6px', marginBottom: '18px', fontSize: '0.85rem', color: '#10b981', fontWeight: 'bold' }}>
+              🏷️ Desconto concedido: R$ {descontoCalculado.toFixed(2)} ({porcentagemDesconto.toFixed(2)}%)
+              <div style={{ fontSize: '0.78rem', color: '#aaa', fontWeight: 'normal', marginTop: '2px' }}>
+                Subtotal Orçamento: R$ {subtotalOriginal.toFixed(2)} ➔ Cobrado: R$ {valPagoNum.toFixed(2)}
+              </div>
+            </div>
+          )}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '12px', marginBottom: '20px' }}>
             <div className="form-group">

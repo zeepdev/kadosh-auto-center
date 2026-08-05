@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Document, Page, Text, View, StyleSheet, PDFDownloadLink, pdf } from '@react-pdf/renderer';
 import { OFICINA } from '../../config/oficina';
 import { supabase } from '../../lib/supabase';
@@ -39,10 +39,18 @@ const styles = StyleSheet.create({
   prioridadeValor: { fontSize: 14, fontWeight: 'bold' }
 });
 
-const KadoshPDF = ({ clientData, items, labor }) => {
+const KadoshPDF = ({ clientData, items, labor, customTotal }) => {
   const totalItems = items.reduce((acc, item) => acc + (item.qtd * item.unit), 0);
   const totalLabor = labor.reduce((acc, item) => acc + (item.qtd * item.unit), 0);
-  const grandTotal = totalItems + totalLabor;
+  const subtotalOriginal = totalItems + totalLabor;
+  
+  const finalCalculated = customTotal !== undefined && customTotal !== null && customTotal !== '' && !isNaN(parseFloat(customTotal)) 
+    ? parseFloat(customTotal) 
+    : subtotalOriginal;
+
+  const descontoValor = subtotalOriginal > finalCalculated ? (subtotalOriginal - finalCalculated) : 0;
+  const descontoPorcentagem = subtotalOriginal > 0 && descontoValor > 0 ? ((descontoValor / subtotalOriginal) * 100) : 0;
+
   const dataEmissao = new Date().toLocaleDateString('pt-BR');
   const prioridade = calcularPrioridade(clientData.servicoDesejado, clientData.descricao);
 
@@ -147,15 +155,15 @@ const KadoshPDF = ({ clientData, items, labor }) => {
         )}
 
         {/* PEÇAS */}
-        <Text style={styles.sectionTitle}>PEÇAS E PRODUTOS</Text>
+        <Text style={styles.sectionTitle}>PEÇAS E COMPONENTES</Text>
         <View style={styles.tableHeader}>
-          <Text style={styles.colQtd}>QTD</Text>
-          <Text style={styles.colDesc}>DESCRIÇÃO</Text>
-          <Text style={styles.colUnit}>VLR. UNIT.</Text>
-          <Text style={styles.colTotal}>TOTAL</Text>
+          <Text style={styles.colQtd}>Qtd</Text>
+          <Text style={styles.colDesc}>Descrição</Text>
+          <Text style={styles.colUnit}>V. Unit</Text>
+          <Text style={styles.colTotal}>Total</Text>
         </View>
-        {items.map((item, i) => (
-          <View key={i} style={styles.tableRow}>
+        {items.map((item, index) => (
+          <View key={index} style={styles.tableRow}>
             <Text style={styles.colQtd}>{item.qtd}</Text>
             <Text style={styles.colDesc}>{item.desc}</Text>
             <Text style={styles.colUnit}>R$ {item.unit.toFixed(2)}</Text>
@@ -166,15 +174,15 @@ const KadoshPDF = ({ clientData, items, labor }) => {
         <Text style={{ textAlign: 'right', padding: 5, fontWeight: 'bold' }}>Subtotal Peças: R$ {totalItems.toFixed(2)}</Text>
 
         {/* MÃO DE OBRA */}
-        <Text style={styles.sectionTitle}>SERVIÇOS / MÃO DE OBRA</Text>
+        <Text style={styles.sectionTitle}>SERVIÇOS E MÃO DE OBRA</Text>
         <View style={styles.tableHeader}>
-          <Text style={styles.colQtd}>QTD</Text>
-          <Text style={styles.colDesc}>DESCRIÇÃO</Text>
-          <Text style={styles.colUnit}>VLR. UNIT.</Text>
-          <Text style={styles.colTotal}>TOTAL</Text>
+          <Text style={styles.colQtd}>Qtd</Text>
+          <Text style={styles.colDesc}>Descrição do Serviço</Text>
+          <Text style={styles.colUnit}>V. Unit</Text>
+          <Text style={styles.colTotal}>Total</Text>
         </View>
-        {labor.map((item, i) => (
-          <View key={i} style={styles.tableRow}>
+        {labor.map((item, index) => (
+          <View key={index} style={styles.tableRow}>
             <Text style={styles.colQtd}>{item.qtd}</Text>
             <Text style={styles.colDesc}>{item.desc}</Text>
             <Text style={styles.colUnit}>R$ {item.unit.toFixed(2)}</Text>
@@ -184,11 +192,24 @@ const KadoshPDF = ({ clientData, items, labor }) => {
         {labor.length === 0 && <Text style={{ padding: 10, textAlign: 'center', color: '#999' }}>Nenhum serviço adicionado.</Text>}
         <Text style={{ textAlign: 'right', padding: 5, fontWeight: 'bold' }}>Subtotal Serviços: R$ {totalLabor.toFixed(2)}</Text>
 
-        {/* TOTAL */}
+        {/* TOTAL COM DESCONTO HIGHLIGHT */}
         <View style={styles.totalBox}>
-          <View style={styles.totalHighlight}>
-            <Text style={{ fontSize: 10, color: '#854d0e', marginBottom: 2 }}>VALOR TOTAL A PAGAR</Text>
-            <Text style={styles.totalText}>R$ {grandTotal.toFixed(2)}</Text>
+          <View style={[styles.totalHighlight, { width: '50%' }]}>
+            {descontoValor > 0 ? (
+              <View>
+                <Text style={{ fontSize: 8, color: '#666', marginBottom: 2 }}>Subtotal Tabela: R$ {subtotalOriginal.toFixed(2)}</Text>
+                <Text style={{ fontSize: 9, color: '#dc2626', marginBottom: 3, fontWeight: 'bold' }}>
+                  Desconto Concedido (-): R$ {descontoValor.toFixed(2)} ({descontoPorcentagem.toFixed(2)}%)
+                </Text>
+                <Text style={{ fontSize: 9, color: '#854d0e', marginTop: 2, fontWeight: 'bold' }}>VALOR TOTAL FINAL</Text>
+                <Text style={styles.totalText}>R$ {finalCalculated.toFixed(2)}</Text>
+              </View>
+            ) : (
+              <View>
+                <Text style={{ fontSize: 10, color: '#854d0e', marginBottom: 2 }}>VALOR TOTAL A PAGAR</Text>
+                <Text style={styles.totalText}>R$ {subtotalOriginal.toFixed(2)}</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -337,6 +358,8 @@ const PDFGenerator = ({ initialData, onClose, onUpdateSuccess }) => {
   const [downloading, setDownloading] = useState(false);
   const [driveStatus, setDriveStatus] = useState('idle');
 
+  const [customTotalInput, setCustomTotalInput] = useState(initialData.valor_total ? initialData.valor_total.toString() : '');
+
   const handleDriveUpload = async (blob) => {
     setDriveStatus('loading');
     try {
@@ -366,7 +389,8 @@ const PDFGenerator = ({ initialData, onClose, onUpdateSuccess }) => {
   const handleGenerateAndDownload = async () => {
     setDownloading(true);
     try {
-      const doc = <KadoshPDF clientData={clientData} items={items} labor={labor} />;
+      const finalVal = customTotalInput !== '' ? parseFloat(customTotalInput) : grandTotal;
+      const doc = <KadoshPDF clientData={clientData} items={items} labor={labor} customTotal={finalVal} />;
       const blob = await pdf(doc).toBlob();
       
       const url = URL.createObjectURL(blob);
@@ -379,7 +403,7 @@ const PDFGenerator = ({ initialData, onClose, onUpdateSuccess }) => {
       URL.revokeObjectURL(url);
 
       if (initialData.id && onUpdateSuccess) {
-        await onUpdateSuccess(initialData.id, grandTotal);
+        await onUpdateSuccess(initialData.id, finalVal);
       }
 
       await handleDriveUpload(blob);
@@ -507,6 +531,33 @@ const PDFGenerator = ({ initialData, onClose, onUpdateSuccess }) => {
             </li>
           ))}
         </ul>
+
+        {/* Ajuste de Valor Final / Desconto */}
+        <div style={{ background: '#1a1a24', padding: '15px', borderRadius: '10px', marginBottom: '25px', border: '1px solid #333' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
+            <div>
+              <span style={{ fontSize: '0.85rem', color: '#aaa' }}>Subtotal Tabela (Peças + Serviços):</span>
+              <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#fff' }}>R$ {grandTotal.toFixed(2)}</div>
+            </div>
+
+            <div style={{ minWidth: '220px' }}>
+              <label style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: 'bold' }}>Valor Final Cobrado (R$)</label>
+              <input 
+                type="number" step="0.01"
+                placeholder={grandTotal.toFixed(2)}
+                value={customTotalInput}
+                onChange={e => setCustomTotalInput(e.target.value)}
+                style={{ width: '100%', padding: '10px', background: '#0a0a0c', border: '1px solid #f59e0b', borderRadius: '8px', color: '#f59e0b', fontWeight: 'bold', fontSize: '1.1rem', marginTop: '4px' }}
+              />
+            </div>
+          </div>
+
+          {customTotalInput !== '' && parseFloat(customTotalInput) < grandTotal && (
+            <div style={{ marginTop: '10px', color: '#10b981', fontSize: '0.85rem', fontWeight: 'bold' }}>
+              🏷️ Desconto concedido: R$ {(grandTotal - parseFloat(customTotalInput)).toFixed(2)} ({(((grandTotal - parseFloat(customTotalInput)) / grandTotal) * 100).toFixed(2)}%) destacado no PDF!
+            </div>
+          )}
+        </div>
 
         <div style={{ borderTop: '1px solid #333', paddingTop: '20px', textAlign: 'center' }}>
           {driveStatus === 'loading' && <p style={{ color: '#60a5fa', marginBottom: '10px', fontSize: '0.9rem' }}>☁️ Enviando cópia para o Google Drive automaticamente...</p>}
