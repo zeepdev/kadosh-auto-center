@@ -417,7 +417,7 @@ const FluxoCaixa = () => {
     }
   };
 
-  // Inscrição no Supabase Realtime para sincronização em tempo real entre todos os dispositivos
+  // Inscrição no Supabase Realtime para sincronização de orçamentos pagos e histórico de fechamentos
   useEffect(() => {
     const channel = supabase
       .channel('kadosh_realtime_cashflow')
@@ -426,9 +426,6 @@ const FluxoCaixa = () => {
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'fluxo_caixa' }, () => {
         fetchHistorico();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'fluxo_caixa_draft' }, () => {
-        loadDraft();
       })
       .subscribe();
 
