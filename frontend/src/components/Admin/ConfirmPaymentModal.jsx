@@ -34,7 +34,7 @@ const ConfirmPaymentModal = ({ atendimento, onClose, onPaymentConfirmed }) => {
     const hoje = new Date().toISOString().split('T')[0];
 
     try {
-      // 1. Atualizar Orçamento no Supabase com valor pago e desconto
+      // 1. Atualizar Orçamento no Supabase com valor pago
       const payload = {
         pago: true,
         status: 'Finalizado',
@@ -42,8 +42,6 @@ const ConfirmPaymentModal = ({ atendimento, onClose, onPaymentConfirmed }) => {
         metodo_pagamento: metodoPagamento,
         conta_destino: contaDestino,
         valor_total: valPagoNum,
-        valor_desconto: descontoCalculado,
-        porcentagem_desconto: porcentagemDesconto,
         avaliacaoSite: '4 | Serviço Concluído'
       };
 
