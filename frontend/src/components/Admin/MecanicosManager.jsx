@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import EditBudgetModal from './EditBudgetModal';
 
 const MecanicosManager = () => {
   const [subTab, setSubTab] = useState('comissoes'); // 'comissoes' ou 'cadastro'
+  const [selectedForEdit, setSelectedForEdit] = useState(null);
   
   // Mecânicos
   const [mecanicos, setMecanicos] = useState([]);
@@ -68,23 +70,26 @@ const MecanicosManager = () => {
   const fetchComissoes = async () => {
     setLoadingComissoes(true);
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from('orcamentos')
         .select('*')
         .eq('pago', true)
         .order('data_pagamento', { ascending: false });
 
-      if (selectedMecanicoId !== 'todos') {
-        query = query.eq('mecanico_id', selectedMecanicoId);
-      }
-
-      const { data, error } = await query;
       if (error) throw error;
 
-      // Filtrar pelo mês selecionado (YYYY-MM)
+      // Filtrar pelo mês selecionado (YYYY-MM) e pelo mecânico selecionado
       const filtrados = (data || []).filter(item => {
-        if (!item.data_pagamento) return false;
-        return item.data_pagamento.startsWith(selectedMonth);
+        if (!item.data_pagamento || !item.data_pagamento.startsWith(selectedMonth)) return false;
+        
+        if (selectedMecanicoId === 'todos') return true;
+
+        // Verificar se mecanico_id bate OU se está na lista de mecanicos_atribuidos
+        if (item.mecanico_id === selectedMecanicoId) return true;
+        if (item.mecanicos_atribuidos && Array.isArray(item.mecanicos_atribuidos)) {
+          return item.mecanicos_atribuidos.some(m => m.mecanico_id === selectedMecanicoId);
+        }
+        return false;
       });
 
       setOrcamentosPagos(filtrados);
@@ -284,9 +289,8 @@ const MecanicosManager = () => {
                       <th style={{ padding: '12px 10px' }}>Cliente / Placa</th>
                       <th style={{ padding: '12px 10px' }}>Mecânico</th>
                       <th style={{ padding: '12px 10px' }}>Mão de Obra</th>
-                      <th style={{ padding: '12px 10px' }}>Taxa</th>
-                      <th style={{ padding: '12px 10px' }}>Comissão</th>
-                      <th style={{ padding: '12px 10px' }}>Status</th>
+                      <th style={{ padding: '12px 10px' }}>Comissão Total</th>
+                      <th style={{ padding: '12px 10px' }}>Ações</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -298,24 +302,46 @@ const MecanicosManager = () => {
                           <span style={{ display: 'block', color: '#fff' }}>{item.nome || 'Cliente Balcão'}</span>
                           <span style={{ fontSize: '0.75rem', color: '#888' }}>{item.placa || 'Sem placa'}</span>
                         </td>
-                        <td style={{ padding: '12px 10px', color: '#f59e0b', fontWeight: 'bold' }}>{item.mecanico_nome || 'N/A'}</td>
-                        <td style={{ padding: '12px 10px', color: '#10b981' }}>{formatCurrency(item.valor_mao_obra)}</td>
-                        <td style={{ padding: '12px 10px', color: '#aaa' }}>
-                          {item.comissao_tipo === 'porcentagem' ? `${item.comissao_taxa || 0}%` : 'R$ Fixo'}
+                        <td style={{ padding: '12px 10px' }}>
+                          {item.mecanicos_atribuidos && Array.isArray(item.mecanicos_atribuidos) && item.mecanicos_atribuidos.length > 0 ? (
+                            item.mecanicos_atribuidos.map((m, mIdx) => (
+                              <div key={mIdx} style={{ fontSize: '0.8rem', color: '#f59e0b', marginBottom: '2px' }}>
+                                👨‍🔧 <strong>{m.mecanico_nome}</strong> ({m.comissao_tipo === 'porcentagem' ? `${m.comissao_taxa}%` : 'R$ Fixo'}: {formatCurrency(m.valor_comissao)})
+                              </div>
+                            ))
+                          ) : (
+                            <span style={{ color: '#f59e0b', fontWeight: 'bold' }}>{item.mecanico_nome || 'N/A'}</span>
+                          )}
                         </td>
+                        <td style={{ padding: '12px 10px', color: '#10b981' }}>{formatCurrency(item.valor_mao_obra)}</td>
                         <td style={{ padding: '12px 10px', color: '#f59e0b', fontWeight: 'bold', fontSize: '0.95rem' }}>
                           {formatCurrency(item.valor_comissao)}
                         </td>
                         <td style={{ padding: '12px 10px' }}>
-                          <span style={{ background: '#10b98120', color: '#10b981', border: '1px solid #10b981', padding: '3px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold' }}>
-                            🟢 Pago
-                          </span>
+                          <button 
+                            type="button"
+                            onClick={() => setSelectedForEdit(item)}
+                            style={{ padding: '6px 12px', background: '#f59e0b', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#000', fontWeight: 'bold', fontSize: '0.78rem', boxShadow: '0 2px 8px rgba(245, 158, 11, 0.2)' }}
+                            title="Editar comissão ou mecânicos desta nota/orçamento"
+                          >
+                            ✏️ Editar Comissão
+                          </button>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+            )}
+            {selectedForEdit && (
+              <EditBudgetModal 
+                atendimento={selectedForEdit}
+                onClose={() => setSelectedForEdit(null)}
+                onSaveSuccess={() => {
+                  setSelectedForEdit(null);
+                  fetchComissoes();
+                }}
+              />
             )}
           </div>
         </div>

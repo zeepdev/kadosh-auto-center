@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
@@ -59,6 +59,24 @@ const InvoiceModal = ({ atendimento, onClose, onSuccess }) => {
 
       if (result.success) {
         setResultado({ success: true, data: result.data });
+
+        // Salvar dados da nota fiscal emitida no registro do cliente
+        if (atendimento?.id) {
+          try {
+            await supabase
+              .from('orcamentos')
+              .update({
+                nota_fiscal_id: result.data.id,
+                nota_fiscal_status: result.data.status,
+                nota_fiscal_valor: parseFloat(result.data.value) || 0,
+                nota_fiscal_emissao: new Date().toISOString(),
+                nota_fiscal_dados: result.data
+              })
+              .eq('id', atendimento.id);
+          } catch (errDb) {
+            console.warn('Nota emitida com sucesso, aviso de salvamento local:', errDb);
+          }
+        }
       } else {
         setResultado({ success: false, error: result.error });
       }

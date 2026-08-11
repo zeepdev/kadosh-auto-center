@@ -13,12 +13,23 @@ export default function EditBudgetModal({ atendimento, onClose, onSaveSuccess })
   const [valorMaoObra, setValorMaoObra] = useState(atendimento?.valor_mao_obra ? atendimento.valor_mao_obra.toString() : '0');
   const [valorTotal, setValorTotal] = useState(atendimento?.valor_total ? atendimento.valor_total.toString() : '0');
 
-  // Mecânico e Comissão
+  // Mecânicos Atribuídos (Multi-mecânicos)
   const [mecanicosList, setMecanicosList] = useState([]);
-  const [selectedMecanicoId, setSelectedMecanicoId] = useState(atendimento?.mecanico_id || '');
-  const [comissaoTipo, setComissaoTipo] = useState(atendimento?.comissao_tipo || 'porcentagem');
-  const [comissaoTaxa, setComissaoTaxa] = useState(atendimento?.comissao_taxa ? atendimento.comissao_taxa.toString() : '0');
-  const [valorComissao, setValorComissao] = useState(atendimento?.valor_comissao ? atendimento.valor_comissao.toString() : '0');
+  const [mecanicosAtribuidos, setMecanicosAtribuidos] = useState(() => {
+    if (atendimento?.mecanicos_atribuidos && Array.isArray(atendimento.mecanicos_atribuidos) && atendimento.mecanicos_atribuidos.length > 0) {
+      return atendimento.mecanicos_atribuidos;
+    }
+    if (atendimento?.mecanico_id || atendimento?.mecanico_nome) {
+      return [{
+        mecanico_id: atendimento.mecanico_id || '',
+        mecanico_nome: atendimento.mecanico_nome || '',
+        comissao_tipo: atendimento.comissao_tipo || 'porcentagem',
+        comissao_taxa: atendimento.comissao_taxa ? atendimento.comissao_taxa.toString() : '0',
+        valor_comissao: atendimento.valor_comissao ? atendimento.valor_comissao.toString() : '0'
+      }];
+    }
+    return [];
+  });
 
   // Status e Pagamento
   const [status, setStatus] = useState(atendimento?.status || 'Pendente');
@@ -28,7 +39,7 @@ export default function EditBudgetModal({ atendimento, onClose, onSaveSuccess })
 
   const [saving, setSaving] = useState(false);
 
-  // Carregar lista de mecânicos
+  // Carregar lista de mecânicos cadastrados
   useEffect(() => {
     (async () => {
       try {
@@ -47,18 +58,17 @@ export default function EditBudgetModal({ atendimento, onClose, onSaveSuccess })
     })();
   }, []);
 
-  // Recalcular comissão automaticamente quando muda mão de obra, tipo ou taxa
+  // Recalcular comissões de todos os mecânicos quando muda o valor da Mão de Obra
   useEffect(() => {
     const moVal = parseFloat(valorMaoObra) || 0;
-    const taxaVal = parseFloat(comissaoTaxa) || 0;
-
-    if (comissaoTipo === 'porcentagem') {
-      const calc = (moVal * taxaVal) / 100;
-      setValorComissao(calc.toFixed(2));
-    } else {
-      setValorComissao(taxaVal.toFixed(2));
-    }
-  }, [valorMaoObra, comissaoTipo, comissaoTaxa]);
+    setMecanicosAtribuidos(prev => prev.map(item => {
+      const taxaVal = parseFloat(item.comissao_taxa) || 0;
+      const vCom = item.comissao_tipo === 'porcentagem' 
+        ? ((moVal * taxaVal) / 100).toFixed(2) 
+        : taxaVal.toFixed(2);
+      return { ...item, valor_comissao: vCom };
+    }));
+  }, [valorMaoObra]);
 
   // Recalcular total se alterar peças ou mão de obra
   const handlePecasChange = (val) => {
@@ -75,14 +85,50 @@ export default function EditBudgetModal({ atendimento, onClose, onSaveSuccess })
     setValorTotal((p + m).toFixed(2));
   };
 
+  // Funções de manipulação de mecânicos atribuídos
+  const addMecanicoRow = () => {
+    setMecanicosAtribuidos([
+      ...mecanicosAtribuidos,
+      { mecanico_id: '', mecanico_nome: '', comissao_tipo: 'porcentagem', comissao_taxa: '10', valor_comissao: '0' }
+    ]);
+  };
+
+  const removeMecanicoRow = (index) => {
+    setMecanicosAtribuidos(mecanicosAtribuidos.filter((_, i) => i !== index));
+  };
+
+  const updateMecanicoRow = (index, field, value) => {
+    const updated = [...mecanicosAtribuidos];
+    const item = { ...updated[index], [field]: value };
+
+    if (field === 'mecanico_id') {
+      const found = mecanicosList.find(m => m.id === value);
+      item.mecanico_nome = found ? found.nome : (value ? 'Mecânico Selecionado' : '');
+    }
+
+    // Recalcular comissão individual da linha
+    const moVal = parseFloat(valorMaoObra) || 0;
+    const taxaVal = parseFloat(field === 'comissao_taxa' ? value : item.comissao_taxa) || 0;
+    const tipo = field === 'comissao_tipo' ? value : item.comissao_tipo;
+
+    if (tipo === 'porcentagem') {
+      item.valor_comissao = ((moVal * taxaVal) / 100).toFixed(2);
+    } else {
+      item.valor_comissao = taxaVal.toFixed(2);
+    }
+
+    updated[index] = item;
+    setMecanicosAtribuidos(updated);
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
     if (saving) return;
 
     setSaving(true);
     try {
-      const selectedMec = mecanicosList.find(m => m.id === selectedMecanicoId);
-      const mecanicoNome = selectedMec ? selectedMec.nome : (selectedMecanicoId ? 'Mecânico Selecionado' : null);
+      const totalComissaoAll = mecanicosAtribuidos.reduce((acc, m) => acc + (parseFloat(m.valor_comissao) || 0), 0);
+      const mecanicosNomesJoined = mecanicosAtribuidos.map(m => m.mecanico_nome).filter(Boolean).join(' / ');
 
       const payload = {
         nome,
@@ -92,11 +138,12 @@ export default function EditBudgetModal({ atendimento, onClose, onSaveSuccess })
         valor_pecas: parseFloat(valorPecas) || 0,
         valor_mao_obra: parseFloat(valorMaoObra) || 0,
         valor_total: parseFloat(valorTotal) || 0,
-        mecanico_id: selectedMecanicoId || null,
-        mecanico_nome: mecanicoNome,
-        comissao_tipo: comissaoTipo,
-        comissao_taxa: parseFloat(comissaoTaxa) || 0,
-        valor_comissao: parseFloat(valorComissao) || 0,
+        mecanicos_atribuidos: mecanicosAtribuidos,
+        mecanico_id: mecanicosAtribuidos.length > 0 ? mecanicosAtribuidos[0].mecanico_id : null,
+        mecanico_nome: mecanicosNomesJoined || null,
+        comissao_tipo: mecanicosAtribuidos.length > 0 ? mecanicosAtribuidos[0].comissao_tipo : 'porcentagem',
+        comissao_taxa: mecanicosAtribuidos.length > 0 ? parseFloat(mecanicosAtribuidos[0].comissao_taxa) : 0,
+        valor_comissao: totalComissaoAll,
         status,
         pago,
         metodo_pagamento: pago ? metodoPagamento : null,
@@ -114,7 +161,7 @@ export default function EditBudgetModal({ atendimento, onClose, onSaveSuccess })
       registrarLog({
         acao: 'EDICAO',
         modulo: 'Orçamentos',
-        detalhes: `Orçamento #${atendimento.id} editado: Cliente ${nome} (${placa}), Mecânico: ${mecanicoNome || 'Nenhum'}, Comissão: R$ ${valorComissao}, Valor Total: R$ ${valorTotal}.`,
+        detalhes: `Orçamento #${atendimento.id} editado: Cliente ${nome} (${placa}), Mecânicos: ${mecanicosNomesJoined || 'Nenhum'}, Comissão Total: R$ ${totalComissaoAll.toFixed(2)}, Valor Total: R$ ${valorTotal}.`,
         metadata: { id: atendimento.id, payload }
       });
 
@@ -129,6 +176,8 @@ export default function EditBudgetModal({ atendimento, onClose, onSaveSuccess })
     }
   };
 
+  const totalComissaoGeral = mecanicosAtribuidos.reduce((acc, m) => acc + (parseFloat(m.valor_comissao) || 0), 0);
+
   return (
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -137,17 +186,17 @@ export default function EditBudgetModal({ atendimento, onClose, onSaveSuccess })
       zIndex: 9999, padding: '20px'
     }}>
       <div className="glass" style={{
-        maxWidth: '750px', width: '100%', maxHeight: '90vh',
+        maxWidth: '850px', width: '100%', maxHeight: '90vh',
         background: '#121216', border: '1px solid #333', borderRadius: '16px',
         padding: '25px', color: '#fff', overflowY: 'auto'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #222', paddingBottom: '15px' }}>
           <div>
             <h3 style={{ margin: 0, color: '#f59e0b', fontSize: '1.3rem' }}>
-              ✏️ Editar Orçamento #{atendimento?.id}
+              ✏️ Editar Orçamento / Nota #${atendimento?.id}
             </h3>
             <p style={{ margin: '4px 0 0 0', color: '#aaa', fontSize: '0.85rem' }}>
-              Corrija valores, mecânico responsável, comissão e dados do atendimento.
+              Edite valores, adicione múltiplos mecânicos e ajuste individualmente a % de comissão de cada um.
             </p>
           </div>
           <button onClick={onClose} style={{ background: 'transparent', color: '#ef4444', border: 'none', fontSize: '1.3rem', cursor: 'pointer' }}>
@@ -197,35 +246,92 @@ export default function EditBudgetModal({ atendimento, onClose, onSaveSuccess })
             </div>
           </div>
 
-          {/* Mecânico e Comissão */}
-          <div style={{ background: '#18181f', padding: '15px', borderRadius: '10px', marginBottom: '20px', border: '1px solid #2a2a35' }}>
-            <h4 style={{ margin: '0 0 12px 0', color: '#f59e0b', fontSize: '0.95rem' }}>👨‍🔧 Mecânico e Comissão de Serviço</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr 1fr', gap: '12px' }}>
+          {/* Seção Múltiplos Mecânicos e Comissões */}
+          <div style={{ background: '#18181f', padding: '18px', borderRadius: '10px', marginBottom: '20px', border: '1px solid #2a2a35' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
               <div>
-                <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Mecânico Responsável</label>
-                <select value={selectedMecanicoId} onChange={e => setSelectedMecanicoId(e.target.value)} style={inputStyle}>
-                  <option value="">Nenhum / Sem Mecânico</option>
-                  {mecanicosList.map(m => (
-                    <option key={m.id} value={m.id}>{m.nome} ({m.especialidade || 'Mecânico'})</option>
-                  ))}
-                </select>
+                <h4 style={{ margin: 0, color: '#f59e0b', fontSize: '0.95rem' }}>👨‍🔧 Mecânicos Atribuídos e Comissões Individuais</h4>
+                <p style={{ margin: '3px 0 0 0', color: '#aaa', fontSize: '0.78rem' }}>Adicione mais de um mecânico e configure o % ou R$ individual de cada um.</p>
               </div>
-              <div>
-                <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Tipo Comissão</label>
-                <select value={comissaoTipo} onChange={e => setComissaoTipo(e.target.value)} style={inputStyle}>
-                  <option value="porcentagem">Porcentagem (%)</option>
-                  <option value="fixo">Valor Fixo (R$)</option>
-                </select>
-              </div>
-              <div>
-                <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Taxa ({comissaoTipo === 'porcentagem' ? '%' : 'R$'})</label>
-                <input type="number" step="0.01" value={comissaoTaxa} onChange={e => setComissaoTaxa(e.target.value)} style={inputStyle} />
-              </div>
-              <div>
-                <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Valor Comissão (R$)</label>
-                <input type="number" step="0.01" value={valorComissao} onChange={e => setValorComissao(e.target.value)} style={{ ...inputStyle, fontWeight: 'bold', color: '#f59e0b' }} />
-              </div>
+              <button 
+                type="button" 
+                onClick={addMecanicoRow} 
+                style={{ padding: '6px 12px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}
+              >
+                + Adicionar Mecânico
+              </button>
             </div>
+
+            {mecanicosAtribuidos.length === 0 ? (
+              <p style={{ color: '#666', fontSize: '0.85rem', fontStyle: 'italic', margin: '10px 0' }}>Nenhum mecânico atribuído. Clique em "+ Adicionar Mecânico" acima.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {mecanicosAtribuidos.map((item, idx) => (
+                  <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr 1fr 40px', gap: '10px', alignItems: 'center', background: '#101014', padding: '10px', borderRadius: '8px', border: '1px solid #222' }}>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', color: '#aaa' }}>Mecânico {idx + 1}</label>
+                      <select 
+                        value={item.mecanico_id || ''} 
+                        onChange={e => updateMecanicoRow(idx, 'mecanico_id', e.target.value)} 
+                        style={inputStyle}
+                      >
+                        <option value="">Selecione o Mecânico...</option>
+                        {mecanicosList.map(m => (
+                          <option key={m.id} value={m.id}>{m.nome} ({m.especialidade || 'Mecânico'})</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: '0.75rem', color: '#aaa' }}>Tipo Comissão</label>
+                      <select 
+                        value={item.comissao_tipo || 'porcentagem'} 
+                        onChange={e => updateMecanicoRow(idx, 'comissao_tipo', e.target.value)} 
+                        style={inputStyle}
+                      >
+                        <option value="porcentagem">Porcentagem (%)</option>
+                        <option value="fixo">Valor Fixo (R$)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: '0.75rem', color: '#aaa' }}>Taxa ({item.comissao_tipo === 'porcentagem' ? '%' : 'R$'})</label>
+                      <input 
+                        type="number" step="0.01" 
+                        value={item.comissao_taxa || '0'} 
+                        onChange={e => updateMecanicoRow(idx, 'comissao_taxa', e.target.value)} 
+                        style={inputStyle} 
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: '0.75rem', color: '#aaa' }}>Valor Comissão (R$)</label>
+                      <input 
+                        type="number" step="0.01" 
+                        value={item.valor_comissao || '0'} 
+                        readOnly 
+                        style={{ ...inputStyle, fontWeight: 'bold', color: '#f59e0b', background: '#1c1c24' }} 
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '18px' }}>
+                      <button 
+                        type="button" 
+                        onClick={() => removeMecanicoRow(idx)} 
+                        style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '1.2rem' }}
+                        title="Remover Mecânico"
+                      >
+                        ❌
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                <div style={{ textAlign: 'right', marginTop: '10px', fontSize: '0.9rem', color: '#aaa' }}>
+                  Total em comissões deste serviço: <strong style={{ color: '#f59e0b', fontSize: '1rem' }}>R$ {totalComissaoGeral.toFixed(2)}</strong>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Status e Pagamento */}

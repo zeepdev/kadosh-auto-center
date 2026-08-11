@@ -170,12 +170,37 @@ const DirectBudgetModal = ({ onClose, onBudgetCreated }) => {
     const mecanicoPrincipalNome = primeiroServico ? primeiroServico.mecanico_nome : '';
     const totalComissaoGeral = servicosValidos.reduce((acc, s) => acc + s.valor_comissao, 0);
 
+    // Mapear mecânicos e comissões individuais
+    const mecanicosAtribuidosMap = {};
+    servicosValidos.forEach(s => {
+      if (s.mecanico_id) {
+        const mecObj = mecanicos.find(m => m.id === s.mecanico_id);
+        const mNome = mecObj ? mecObj.nome : 'Mecânico';
+        const subVal = (parseFloat(s.unit) || 0) * (parseFloat(s.qtd) || 1);
+        const taxa = parseFloat(s.comissao_taxa) || 0;
+        const vCom = (subVal * taxa) / 100;
+
+        if (!mecanicosAtribuidosMap[s.mecanico_id]) {
+          mecanicosAtribuidosMap[s.mecanico_id] = {
+            mecanico_id: s.mecanico_id,
+            mecanico_nome: mNome,
+            comissao_tipo: 'porcentagem',
+            comissao_taxa: taxa,
+            valor_comissao: vCom
+          };
+        } else {
+          mecanicosAtribuidosMap[s.mecanico_id].valor_comissao += vCom;
+        }
+      }
+    });
+
+    const mecanicosAtribuidosList = Object.values(mecanicosAtribuidosMap);
+
     const payload = {
       nome: nome || 'Cliente Balcão',
       whatsapp: whatsapp.replace(/\D/g, '') || '5562900000000',
       placa: placa.toUpperCase(),
       servicoDesejado,
-      descricao: `Peças: ${pecasValidas.length} it. | Serviços: ${servicosValidos.length} it.`,
       valor_pecas: totalPecas,
       valor_mao_obra: totalMaoObra,
       valor_total: totalGeral,
@@ -184,6 +209,7 @@ const DirectBudgetModal = ({ onClose, onBudgetCreated }) => {
       comissao_tipo: 'porcentagem',
       comissao_taxa: servicosValidos.length > 0 ? servicosValidos[0].comissao_taxa : 30,
       valor_comissao: totalComissaoGeral,
+      mecanicos_atribuidos: mecanicosAtribuidosList,
       status: 'Pendente',
       pago: false,
       avaliacaoSite: JSON.stringify({
