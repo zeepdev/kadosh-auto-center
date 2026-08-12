@@ -67,6 +67,41 @@ const MecanicosManager = () => {
     }
   };
 
+  const extractMecanicosAtribuidos = (item) => {
+    if (item.mecanicos_atribuidos && Array.isArray(item.mecanicos_atribuidos) && item.mecanicos_atribuidos.length > 0) {
+      return item.mecanicos_atribuidos;
+    }
+    if (item.avaliacaoSite) {
+      try {
+        const parsed = typeof item.avaliacaoSite === 'string' ? JSON.parse(item.avaliacaoSite) : item.avaliacaoSite;
+        if (parsed?.mecanicos_atribuidos && Array.isArray(parsed.mecanicos_atribuidos) && parsed.mecanicos_atribuidos.length > 0) {
+          return parsed.mecanicos_atribuidos;
+        }
+        if (parsed?.servicos && Array.isArray(parsed.servicos) && parsed.servicos.length > 0) {
+          const map = {};
+          parsed.servicos.forEach(s => {
+            if (s.mecanico_id) {
+              const mId = s.mecanico_id;
+              const mNome = s.mecanico_nome || 'Mecânico';
+              const vCom = parseFloat(s.valor_comissao) || 0;
+              if (!map[mId]) {
+                map[mId] = { mecanico_id: mId, mecanico_nome: mNome, comissao_tipo: s.comissao_tipo || 'porcentagem', comissao_taxa: s.comissao_taxa || 0, valor_comissao: vCom };
+              } else {
+                map[mId].valor_comissao += vCom;
+              }
+            }
+          });
+          const list = Object.values(map);
+          if (list.length > 0) return list;
+        }
+      } catch (e) {}
+    }
+    if (item.mecanico_id || item.mecanico_nome) {
+      return [{ mecanico_id: item.mecanico_id, mecanico_nome: item.mecanico_nome, comissao_tipo: item.comissao_tipo || 'porcentagem', comissao_taxa: item.comissao_taxa || 0, valor_comissao: item.valor_comissao || 0 }];
+    }
+    return [];
+  };
+
   const fetchComissoes = async () => {
     setLoadingComissoes(true);
     try {
@@ -84,12 +119,9 @@ const MecanicosManager = () => {
         
         if (selectedMecanicoId === 'todos') return true;
 
-        // Verificar se mecanico_id bate OU se está na lista de mecanicos_atribuidos
+        const atribs = extractMecanicosAtribuidos(item);
         if (item.mecanico_id === selectedMecanicoId) return true;
-        if (item.mecanicos_atribuidos && Array.isArray(item.mecanicos_atribuidos)) {
-          return item.mecanicos_atribuidos.some(m => m.mecanico_id === selectedMecanicoId);
-        }
-        return false;
+        return atribs.some(m => m.mecanico_id === selectedMecanicoId);
       });
 
       setOrcamentosPagos(filtrados);
@@ -303,15 +335,17 @@ const MecanicosManager = () => {
                           <span style={{ fontSize: '0.75rem', color: '#888' }}>{item.placa || 'Sem placa'}</span>
                         </td>
                         <td style={{ padding: '12px 10px' }}>
-                          {item.mecanicos_atribuidos && Array.isArray(item.mecanicos_atribuidos) && item.mecanicos_atribuidos.length > 0 ? (
-                            item.mecanicos_atribuidos.map((m, mIdx) => (
-                              <div key={mIdx} style={{ fontSize: '0.8rem', color: '#f59e0b', marginBottom: '2px' }}>
-                                👨‍🔧 <strong>{m.mecanico_nome}</strong> ({m.comissao_tipo === 'porcentagem' ? `${m.comissao_taxa}%` : 'R$ Fixo'}: {formatCurrency(m.valor_comissao)})
-                              </div>
-                            ))
-                          ) : (
-                            <span style={{ color: '#f59e0b', fontWeight: 'bold' }}>{item.mecanico_nome || 'N/A'}</span>
-                          )}
+                          {(() => {
+                            const atribs = extractMecanicosAtribuidos(item);
+                            if (atribs.length > 0) {
+                              return atribs.map((m, mIdx) => (
+                                <div key={mIdx} style={{ fontSize: '0.8rem', color: '#f59e0b', marginBottom: '2px' }}>
+                                  👨‍🔧 <strong>{m.mecanico_nome}</strong> ({m.comissao_tipo === 'porcentagem' ? `${m.comissao_taxa}%` : 'R$ Fixo'}: {formatCurrency(m.valor_comissao)})
+                                </div>
+                              ));
+                            }
+                            return <span style={{ color: '#f59e0b', fontWeight: 'bold' }}>{item.mecanico_nome || 'N/A'}</span>;
+                          })()}
                         </td>
                         <td style={{ padding: '12px 10px', color: '#10b981' }}>{formatCurrency(item.valor_mao_obra)}</td>
                         <td style={{ padding: '12px 10px', color: '#f59e0b', fontWeight: 'bold', fontSize: '0.95rem' }}>

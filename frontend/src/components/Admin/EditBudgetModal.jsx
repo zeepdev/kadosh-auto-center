@@ -204,6 +204,7 @@ export default function EditBudgetModal({ atendimento, onClose, onSaveSuccess })
         comissao_taxa: parseFloat(s.comissao_taxa) || 0,
         valor_comissao: parseFloat(s.valor_comissao) || 0
       }));
+      avaliacaoSiteObj.mecanicos_atribuidos = mecanicosAtribuidosList;
 
       const payload = {
         nome,
@@ -213,7 +214,6 @@ export default function EditBudgetModal({ atendimento, onClose, onSaveSuccess })
         valor_pecas: parseFloat(valorPecas) || 0,
         valor_mao_obra: parseFloat(valorMaoObra) || 0,
         valor_total: parseFloat(valorTotal) || 0,
-        mecanicos_atribuidos: mecanicosAtribuidosList,
         mecanico_id: mecanicosAtribuidosList.length > 0 ? mecanicosAtribuidosList[0].mecanico_id : null,
         mecanico_nome: mecanicosNomesJoined || null,
         comissao_tipo: mecanicosAtribuidosList.length > 0 ? mecanicosAtribuidosList[0].comissao_tipo : 'porcentagem',

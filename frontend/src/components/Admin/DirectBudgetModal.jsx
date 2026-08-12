@@ -209,13 +209,13 @@ const DirectBudgetModal = ({ onClose, onBudgetCreated }) => {
       comissao_tipo: 'porcentagem',
       comissao_taxa: servicosValidos.length > 0 ? servicosValidos[0].comissao_taxa : 30,
       valor_comissao: totalComissaoGeral,
-      mecanicos_atribuidos: mecanicosAtribuidosList,
       status: 'Pendente',
       pago: false,
       avaliacaoSite: JSON.stringify({
         veiculo: { marca, modelo, submodelo, anoFabricacao, anoModelo, cor, combustivel, segmento },
         pecas: pecasValidas,
-        servicos: servicosValidos
+        servicos: servicosValidos,
+        mecanicos_atribuidos: mecanicosAtribuidosList
       })
     };
 
