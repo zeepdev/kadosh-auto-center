@@ -40,7 +40,28 @@ export default function EditBudgetModal({ atendimento, onClose, onSaveSuccess })
       console.warn('Erro ao parsear servicos de avaliacaoSite:', err);
     }
 
-    // Fallback se não houver lista de serviços salvos
+    // Tentar separar por quebra de linha ou vírgulas se houver múltiplos serviços no texto
+    const rawText = atendimento?.servicoDesejado || atendimento?.descricao || '';
+    const parts = rawText.split(/[\n;,]+/).map(p => p.trim()).filter(Boolean);
+
+    if (parts.length > 1) {
+      const valTotalMO = parseFloat(atendimento?.valor_mao_obra) || 0;
+      const valPorParte = (valTotalMO / parts.length).toFixed(2);
+      const taxaStd = atendimento?.comissao_taxa ? atendimento.comissao_taxa.toString() : '30';
+
+      return parts.map(partName => ({
+        qtd: 1,
+        descricao: partName,
+        unit: valPorParte,
+        mecanico_id: atendimento?.mecanico_id || '',
+        mecanico_nome: atendimento?.mecanico_nome || '',
+        comissao_tipo: atendimento?.comissao_tipo || 'porcentagem',
+        comissao_taxa: taxaStd,
+        valor_comissao: ((parseFloat(valPorParte) * parseFloat(taxaStd)) / 100).toFixed(2)
+      }));
+    }
+
+    // Fallback padrão se for 1 único serviço
     return [{
       qtd: 1,
       descricao: atendimento?.servicoDesejado || 'Mão de Obra Geral',
@@ -110,6 +131,41 @@ export default function EditBudgetModal({ atendimento, onClose, onSaveSuccess })
         valor_comissao: '0'
       }
     ]);
+  };
+
+  // Função para desmembrar / separar uma mão de obra única em vários serviços editáveis
+  const handleSplitServicos = () => {
+    if (servicosItens.length === 1) {
+      const itemUnico = servicosItens[0];
+      const valTotal = parseFloat(itemUnico.unit) || parseFloat(valorMaoObra) || 0;
+      const metade = (valTotal / 2).toFixed(2);
+      const defaultMec = mecanicosList.length > 0 ? mecanicosList[0] : null;
+
+      setServicosItens([
+        {
+          qtd: 1,
+          descricao: itemUnico.descricao && itemUnico.descricao !== 'Revisão Geral' ? itemUnico.descricao : 'Serviço 1',
+          unit: metade,
+          mecanico_id: itemUnico.mecanico_id || (defaultMec ? defaultMec.id : ''),
+          mecanico_nome: itemUnico.mecanico_nome || (defaultMec ? defaultMec.nome : ''),
+          comissao_tipo: itemUnico.comissao_tipo || 'porcentagem',
+          comissao_taxa: itemUnico.comissao_taxa || '30',
+          valor_comissao: ((parseFloat(metade) * (parseFloat(itemUnico.comissao_taxa) || 30)) / 100).toFixed(2)
+        },
+        {
+          qtd: 1,
+          descricao: 'Serviço 2',
+          unit: metade,
+          mecanico_id: defaultMec ? defaultMec.id : '',
+          mecanico_nome: defaultMec ? defaultMec.nome : '',
+          comissao_tipo: 'porcentagem',
+          comissao_taxa: '30',
+          valor_comissao: ((parseFloat(metade) * 30) / 100).toFixed(2)
+        }
+      ]);
+    } else {
+      addServicoItem();
+    }
   };
 
   const removeServicoItem = (index) => {
@@ -191,7 +247,7 @@ export default function EditBudgetModal({ atendimento, onClose, onSaveSuccess })
             : atendimento.avaliacaoSite;
         }
       } catch (e) {
-        console.warn('E');
+        console.warn('Erro parse json avaliacaoSite:', e);
       }
 
       avaliacaoSiteObj.servicos = servicosItens.map(s => ({
@@ -273,7 +329,7 @@ export default function EditBudgetModal({ atendimento, onClose, onSaveSuccess })
               ✏️ Editar Orçamento / Pagamento Fechado #{atendimento?.id}
             </h3>
             <p style={{ margin: '4px 0 0 0', color: '#aaa', fontSize: '0.85rem' }}>
-              Selecione exatamente qual mecânico realizou cada mão de obra e ajuste a % individual de cada um.
+              Separe os serviços em várias linhas para selecionar individualmente quem fez cada mão de obra.
             </p>
           </div>
           <button onClick={onClose} style={{ background: 'transparent', color: '#ef4444', border: 'none', fontSize: '1.3rem', cursor: 'pointer' }}>
@@ -306,7 +362,7 @@ export default function EditBudgetModal({ atendimento, onClose, onSaveSuccess })
 
           {/* Seção Detalhada de Mão de Obra e Mecânico por Serviço */}
           <div style={{ background: '#18181f', padding: '18px', borderRadius: '10px', marginBottom: '20px', border: '1px solid #2a2a35' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap', gap: '10px' }}>
               <div>
                 <h4 style={{ margin: 0, color: '#f59e0b', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   🛠️ Itens de Mão de Obra e Seleção de Mecânico por Serviço
@@ -315,21 +371,34 @@ export default function EditBudgetModal({ atendimento, onClose, onSaveSuccess })
                   Escolha o mecânico responsável por cada item de serviço individualmente.
                 </p>
               </div>
-              <button 
-                type="button" 
-                onClick={addServicoItem} 
-                style={{ padding: '6px 12px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}
-              >
-                + Adicionar Mão de Obra
-              </button>
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {servicosItens.length === 1 && (
+                  <button 
+                    type="button" 
+                    onClick={handleSplitServicos} 
+                    style={{ padding: '6px 12px', background: '#f59e0b', color: '#000', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}
+                    title="Dividir o valor atual em 2 serviços separados para atribuir mecânicos diferentes"
+                  >
+                    ✂️ Separar em Vários Serviços
+                  </button>
+                )}
+                <button 
+                  type="button" 
+                  onClick={addServicoItem} 
+                  style={{ padding: '6px 12px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}
+                >
+                  + Adicionar Mão de Obra
+                </button>
+              </div>
             </div>
 
             {servicosItens.length === 0 ? (
-              <p style={{ color: '#666', fontSize: '0.85rem', fontStyle: 'italic', margin: '10px 0' }}>Nenhuma mão de obra cadastrada.</p>
+              <p style={{ color: '#666', fontSize: '0.85rem', fontStyle: 'italic', margin: '10px 0' }}>Nenhuma mão de obra cadastrada. Clique em "+ Adicionar Mão de Obra" acima.</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {servicosItens.map((item, idx) => (
-                  <div key={idx} style={{ display: 'grid', gridTemplateColumns: '60px 1.5fr 1fr 1.2fr 100px 90px 40px', gap: '8px', alignItems: 'center', background: '#101014', padding: '10px', borderRadius: '8px', border: '1px solid #222' }}>
+                  <div key={idx} style={{ display: 'grid', gridTemplateColumns: '60px 1.5fr 1fr 1.2fr 90px 90px 40px', gap: '8px', alignItems: 'center', background: '#101014', padding: '10px', borderRadius: '8px', border: '1px solid #222' }}>
                     <div>
                       <label style={{ fontSize: '0.72rem', color: '#aaa' }}>Qtd</label>
                       <input 
@@ -344,7 +413,7 @@ export default function EditBudgetModal({ atendimento, onClose, onSaveSuccess })
                       <label style={{ fontSize: '0.72rem', color: '#aaa' }}>Descrição da Mão de Obra {idx + 1}</label>
                       <input 
                         type="text" 
-                        placeholder="Ex: Troca de Pastilhas" 
+                        placeholder="Ex: Troca de Pastilhas / Alinhamento" 
                         value={item.descricao || ''} 
                         onChange={e => updateServicoItem(idx, 'descricao', e.target.value)} 
                         style={inputStyle} 
