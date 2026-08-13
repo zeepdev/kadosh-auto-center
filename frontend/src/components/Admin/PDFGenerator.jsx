@@ -192,26 +192,49 @@ const KadoshPDF = ({ clientData, items, labor, customTotal }) => {
         {labor.length === 0 && <Text style={{ padding: 10, textAlign: 'center', color: '#999' }}>Nenhum serviço adicionado.</Text>}
         <Text style={{ textAlign: 'right', padding: 5, fontWeight: 'bold' }}>Subtotal Serviços: R$ {totalLabor.toFixed(2)}</Text>
 
-        {/* TOTAL COM DESCONTO HIGHLIGHT */}
-        <View style={styles.totalBox}>
-          <View style={[styles.totalHighlight, { width: '50%' }]}>
-            {descontoValor > 0 ? (
-              <View>
-                <Text style={{ fontSize: 8, color: '#666', marginBottom: 2 }}>Subtotal Tabela: R$ {subtotalOriginal.toFixed(2)}</Text>
-                <Text style={{ fontSize: 9, color: '#dc2626', marginBottom: 3, fontWeight: 'bold' }}>
-                  Desconto Concedido (-): R$ {descontoValor.toFixed(2)} ({descontoPorcentagem.toFixed(2)}%)
-                </Text>
-                <Text style={{ fontSize: 9, color: '#854d0e', marginTop: 2, fontWeight: 'bold' }}>VALOR TOTAL FINAL</Text>
-                <Text style={styles.totalText}>R$ {finalCalculated.toFixed(2)}</Text>
+        {/* TOTAL COM DESCONTO OU ENTRADA HIGHLIGHT */}
+        {(() => {
+          let entradaPaga = 0;
+          let saldoPendente = 0;
+          try {
+            if (initialData?.avaliacaoSite) {
+              const parsed = typeof initialData.avaliacaoSite === 'string' ? JSON.parse(initialData.avaliacaoSite) : initialData.avaliacaoSite;
+              if (parsed?.entrada_paga) entradaPaga = parseFloat(parsed.entrada_paga) || 0;
+              if (parsed?.saldo_pendente) saldoPendente = parseFloat(parsed.saldo_pendente) || 0;
+            }
+          } catch (e) {}
+
+          return (
+            <View style={styles.totalBox}>
+              <View style={[styles.totalHighlight, { width: '55%' }]}>
+                {entradaPaga > 0 && saldoPendente > 0 ? (
+                  <View>
+                    <Text style={{ fontSize: 8, color: '#666', marginBottom: 2 }}>Subtotal Orçamento: R$ {subtotalOriginal.toFixed(2)}</Text>
+                    <Text style={{ fontSize: 9, color: '#16a34a', marginBottom: 3, fontWeight: 'bold' }}>
+                      🟢 Entrada / Sinal Pago: -R$ {entradaPaga.toFixed(2)}
+                    </Text>
+                    <Text style={{ fontSize: 9, color: '#b45309', marginTop: 2, fontWeight: 'bold' }}>SALDO RESTANTE NA ENTREGA</Text>
+                    <Text style={styles.totalText}>R$ {saldoPendente.toFixed(2)}</Text>
+                  </View>
+                ) : descontoValor > 0 ? (
+                  <View>
+                    <Text style={{ fontSize: 8, color: '#666', marginBottom: 2 }}>Subtotal Tabela: R$ {subtotalOriginal.toFixed(2)}</Text>
+                    <Text style={{ fontSize: 9, color: '#dc2626', marginBottom: 3, fontWeight: 'bold' }}>
+                      Desconto Concedido (-): R$ {descontoValor.toFixed(2)} ({descontoPorcentagem.toFixed(2)}%)
+                    </Text>
+                    <Text style={{ fontSize: 9, color: '#854d0e', marginTop: 2, fontWeight: 'bold' }}>VALOR TOTAL FINAL</Text>
+                    <Text style={styles.totalText}>R$ {finalCalculated.toFixed(2)}</Text>
+                  </View>
+                ) : (
+                  <View>
+                    <Text style={{ fontSize: 10, color: '#854d0e', marginBottom: 2 }}>VALOR TOTAL A PAGAR</Text>
+                    <Text style={styles.totalText}>R$ {subtotalOriginal.toFixed(2)}</Text>
+                  </View>
+                )}
               </View>
-            ) : (
-              <View>
-                <Text style={{ fontSize: 10, color: '#854d0e', marginBottom: 2 }}>VALOR TOTAL A PAGAR</Text>
-                <Text style={styles.totalText}>R$ {subtotalOriginal.toFixed(2)}</Text>
-              </View>
-            )}
-          </View>
-        </View>
+            </View>
+          );
+        })()}
 
         {/* FOOTER */}
         <View style={styles.footer}>

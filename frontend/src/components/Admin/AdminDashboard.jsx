@@ -986,25 +986,60 @@ const AdminDashboard = () => {
                         </div>
                       </td>
                       <td style={{ padding: '20px 15px' }}>
-                        {item.pago ? (
-                          <div>
-                            <span style={{ background: '#10b98120', color: '#10b981', border: '1px solid #10b981', padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 'bold', display: 'inline-block' }}>
-                              🟢 Pago
-                            </span>
-                            {item.metodo_pagamento && (
-                              <span style={{ display: 'block', fontSize: '0.72rem', color: '#aaa', marginTop: '3px' }}>
-                                {item.metodo_pagamento} • {item.conta_destino || ''}
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          <button 
-                            onClick={() => setSelectedForPayment(item)}
-                            style={{ background: 'rgba(245, 158, 11, 0.15)', border: '1px solid #f59e0b', color: '#f59e0b', padding: '6px 12px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                          >
-                            💲 Dar Baixa
-                          </button>
-                        )}
+                        {(() => {
+                          let entradaPaga = 0;
+                          let saldoPendente = 0;
+                          try {
+                            if (item.avaliacaoSite) {
+                              const parsed = typeof item.avaliacaoSite === 'string' ? JSON.parse(item.avaliacaoSite) : item.avaliacaoSite;
+                              if (parsed?.entrada_paga) entradaPaga = parseFloat(parsed.entrada_paga) || 0;
+                              if (parsed?.saldo_pendente) saldoPendente = parseFloat(parsed.saldo_pendente) || 0;
+                            }
+                          } catch (e) {}
+
+                          if (item.pago) {
+                            return (
+                              <div>
+                                <span style={{ background: '#10b98120', color: '#10b981', border: '1px solid #10b981', padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 'bold', display: 'inline-block' }}>
+                                  🟢 Pago
+                                </span>
+                                {item.metodo_pagamento && (
+                                  <span style={{ display: 'block', fontSize: '0.72rem', color: '#aaa', marginTop: '3px' }}>
+                                    {item.metodo_pagamento} • {item.conta_destino || ''}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          }
+
+                          if (entradaPaga > 0 && saldoPendente > 0) {
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <span style={{ background: '#3b82f620', color: '#60a5fa', border: '1px solid #3b82f6', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold' }}>
+                                  🟢 Entrada: R$ {entradaPaga.toFixed(2)}
+                                </span>
+                                <span style={{ fontSize: '0.72rem', color: '#f59e0b', fontWeight: 'bold' }}>
+                                  ⏳ Resta: R$ {saldoPendente.toFixed(2)}
+                                </span>
+                                <button 
+                                  onClick={() => setSelectedForPayment(item)}
+                                  style={{ background: '#f59e0b', border: 'none', color: '#000', padding: '5px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', marginTop: '2px', boxShadow: '0 2px 8px rgba(245, 158, 11, 0.3)' }}
+                                >
+                                  💵 Quitar Saldo
+                                </button>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <button 
+                              onClick={() => setSelectedForPayment(item)}
+                              style={{ background: 'rgba(245, 158, 11, 0.15)', border: '1px solid #f59e0b', color: '#f59e0b', padding: '6px 12px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                            >
+                              💲 Dar Baixa
+                            </button>
+                          );
+                        })()}
                       </td>
                       <td style={{ padding: '20px 15px', minWidth: '200px' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
