@@ -189,19 +189,12 @@ const ConfirmPaymentModal = ({ atendimento, onClose, onPaymentConfirmed, isQuita
       if (tipoBaixa === 'parcial') {
         alert(
           `✅ Entrada de R$ ${valPagoNum.toFixed(2)} registrada com sucesso!\n\n` +
-          `💵 R$ ${valPagoNum.toFixed(2)} adicionado ao Fluxo de Caixa de Hoje.\n` +
-          `⏳ Saldo de R$ ${saldoPendenteCalculado.toFixed(2)} fica agendado a receber na entrega do carro.`
+          `⏳ Saldo de R$ ${saldoPendenteCalculado.toFixed(2)} agendado para a entrega do veículo.`
         );
       } else if (tipoBaixa === 'quitacao') {
-        alert(
-          `✅ Quitação de R$ ${valPagoNum.toFixed(2)} concluída com sucesso!\n\n` +
-          `💵 Valor enviado ao Fluxo de Caixa e Orçamento Finalizado.`
-        );
+        alert(`✅ Quitação de R$ ${valPagoNum.toFixed(2)} concluída com sucesso!`);
       } else {
-        alert(
-          `✅ Pagamento Integral do Orçamento #${atendimento.id} confirmado!\n\n` +
-          `💵 R$ ${valPagoNum.toFixed(2)} adicionado às Entradas do Fluxo de Caixa.`
-        );
+        alert(`✅ Pagamento de R$ ${valPagoNum.toFixed(2)} confirmado com sucesso!`);
       }
 
       if (onPaymentConfirmed) onPaymentConfirmed();
@@ -276,7 +269,7 @@ const ConfirmPaymentModal = ({ atendimento, onClose, onPaymentConfirmed, isQuita
 
           {tipoBaixa === 'parcial' && (
             <div className="form-group" style={{ marginBottom: '15px' }}>
-              <label style={{ color: '#f59e0b', fontSize: '0.85rem', fontWeight: 'bold' }}>Valor da Entrada / Sinal Recebido Hoje (R$)</label>
+              <label style={{ color: '#f59e0b', fontSize: '0.85rem', fontWeight: 'bold' }}>Valor da Entrada / Sinal Recebido (R$)</label>
               <input 
                 type="number" step="0.01" 
                 value={valorEntradaInput} 
@@ -303,7 +296,7 @@ const ConfirmPaymentModal = ({ atendimento, onClose, onPaymentConfirmed, isQuita
           {/* Destaque do Saldo Pendente (Parcial) */}
           {tipoBaixa === 'parcial' && (
             <div style={{ background: '#f59e0b15', borderLeft: '4px solid #f59e0b', padding: '12px', borderRadius: '6px', marginBottom: '18px', fontSize: '0.85rem', color: '#f59e0b', fontWeight: 'bold' }}>
-              🟢 Entrada recebida hoje: R$ {valPagoNum.toFixed(2)} (Vai para o Fluxo de Caixa de Hoje)
+              🟢 Entrada recebida: R$ {valPagoNum.toFixed(2)}
               <div style={{ fontSize: '0.8rem', color: '#fff', fontWeight: 'bold', marginTop: '4px' }}>
                 ⏳ Saldo Restante a Receber na Entrega: R$ {saldoPendenteCalculado.toFixed(2)}
               </div>
