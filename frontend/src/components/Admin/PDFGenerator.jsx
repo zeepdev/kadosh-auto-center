@@ -250,6 +250,60 @@ const KadoshPDF = ({ clientData, items, labor, customTotal }) => {
 };
 
 const PDFGenerator = ({ initialData, onClose, onUpdateSuccess }) => {
+  // Extrair veículo, peças e serviços salvos no avaliacaoSite ou no orçamento
+  const parseInitialData = () => {
+    let veiculoObj = {};
+    let pecasArr = [];
+    let servicosArr = [];
+
+    try {
+      if (initialData?.avaliacaoSite) {
+        const parsed = typeof initialData.avaliacaoSite === 'string'
+          ? JSON.parse(initialData.avaliacaoSite)
+          : initialData.avaliacaoSite;
+        if (parsed?.veiculo) veiculoObj = parsed.veiculo;
+        if (parsed?.pecas && Array.isArray(parsed.pecas)) pecasArr = parsed.pecas;
+        if (parsed?.servicos && Array.isArray(parsed.servicos)) servicosArr = parsed.servicos;
+      }
+    } catch (e) {
+      console.warn('Erro parse avaliacaoSite no PDF Generator:', e);
+    }
+
+    // Tratar array de Peças
+    if (pecasArr.length === 0 && parseFloat(initialData?.valor_pecas) > 0) {
+      pecasArr = [{
+        qtd: 1,
+        desc: 'Peças e Produtos',
+        unit: parseFloat(initialData.valor_pecas) || 0
+      }];
+    } else {
+      pecasArr = pecasArr.map(p => ({
+        qtd: parseFloat(p.qtd) || 1,
+        desc: p.desc || p.descricao || 'Peça',
+        unit: parseFloat(p.unit) || parseFloat(p.valor) || 0
+      }));
+    }
+
+    // Tratar array de Serviços / Mão de Obra
+    if (servicosArr.length === 0 && parseFloat(initialData?.valor_mao_obra) > 0) {
+      servicosArr = [{
+        qtd: 1,
+        desc: initialData.servicoDesejado || 'Mão de Obra e Serviços',
+        unit: parseFloat(initialData.valor_mao_obra) || 0
+      }];
+    } else {
+      servicosArr = servicosArr.map(s => ({
+        qtd: parseFloat(s.qtd) || 1,
+        desc: s.desc || s.descricao || 'Serviço',
+        unit: parseFloat(s.unit) || parseFloat(s.valor) || 0
+      }));
+    }
+
+    return { veiculoObj, pecasArr, servicosArr };
+  };
+
+  const initialParsed = parseInitialData();
+
   const [clientData, setClientData] = useState({
     nome: initialData.nome || '',
     whatsapp: initialData.whatsapp || '',
@@ -257,20 +311,21 @@ const PDFGenerator = ({ initialData, onClose, onUpdateSuccess }) => {
     placa: initialData.placa || '',
     cpf: '',
     endereco: '',
-    veiculo: '',
-    ano: '',
-    cor: '',
-    marca: '',
-    modelo: '',
-    submodelo: '',
-    anoFabricacao: '',
-    anoModelo: '',
-    segmento: '',
-    combustivel: '',
+    veiculo: initialParsed.veiculoObj.modelo ? `${initialParsed.veiculoObj.marca || ''} ${initialParsed.veiculoObj.modelo || ''}`.trim() : '',
+    ano: initialParsed.veiculoObj.anoModelo || initialParsed.veiculoObj.anoFabricacao || '',
+    cor: initialParsed.veiculoObj.cor || '',
+    marca: initialParsed.veiculoObj.marca || '',
+    modelo: initialParsed.veiculoObj.modelo || '',
+    submodelo: initialParsed.veiculoObj.submodelo || '',
+    anoFabricacao: initialParsed.veiculoObj.anoFabricacao || '',
+    anoModelo: initialParsed.veiculoObj.anoModelo || '',
+    segmento: initialParsed.veiculoObj.segmento || '',
+    combustivel: initialParsed.veiculoObj.combustivel || '',
     servicoDesejado: initialData.servicoDesejado || '',
     descricao: initialData.descricao || ''
   });
-  const [autoFillStatus, setAutoFillStatus] = useState('idle');
+  const [items, setItems] = useState(initialParsed.pecasArr);
+  const [labor, setLabor] = useState(initialParsed.servicosArr);
 
   // Auto-preenche CPF/veículo quando o orçamento tem cliente_id (cliente cadastrado)
   useEffect(() => {
@@ -292,8 +347,8 @@ const PDFGenerator = ({ initialData, onClose, onUpdateSuccess }) => {
           nome: prev.nome || cliente?.nome || '',
           whatsapp: prev.whatsapp || cliente?.whatsapp || '',
           endereco: cliente?.endereco || prev.endereco,
-          veiculo: veiculoMatch ? `${veiculoMatch.marca} ${veiculoMatch.modelo}`.trim() : prev.veiculo,
-          ano: veiculoMatch?.ano || prev.ano
+          veiculo: prev.veiculo || (veiculoMatch ? `${veiculoMatch.marca} ${veiculoMatch.modelo}`.trim() : ''),
+          ano: prev.ano || veiculoMatch?.ano || ''
         }));
         setAutoFillStatus('done');
       } catch (err) {
@@ -314,14 +369,14 @@ const PDFGenerator = ({ initialData, onClose, onUpdateSuccess }) => {
           const extra = dados.extra || {};
           setClientData(prev => ({
             ...prev,
-            marca: dados.marca || prev.marca || '',
-            modelo: extra.modelo_completo || dados.modelo || prev.modelo || '',
-            submodelo: extra.submodelo || prev.submodelo || '',
-            anoFabricacao: extra.ano_fabricacao || prev.anoFabricacao || '',
-            anoModelo: extra.ano_modelo || dados.ano || prev.anoModelo || '',
-            cor: dados.cor || prev.cor || '',
-            segmento: extra.segmento || prev.segmento || '',
-            combustivel: extra.combustivel || prev.combustivel || '',
+            marca: prev.marca || dados.marca || '',
+            modelo: prev.modelo || extra.modelo_completo || dados.modelo || '',
+            submodelo: prev.submodelo || extra.submodelo || '',
+            anoFabricacao: prev.anoFabricacao || extra.ano_fabricacao || '',
+            anoModelo: prev.anoModelo || extra.ano_modelo || dados.ano || '',
+            cor: prev.cor || dados.cor || '',
+            segmento: prev.segmento || extra.segmento || '',
+            combustivel: prev.combustivel || extra.combustivel || '',
             veiculo: prev.veiculo || `${dados.marca} ${dados.modelo}`.trim(),
             ano: prev.ano || dados.ano || ''
           }));
@@ -331,9 +386,6 @@ const PDFGenerator = ({ initialData, onClose, onUpdateSuccess }) => {
       }
     })();
   }, [initialData.placa]);
-
-  const [items, setItems] = useState([]);
-  const [labor, setLabor] = useState([]);
 
   const [newItem, setNewItem] = useState({ qtd: 1, desc: '', unit: 0 });
   const [newLabor, setNewLabor] = useState({ qtd: 1, desc: '', unit: 0 });
