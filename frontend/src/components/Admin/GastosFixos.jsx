@@ -1,0 +1,733 @@
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabase';
+import { registrarLog } from '../../services/logService';
+
+const STORAGE_KEY = 'kadosh_gastos_fixos';
+
+const CATEGORIAS = [
+  'Instalações & Aluguel',
+  'Energia, Água & Telefonia',
+  'Salários & Pró-Labore',
+  'Softwares, Sistemas & IT',
+  'Impostos, Taxas & Licenças',
+  'Manutenção & Equipamentos',
+  'Fornecedores & Insumos',
+  'Seguros & Segurança',
+  'Outros Gastos Fixos'
+];
+
+const RECORRENCIAS = [
+  { id: 'mensal', label: 'Mensal (Todo mês)' },
+  { id: 'semanal', label: 'Semanal (Toda semana)' },
+  { id: 'quinzenal', label: 'Quinzenal (A cada 15 dias)' },
+  { id: 'trimestral', label: 'Trimestral (A cada 3 meses)' },
+  { id: 'semestral', label: 'Semestral (A cada 6 meses)' },
+  { id: 'anual', label: 'Anual (1 vez por ano)' }
+];
+
+export default function GastosFixos() {
+  const [gastos, setGastos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('todos'); // 'todos', 'pago', 'pendente', 'atrasado'
+  const [categoriaFilter, setCategoriaFilter] = useState('todas');
+  
+  const [showModal, setShowModal] = useState(false);
+  const [editingGasto, setEditingGasto] = useState(null);
+
+  // Form State
+  const [descricao, setDescricao] = useState('');
+  const [categoria, setCategoria] = useState(CATEGORIAS[0]);
+  const [valor, setValor] = useState('');
+  const [dataVencimento, setDataVencimento] = useState(new Date().toISOString().split('T')[0]);
+  const [dataFinal, setDataFinal] = useState('');
+  const [recorrencia, setRecorrencia] = useState('mensal');
+  const [status, setStatus] = useState('pendente'); // 'pago' ou 'pendente'
+  const [observacoes, setObservacoes] = useState('');
+
+  // Modal de Baixa de Pagamento
+  const [payingGasto, setPayingGasto] = useState(null);
+  const [metodoPagamento, setMetodoPagamento] = useState('PIX');
+  const [contaDestino, setContaDestino] = useState('Mercado Pago KADOSH');
+
+  // Carregar Gastos Fixos (Supabase + localStorage fallback)
+  const fetchGastos = async () => {
+    setLoading(true);
+    try {
+      // 1. Tentar buscar da tabela no Supabase
+      const { data, error } = await supabase
+        .from('gastos_fixos')
+        .select('*')
+        .order('data_vencimento', { ascending: true });
+
+      if (!error && data) {
+        setGastos(data);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } else {
+        // Fallback no localStorage
+        const local = localStorage.getItem(STORAGE_KEY);
+        if (local) setGastos(JSON.parse(local));
+      }
+    } catch (err) {
+      console.warn('Usando armazenamento local para Gastos Fixos:', err);
+      const local = localStorage.getItem(STORAGE_KEY);
+      if (local) setGastos(JSON.parse(local));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchGastos();
+
+    // Inscrever em canal de Realtime se disponível
+    const channel = supabase
+      .channel('gastos_fixos_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'gastos_fixos' }, () => {
+        fetchGastos();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const saveLocalGastos = (newList) => {
+    setGastos(newList);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newList));
+  };
+
+  // Abrir Modal para Criar ou Editar
+  const handleOpenModal = (item = null) => {
+    if (item) {
+      setEditingGasto(item);
+      setDescricao(item.descricao || '');
+      setCategoria(item.categoria || CATEGORIAS[0]);
+      setValor(item.valor ? item.valor.toString() : '');
+      setDataVencimento(item.data_vencimento || new Date().toISOString().split('T')[0]);
+      setDataFinal(item.data_final || '');
+      setRecorrencia(item.recorrencia || 'mensal');
+      setStatus(item.status || 'pendente');
+      setObservacoes(item.observacoes || '');
+    } else {
+      setEditingGasto(null);
+      setDescricao('');
+      setCategoria(CATEGORIAS[0]);
+      setValor('');
+      setDataVencimento(new Date().toISOString().split('T')[0]);
+      setDataFinal('');
+      setRecorrencia('mensal');
+      setStatus('pendente');
+      setObservacoes('');
+    }
+    setShowModal(true);
+  };
+
+  // Salvar Novo Gasto ou Alteração
+  const handleSaveGasto = async (e) => {
+    e.preventDefault();
+    if (!descricao.trim() || !valor || !dataVencimento) {
+      alert('Por favor, preencha a descrição, valor e data de vencimento.');
+      return;
+    }
+
+    const payload = {
+      id: editingGasto ? editingGasto.id : Date.now().toString(),
+      descricao: descricao.trim(),
+      categoria,
+      valor: parseFloat(valor) || 0,
+      data_vencimento: dataVencimento,
+      data_final: dataFinal || null,
+      recorrencia,
+      status,
+      data_pagamento: status === 'pago' ? (editingGasto?.data_pagamento || new Date().toISOString().split('T')[0]) : null,
+      observacoes: observacoes.trim(),
+      updated_at: new Date().toISOString()
+    };
+
+    try {
+      // Tentar no Supabase
+      const { error } = editingGasto
+        ? await supabase.from('gastos_fixos').update(payload).eq('id', editingGasto.id)
+        : await supabase.from('gastos_fixos').insert([payload]);
+
+      if (error) {
+        console.warn('Fallback Supabase save:', error.message);
+      }
+
+      // Salvar localmente
+      let updatedList = [];
+      if (editingGasto) {
+        updatedList = gastos.map(g => g.id === editingGasto.id ? { ...g, ...payload } : g);
+      } else {
+        updatedList = [payload, ...gastos];
+      }
+      saveLocalGastos(updatedList);
+
+      registrarLog({
+        acao: editingGasto ? 'EDICAO_GASTO_FIXO' : 'CRIACAO_GASTO_FIXO',
+        modulo: 'Gastos Fixos',
+        detalhes: `Gasto Fixo "${payload.descricao}" (${payload.categoria}): R$ ${payload.valor.toFixed(2)} - Vencimento: ${payload.data_vencimento}.`,
+        metadata: payload
+      });
+
+      setShowModal(false);
+    } catch (err) {
+      console.error('Erro ao salvar gasto fixo:', err);
+    }
+  };
+
+  // Deletar Gasto Fixo
+  const handleDeleteGasto = async (id, name) => {
+    if (!window.confirm(`Tem certeza que deseja excluir o gasto fixo "${name}"?`)) return;
+
+    try {
+      await supabase.from('gastos_fixos').delete().eq('id', id);
+    } catch (e) {}
+
+    const newList = gastos.filter(g => g.id !== id);
+    saveLocalGastos(newList);
+
+    registrarLog({
+      acao: 'EXCLUSAO_GASTO_FIXO',
+      modulo: 'Gastos Fixos',
+      detalhes: `Gasto Fixo "${name}" removido.`,
+      metadata: { id, name }
+    });
+  };
+
+  // Marcar como Pago e Lançar Saída Automática no Fluxo de Caixa
+  const handleConfirmPayGasto = async (e) => {
+    e.preventDefault();
+    if (!payingGasto) return;
+
+    const hoje = new Date().toISOString().split('T')[0];
+    const updatedPayload = {
+      ...payingGasto,
+      status: 'pago',
+      data_pagamento: hoje,
+      metodo_pagamento: metodoPagamento,
+      conta_destino: contaDestino
+    };
+
+    try {
+      // 1. Atualizar Gasto Fixo no Supabase / Local
+      try {
+        await supabase.from('gastos_fixos').update(updatedPayload).eq('id', payingGasto.id);
+      } catch (e) {}
+
+      const newList = gastos.map(g => g.id === payingGasto.id ? updatedPayload : g);
+      saveLocalGastos(newList);
+
+      // 2. Lançar Saída Automática no Fluxo de Caixa de Hoje
+      const novaSaida = {
+        descricao: `Gasto Fixo: ${payingGasto.descricao} (${payingGasto.categoria})`,
+        valor: (payingGasto.valor || 0).toString(),
+        metodo: metodoPagamento,
+        conta: contaDestino
+      };
+
+      try {
+        const draftStr = localStorage.getItem('kadosh_fluxo_caixa_draft');
+        let draft = draftStr ? JSON.parse(draftStr) : {};
+        const saidasAtuais = draft.saidas || [{ descricao: '', valor: '', metodo: 'PIX', conta: 'Mercado Pago KADOSH' }];
+
+        if (saidasAtuais.length === 1 && !saidasAtuais[0].descricao && !saidasAtuais[0].valor) {
+          draft.saidas = [novaSaida];
+        } else {
+          draft.saidas = [novaSaida, ...saidasAtuais];
+        }
+
+        localStorage.setItem('kadosh_fluxo_caixa_draft', JSON.stringify(draft));
+
+        try {
+          await supabase.from('fluxo_caixa_draft').upsert([{
+            id: 'current_draft',
+            data_caixa: hoje,
+            saidas: draft.saidas,
+            updated_at: new Date().toISOString()
+          }]);
+        } catch (eOnline) {}
+
+        // Disparar evento para atualizar a aba do Fluxo de Caixa se aberta
+        window.dispatchEvent(new CustomEvent('kadosh_gasto_fixo_paid', { detail: novaSaida }));
+      } catch (errDraft) {
+        console.warn('Erro ao atualizar rascunho de saídas:', errDraft);
+      }
+
+      registrarLog({
+        acao: 'PAGAMENTO_GASTO_FIXO',
+        modulo: 'Gastos Fixos',
+        detalhes: `Baixa no Gasto Fixo "${payingGasto.descricao}": R$ ${payingGasto.valor.toFixed(2)} lançado como Saída no Fluxo de Caixa.`,
+        metadata: updatedPayload
+      });
+
+      alert(`✅ Gasto Fixo "${payingGasto.descricao}" baixado como PAGO!\n💵 Saída de R$ ${payingGasto.valor.toFixed(2)} lançada no Fluxo de Caixa.`);
+      setPayingGasto(null);
+
+    } catch (err) {
+      console.error('Erro ao pagar gasto fixo:', err);
+      alert('Erro ao dar baixa: ' + err.message);
+    }
+  };
+
+  // Alternar Status Direto (Reabrir ou Marcar como Pago rápido)
+  const handleToggleStatusQuick = async (gasto) => {
+    if (gasto.status !== 'pago') {
+      setPayingGasto(gasto);
+    } else {
+      // Reabrir pendência
+      if (!window.confirm(`Deseja reabrir a pendência do gasto "${gasto.descricao}"?`)) return;
+
+      const updated = { ...gasto, status: 'pendente', data_pagamento: null };
+      try {
+        await supabase.from('gastos_fixos').update(updated).eq('id', gasto.id);
+      } catch (e) {}
+
+      const newList = gastos.map(g => g.id === gasto.id ? updated : g);
+      saveLocalGastos(newList);
+    }
+  };
+
+  // Auxiliares de Datas e Status
+  const hojeStr = new Date().toISOString().split('T')[0];
+
+  const getComputedStatus = (item) => {
+    if (item.status === 'pago') return { label: '🟢 Pago', code: 'pago', color: '#10b981', bg: '#10b98115', border: '#10b981' };
+    if (item.data_vencimento && item.data_vencimento < hojeStr) {
+      return { label: '🔴 Atrasado', code: 'atrasado', color: '#ef4444', bg: '#ef444415', border: '#ef4444' };
+    }
+    return { label: '⏳ Pendente', code: 'pendente', color: '#f59e0b', bg: '#f59e0b15', border: '#f59e0b' };
+  };
+
+  // Filtragem
+  const filteredGastos = gastos.filter(item => {
+    const comp = getComputedStatus(item);
+
+    if (statusFilter !== 'todos' && comp.code !== statusFilter) return false;
+    if (categoriaFilter !== 'todas' && item.categoria !== categoriaFilter) return false;
+
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      const matchDesc = item.descricao?.toLowerCase().includes(q);
+      const matchCat = item.categoria?.toLowerCase().includes(q);
+      const matchObs = item.observacoes?.toLowerCase().includes(q);
+      return matchDesc || matchCat || matchObs;
+    }
+    return true;
+  });
+
+  // Métricas
+  const totalGeral = filteredGastos.reduce((acc, g) => acc + (parseFloat(g.valor) || 0), 0);
+  const totalPago = filteredGastos.filter(g => g.status === 'pago').reduce((acc, g) => acc + (parseFloat(g.valor) || 0), 0);
+  const totalPendente = filteredGastos.filter(g => getComputedStatus(g).code === 'pendente').reduce((acc, g) => acc + (parseFloat(g.valor) || 0), 0);
+  const totalAtrasado = filteredGastos.filter(g => getComputedStatus(g).code === 'atrasado').reduce((acc, g) => acc + (parseFloat(g.valor) || 0), 0);
+
+  const formatCurrency = (val) => {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
+  };
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '—';
+    const [y, m, d] = dateStr.split('-');
+    return `${d}/${m}/${y}`;
+  };
+
+  return (
+    <div style={{ padding: '20px 0' }}>
+      
+      {/* Header com Ações */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px', flexWrap: 'wrap', gap: '15px' }}>
+        <div>
+          <h2 style={{ color: '#fff', margin: 0, fontSize: '1.4rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            📌 Gestão de Gastos Fixos & Recorrentes
+          </h2>
+          <p style={{ color: '#aaa', margin: '4px 0 0 0', fontSize: '0.85rem' }}>
+            Cadastre contas fixas, aluguéis e licenças. Acompanhe vencimentos, recorrências e dê baixa com saída automática no caixa.
+          </p>
+        </div>
+
+        <button 
+          onClick={() => handleOpenModal(null)}
+          className="btn"
+          style={{ background: '#f59e0b', color: '#000', fontWeight: 'bold', padding: '12px 20px', borderRadius: '8px', fontSize: '0.9rem', boxShadow: '0 4px 14px rgba(245, 158, 11, 0.3)' }}
+        >
+          + Novo Gasto Fixo
+        </button>
+      </div>
+
+      {/* Cards KPI de Resumo Sólido */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '15px', marginBottom: '25px' }}>
+        <div style={{ background: '#16161a', border: '1px solid #2a2a35', padding: '18px', borderRadius: '12px', borderLeft: '4px solid #3b82f6' }}>
+          <span style={{ fontSize: '0.78rem', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total de Gastos Fixos</span>
+          <h3 style={{ margin: '6px 0 0 0', fontSize: '1.7rem', color: '#3b82f6' }}>{formatCurrency(totalGeral)}</h3>
+          <span style={{ fontSize: '0.72rem', color: '#888' }}>{filteredGastos.length} item(ns) listado(s)</span>
+        </div>
+
+        <div style={{ background: '#16161a', border: '1px solid #2a2a35', padding: '18px', borderRadius: '12px', borderLeft: '4px solid #10b981' }}>
+          <span style={{ fontSize: '0.78rem', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🟢 Total Pago</span>
+          <h3 style={{ margin: '6px 0 0 0', fontSize: '1.7rem', color: '#10b981' }}>{formatCurrency(totalPago)}</h3>
+          <span style={{ fontSize: '0.72rem', color: '#888' }}>Contas quitadas no período</span>
+        </div>
+
+        <div style={{ background: '#16161a', border: '1px solid #2a2a35', padding: '18px', borderRadius: '12px', borderLeft: '4px solid #f59e0b' }}>
+          <span style={{ fontSize: '0.78rem', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.5px' }}>⏳ A Vencer (Pendente)</span>
+          <h3 style={{ margin: '6px 0 0 0', fontSize: '1.7rem', color: '#f59e0b' }}>{formatCurrency(totalPendente)}</h3>
+          <span style={{ fontSize: '0.72rem', color: '#888' }}>Contas a vencer no prazo</span>
+        </div>
+
+        <div style={{ background: '#16161a', border: '1px solid #2a2a35', padding: '18px', borderRadius: '12px', borderLeft: '4px solid #ef4444' }}>
+          <span style={{ fontSize: '0.78rem', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🔴 Atrasado (Vencidos)</span>
+          <h3 style={{ margin: '6px 0 0 0', fontSize: '1.7rem', color: '#ef4444' }}>{formatCurrency(totalAtrasado)}</h3>
+          <span style={{ fontSize: '0.72rem', color: totalAtrasado > 0 ? '#ef4444' : '#888', fontWeight: totalAtrasado > 0 ? 'bold' : 'normal' }}>
+            {totalAtrasado > 0 ? '⚠️ Atenção: Contas vencidas!' : 'Nenhuma conta atrasada'}
+          </span>
+        </div>
+      </div>
+
+      {/* Barra de Filtros e Busca */}
+      <div style={{ background: '#16161a', padding: '15px 20px', borderRadius: '12px', border: '1px solid #2a2a35', marginBottom: '20px', display: 'flex', gap: '15px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ flex: 1, minWidth: '220px' }}>
+          <input 
+            type="text" 
+            placeholder="Pesquisar por nome, categoria ou anotação..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={inputStyle}
+          />
+        </div>
+
+        <div style={{ width: '180px' }}>
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={inputStyle}>
+            <option value="todos">Todos os Status</option>
+            <option value="pago">🟢 Apenas Pagos</option>
+            <option value="pendente">⏳ Apenas Pendentes</option>
+            <option value="atrasado">🔴 Apenas Atrasados</option>
+          </select>
+        </div>
+
+        <div style={{ width: '220px' }}>
+          <select value={categoriaFilter} onChange={e => setCategoriaFilter(e.target.value)} style={inputStyle}>
+            <option value="todas">Todas as Categorias</option>
+            {CATEGORIAS.map((cat, i) => (
+              <option key={i} value={cat}>{cat}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Tabela de Gastos Fixos */}
+      <div style={{ background: '#16161a', borderRadius: '12px', border: '1px solid #2a2a35', overflow: 'hidden' }}>
+        {loading ? (
+          <p style={{ color: '#aaa', textAlign: 'center', padding: '40px' }}>Carregando gastos fixos...</p>
+        ) : filteredGastos.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '50px 20px' }}>
+            <p style={{ fontSize: '2.5rem', margin: '0 0 10px 0' }}>📌</p>
+            <p style={{ color: '#fff', fontWeight: 'bold', fontSize: '1.1rem' }}>Nenhum gasto fixo localizado</p>
+            <p style={{ color: '#888', fontSize: '0.85rem' }}>Clique no botão "+ Novo Gasto Fixo" acima para cadastrar contas recorrentes.</p>
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
+              <thead>
+                <tr style={{ background: '#0f0f13', borderBottom: '2px solid #2a2a35', color: '#aaa' }}>
+                  <th style={{ padding: '14px 12px' }}>Descrição / Categoria</th>
+                  <th style={{ padding: '14px 12px' }}>Vencimento</th>
+                  <th style={{ padding: '14px 12px' }}>Data Final</th>
+                  <th style={{ padding: '14px 12px' }}>Recorrência</th>
+                  <th style={{ padding: '14px 12px' }}>Valor</th>
+                  <th style={{ padding: '14px 12px' }}>Status</th>
+                  <th style={{ padding: '14px 12px', textAlign: 'right' }}>Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredGastos.map((item) => {
+                  const compStatus = getComputedStatus(item);
+
+                  return (
+                    <tr key={item.id} style={{ borderBottom: '1px solid #22222a' }}>
+                      <td style={{ padding: '14px 12px' }}>
+                        <strong style={{ color: '#fff', fontSize: '0.95rem', display: 'block' }}>{item.descricao}</strong>
+                        <span style={{ fontSize: '0.75rem', color: '#f59e0b', background: '#f59e0b10', padding: '2px 6px', borderRadius: '4px', border: '1px solid #f59e0b33', marginTop: '3px', display: 'inline-block' }}>
+                          {item.categoria}
+                        </span>
+                        {item.observacoes && (
+                          <span style={{ display: 'block', fontSize: '0.75rem', color: '#777', marginTop: '3px', fontStyle: 'italic' }}>
+                            📝 {item.observacoes}
+                          </span>
+                        )}
+                      </td>
+
+                      <td style={{ padding: '14px 12px', color: '#ccc', fontWeight: '500' }}>
+                        📅 {formatDate(item.data_vencimento)}
+                      </td>
+
+                      <td style={{ padding: '14px 12px', color: '#888' }}>
+                        {item.data_final ? formatDate(item.data_final) : '∞ Contínuo'}
+                      </td>
+
+                      <td style={{ padding: '14px 12px' }}>
+                        <span style={{ background: '#3b82f615', color: '#60a5fa', border: '1px solid #3b82f633', padding: '3px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold' }}>
+                          🔄 {RECORRENCIAS.find(r => r.id === item.recorrencia)?.label || item.recorrencia}
+                        </span>
+                      </td>
+
+                      <td style={{ padding: '14px 12px', fontWeight: 'bold', color: '#10b981', fontSize: '1rem' }}>
+                        {formatCurrency(item.valor)}
+                      </td>
+
+                      <td style={{ padding: '14px 12px' }}>
+                        <span style={{ background: compStatus.bg, color: compStatus.color, border: `1px solid ${compStatus.border}`, padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 'bold', display: 'inline-block' }}>
+                          {compStatus.label}
+                        </span>
+                        {item.status === 'pago' && item.data_pagamento && (
+                          <span style={{ display: 'block', fontSize: '0.72rem', color: '#888', marginTop: '3px' }}>
+                            Pago em: {formatDate(item.data_pagamento)}
+                          </span>
+                        )}
+                      </td>
+
+                      <td style={{ padding: '14px 12px', textAlign: 'right' }}>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                          <button
+                            onClick={() => handleToggleStatusQuick(item)}
+                            style={{
+                              padding: '6px 12px',
+                              background: item.status === 'pago' ? '#333' : '#10b981',
+                              color: item.status === 'pago' ? '#aaa' : '#000',
+                              border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.78rem'
+                            }}
+                            title={item.status === 'pago' ? 'Reabrir pendência' : 'Marcar como Pago e lançar saída no caixa'}
+                          >
+                            {item.status === 'pago' ? '↩️ Reabrir' : '✅ Pagar'}
+                          </button>
+
+                          <button
+                            onClick={() => handleOpenModal(item)}
+                            style={{ padding: '6px 10px', background: '#f59e0b', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#000', fontWeight: 'bold', fontSize: '0.78rem' }}
+                            title="Editar Gasto Fixo"
+                          >
+                            ✏️
+                          </button>
+
+                          <button
+                            onClick={() => handleDeleteGasto(item.id, item.descricao)}
+                            style={{ padding: '6px 10px', background: '#ef444420', border: '1px solid #ef4444', borderRadius: '6px', cursor: 'pointer', color: '#ef4444', fontWeight: 'bold', fontSize: '0.78rem' }}
+                            title="Excluir Gasto Fixo"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Modal de Cadastro / Edição de Gasto Fixo */}
+      {showModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)',
+          display: 'flex', justifyContent: 'center', alignItems: 'center',
+          zIndex: 9999, padding: '20px'
+        }}>
+          <div style={{
+            maxWidth: '650px', width: '100%', background: '#121216',
+            border: '1px solid #333', borderRadius: '16px', padding: '25px', color: '#fff',
+            maxHeight: '90vh', overflowY: 'auto'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #222', paddingBottom: '12px' }}>
+              <h3 style={{ margin: 0, color: '#f59e0b', fontSize: '1.2rem' }}>
+                {editingGasto ? '✏️ Editar Gasto Fixo' : '📌 Cadastrar Novo Gasto Fixo'}
+              </h3>
+              <button onClick={() => setShowModal(false)} style={{ background: 'transparent', color: '#ef4444', border: 'none', fontSize: '1.3rem', cursor: 'pointer' }}>
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveGasto}>
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Descrição da Despesa / Nome da Conta *</label>
+                <input 
+                  type="text" 
+                  placeholder="Ex: Aluguel do Galpão, Conta de Energia (Enel), Sistema Kadosh" 
+                  value={descricao} 
+                  onChange={e => setDescricao(e.target.value)} 
+                  style={inputStyle} 
+                  required 
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
+                <div>
+                  <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Categoria do Gasto</label>
+                  <select value={categoria} onChange={e => setCategoria(e.target.value)} style={inputStyle}>
+                    {CATEGORIAS.map((cat, i) => (
+                      <option key={i} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Valor do Gasto (R$) *</label>
+                  <input 
+                    type="number" step="0.01" 
+                    placeholder="0.00" 
+                    value={valor} 
+                    onChange={e => setValor(e.target.value)} 
+                    style={{ ...inputStyle, color: '#10b981', fontWeight: 'bold' }} 
+                    required 
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
+                <div>
+                  <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Data de Vencimento / Pagamento *</label>
+                  <input 
+                    type="date" 
+                    value={dataVencimento} 
+                    onChange={e => setDataVencimento(e.target.value)} 
+                    style={inputStyle} 
+                    required 
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Data Final de Término (Opcional)</label>
+                  <input 
+                    type="date" 
+                    value={dataFinal} 
+                    onChange={e => setDataFinal(e.target.value)} 
+                    style={inputStyle} 
+                  />
+                  <span style={{ fontSize: '0.7rem', color: '#777' }}>Deixe vazio se for contrato sem prazo fixo.</span>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
+                <div>
+                  <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Recorrência Personalizada</label>
+                  <select value={recorrencia} onChange={e => setRecorrencia(e.target.value)} style={inputStyle}>
+                    {RECORRENCIAS.map(r => (
+                      <option key={r.id} value={r.id}>{r.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Status Inicial</label>
+                  <select value={status} onChange={e => setStatus(e.target.value)} style={inputStyle}>
+                    <option value="pendente">⏳ Pendente</option>
+                    <option value="pago">🟢 Pago</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Observações / Detalhes Adicionais</label>
+                <textarea 
+                  rows={3} 
+                  placeholder="Instruções de pagamento, código de barras ou detalhes..." 
+                  value={observacoes} 
+                  onChange={e => setObservacoes(e.target.value)} 
+                  style={{ ...inputStyle, resize: 'vertical' }} 
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button type="button" onClick={() => setShowModal(false)} className="btn" style={{ background: '#333', color: '#fff' }}>
+                  Cancelar
+                </button>
+                <button type="submit" className="btn" style={{ background: '#f59e0b', color: '#000', fontWeight: 'bold' }}>
+                  💾 Salvar Gasto Fixo
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Baixa de Pagamento de Gasto Fixo */}
+      {payingGasto && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)',
+          display: 'flex', justifyContent: 'center', alignItems: 'center',
+          zIndex: 9999, padding: '20px'
+        }}>
+          <div style={{
+            maxWidth: '480px', width: '100%', background: '#141418',
+            border: '1px solid #2a2a35', borderRadius: '14px', padding: '22px', color: '#fff'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '1px solid #222', paddingBottom: '10px' }}>
+              <h3 style={{ margin: 0, color: '#10b981', fontSize: '1.15rem' }}>
+                ✅ Dar Baixa no Gasto Fixo
+              </h3>
+              <button onClick={() => setPayingGasto(null)} style={{ background: 'transparent', color: '#aaa', border: 'none', fontSize: '1.3rem', cursor: 'pointer' }}>
+                ✕
+              </button>
+            </div>
+
+            <div style={{ background: '#1a1a20', padding: '12px', borderRadius: '8px', marginBottom: '15px', fontSize: '0.85rem' }}>
+              <p style={{ margin: '0 0 4px 0', color: '#fff', fontWeight: 'bold' }}>{payingGasto.descricao}</p>
+              <p style={{ margin: '0 0 4px 0', color: '#f59e0b' }}>Categoria: {payingGasto.categoria}</p>
+              <p style={{ margin: 0, color: '#10b981', fontWeight: 'bold', fontSize: '1.1rem' }}>
+                Valor: {formatCurrency(payingGasto.valor)}
+              </p>
+            </div>
+
+            <form onSubmit={handleConfirmPayGasto}>
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Forma de Pagamento</label>
+                <select value={metodoPagamento} onChange={e => setMetodoPagamento(e.target.value)} style={inputStyle}>
+                  <option value="PIX">PIX</option>
+                  <option value="Boleto">Boleto Bancário</option>
+                  <option value="Cartão Crédito">Cartão de Crédito</option>
+                  <option value="Cartão Débito">Cartão de Débito</option>
+                  <option value="Dinheiro">Dinheiro Espécie</option>
+                </select>
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Conta de Saída</label>
+                <select value={contaDestino} onChange={e => setContaDestino(e.target.value)} style={inputStyle}>
+                  <option value="Mercado Pago KADOSH">Mercado Pago KADOSH (Reserva)</option>
+                  <option value="Mercado Pago ROMANOS">Mercado Pago ROMANOS (Fundo de Caixa)</option>
+                  <option value="Caixa da Empresa">Caixa da Empresa (Cofre/Espécie)</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button type="button" onClick={() => setPayingGasto(null)} className="btn" style={{ background: '#333', color: '#fff' }}>
+                  Cancelar
+                </button>
+                <button type="submit" className="btn" style={{ background: '#10b981', color: '#000', fontWeight: 'bold' }}>
+                  ✅ Confirmar Baixa (Lançar Saída)
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+const inputStyle = {
+  width: '100%',
+  padding: '10px 12px',
+  background: '#0a0a0c',
+  border: '1px solid #333',
+  borderRadius: '8px',
+  color: '#fff',
+  marginTop: '4px',
+  fontSize: '0.85rem'
+};

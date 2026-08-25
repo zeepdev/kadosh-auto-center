@@ -10,6 +10,7 @@ import ConfirmPaymentModal from './ConfirmPaymentModal';
 import EditBudgetModal from './EditBudgetModal';
 import MecanicosManager from './MecanicosManager';
 import FluxoCaixa from './FluxoCaixa';
+import GastosFixos from './GastosFixos';
 import { supabase } from '../../lib/supabase';
 import { calcularPrioridade, PRIORIDADES } from '../../lib/prioridade';
 import { registrarLog, fetchLogs } from '../../services/logService';
@@ -651,6 +652,16 @@ const AdminDashboard = () => {
             💵 Fluxo de Caixa
           </button>
           <button 
+            onClick={() => setActiveTab('gastos_fixos')}
+            style={{ 
+              padding: '12px 24px', borderRadius: '8px', cursor: 'pointer', border: 'none',
+              background: activeTab === 'gastos_fixos' ? '#ef4444' : '#222',
+              color: '#fff', fontWeight: 'bold'
+            }}
+          >
+            📌 Gastos Fixos & Recorrentes
+          </button>
+          <button 
             onClick={() => setActiveTab('mecanicos')}
             style={{ 
               padding: '12px 24px', borderRadius: '8px', cursor: 'pointer', border: 'none',
@@ -877,12 +888,16 @@ const AdminDashboard = () => {
           </div>
         )}
 
+        {activeTab === 'fluxo_caixa' && <FluxoCaixa />}
+        {activeTab === 'gastos_fixos' && <GastosFixos />}
+        {activeTab === 'mecanicos' && <MecanicosManager />}
         {activeTab === 'logs' && <LogsSistemaView />}
 
-        <div className="glass" style={{ overflowX: 'auto', padding: '0', borderRadius: '12px' }}>
-          {loading ? (
-            <p style={{ padding: '30px', textAlign: 'center' }}>Carregando dados...</p>
-          ) : (activeTab === 'atendimentos' || activeTab === 'agenda') && (
+        {(activeTab === 'atendimentos' || activeTab === 'agenda') && (
+          <div className="glass" style={{ overflowX: 'auto', padding: '0', borderRadius: '12px' }}>
+            {loading ? (
+              <p style={{ padding: '30px', textAlign: 'center' }}>Carregando dados...</p>
+            ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead>
                 <tr style={{ background: 'var(--bg-elev)', borderBottom: '2px solid var(--hairline)' }}>
@@ -1261,7 +1276,7 @@ const AdminDashboard = () => {
             </table>
           )}
         </div>
-      </div>
+        )}
 
       {selectedClientForPDF && (
         <PDFGenerator 
@@ -1339,6 +1354,7 @@ const AdminDashboard = () => {
           }}
         />
       )}
+    </div>
     </div>
   );
 };
