@@ -45,8 +45,10 @@ export default function GastosFixos() {
   const [status, setStatus] = useState('pendente'); // 'pago' ou 'pendente'
   const [observacoes, setObservacoes] = useState('');
 
-  // Modal de Baixa de Pagamento
+  // Modal de Baixa de Pagamento com Valor Editável
   const [payingGasto, setPayingGasto] = useState(null);
+  const [payingValorReal, setPayingValorReal] = useState('');
+  const [updateDefaultEstimate, setUpdateDefaultEstimate] = useState(false);
   const [metodoPagamento, setMetodoPagamento] = useState('PIX');
   const [contaDestino, setContaDestino] = useState('Mercado Pago KADOSH');
 
@@ -54,7 +56,6 @@ export default function GastosFixos() {
   const fetchGastos = async () => {
     setLoading(true);
     try {
-      // 1. Tentar buscar da tabela no Supabase
       const { data, error } = await supabase
         .from('gastos_fixos')
         .select('*')
@@ -64,7 +65,6 @@ export default function GastosFixos() {
         setGastos(data);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
       } else {
-        // Fallback no localStorage
         const local = localStorage.getItem(STORAGE_KEY);
         if (local) setGastos(JSON.parse(local));
       }
@@ -80,7 +80,6 @@ export default function GastosFixos() {
   useEffect(() => {
     fetchGastos();
 
-    // Inscrever em canal de Realtime se disponível
     const channel = supabase
       .channel('gastos_fixos_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'gastos_fixos' }, () => {
@@ -104,7 +103,7 @@ export default function GastosFixos() {
       setEditingGasto(item);
       setDescricao(item.descricao || '');
       setCategoria(item.categoria || CATEGORIAS[0]);
-      setValor(item.valor ? item.valor.toString() : '');
+      setValor(item.valor !== undefined ? item.valor.toString() : '');
       setDataVencimento(item.data_vencimento || new Date().toISOString().split('T')[0]);
       setDataFinal(item.data_final || '');
       setRecorrencia(item.recorrencia || 'mensal');
@@ -127,16 +126,18 @@ export default function GastosFixos() {
   // Salvar Novo Gasto ou Alteração
   const handleSaveGasto = async (e) => {
     e.preventDefault();
-    if (!descricao.trim() || !valor || !dataVencimento) {
-      alert('Por favor, preencha a descrição, valor e data de vencimento.');
+    if (!descricao.trim() || !dataVencimento) {
+      alert('Por favor, preencha a descrição e a data de vencimento.');
       return;
     }
+
+    const valNum = parseFloat(valor) || 0;
 
     const payload = {
       id: editingGasto ? editingGasto.id : Date.now().toString(),
       descricao: descricao.trim(),
       categoria,
-      valor: parseFloat(valor) || 0,
+      valor: valNum,
       data_vencimento: dataVencimento,
       data_final: dataFinal || null,
       recorrencia,
@@ -147,7 +148,6 @@ export default function GastosFixos() {
     };
 
     try {
-      // Tentar no Supabase
       const { error } = editingGasto
         ? await supabase.from('gastos_fixos').update(payload).eq('id', editingGasto.id)
         : await supabase.from('gastos_fixos').insert([payload]);
@@ -156,7 +156,6 @@ export default function GastosFixos() {
         console.warn('Fallback Supabase save:', error.message);
       }
 
-      // Salvar localmente
       let updatedList = [];
       if (editingGasto) {
         updatedList = gastos.map(g => g.id === editingGasto.id ? { ...g, ...payload } : g);
@@ -197,14 +196,18 @@ export default function GastosFixos() {
     });
   };
 
-  // Marcar como Pago e Lançar Saída Automática no Fluxo de Caixa
+  // Marcar como Pago e Lançar Saída Automática no Fluxo de Caixa (Permitindo alterar o valor final pago)
   const handleConfirmPayGasto = async (e) => {
     e.preventDefault();
     if (!payingGasto) return;
 
+    const valPagoNum = parseFloat(payingValorReal) || parseFloat(payingGasto.valor) || 0;
     const hoje = new Date().toISOString().split('T')[0];
+
     const updatedPayload = {
       ...payingGasto,
+      valor: updateDefaultEstimate ? valPagoNum : (payingGasto.valor || valPagoNum),
+      valor_pago_real: valPagoNum,
       status: 'pago',
       data_pagamento: hoje,
       metodo_pagamento: metodoPagamento,
@@ -220,10 +223,10 @@ export default function GastosFixos() {
       const newList = gastos.map(g => g.id === payingGasto.id ? updatedPayload : g);
       saveLocalGastos(newList);
 
-      // 2. Lançar Saída Automática no Fluxo de Caixa de Hoje
+      // 2. Lançar Saída Automática no Fluxo de Caixa de Hoje com o Valor REAL Confirmado
       const novaSaida = {
         descricao: `Gasto Fixo: ${payingGasto.descricao} (${payingGasto.categoria})`,
-        valor: (payingGasto.valor || 0).toString(),
+        valor: valPagoNum.toString(),
         metodo: metodoPagamento,
         conta: contaDestino
       };
@@ -250,7 +253,6 @@ export default function GastosFixos() {
           }]);
         } catch (eOnline) {}
 
-        // Disparar evento para atualizar a aba do Fluxo de Caixa se aberta
         window.dispatchEvent(new CustomEvent('kadosh_gasto_fixo_paid', { detail: novaSaida }));
       } catch (errDraft) {
         console.warn('Erro ao atualizar rascunho de saídas:', errDraft);
@@ -259,11 +261,11 @@ export default function GastosFixos() {
       registrarLog({
         acao: 'PAGAMENTO_GASTO_FIXO',
         modulo: 'Gastos Fixos',
-        detalhes: `Baixa no Gasto Fixo "${payingGasto.descricao}": R$ ${payingGasto.valor.toFixed(2)} lançado como Saída no Fluxo de Caixa.`,
+        detalhes: `Baixa no Gasto Fixo "${payingGasto.descricao}": R$ ${valPagoNum.toFixed(2)} lançado como Saída no Fluxo de Caixa.`,
         metadata: updatedPayload
       });
 
-      alert(`✅ Gasto Fixo "${payingGasto.descricao}" baixado como PAGO!\n💵 Saída de R$ ${payingGasto.valor.toFixed(2)} lançada no Fluxo de Caixa.`);
+      alert(`✅ Gasto Fixo "${payingGasto.descricao}" baixado como PAGO!\n💵 Saída de R$ ${valPagoNum.toFixed(2)} lançada no Fluxo de Caixa.`);
       setPayingGasto(null);
 
     } catch (err) {
@@ -272,12 +274,13 @@ export default function GastosFixos() {
     }
   };
 
-  // Alternar Status Direto (Reabrir ou Marcar como Pago rápido)
+  // Alternar Status Direto (Abrir modal de baixa com valor editável ou reabrir)
   const handleToggleStatusQuick = async (gasto) => {
     if (gasto.status !== 'pago') {
       setPayingGasto(gasto);
+      setPayingValorReal(gasto.valor ? gasto.valor.toString() : '0');
+      setUpdateDefaultEstimate(false);
     } else {
-      // Reabrir pendência
       if (!window.confirm(`Deseja reabrir a pendência do gasto "${gasto.descricao}"?`)) return;
 
       const updated = { ...gasto, status: 'pendente', data_pagamento: null };
@@ -319,8 +322,8 @@ export default function GastosFixos() {
   });
 
   // Métricas
-  const totalGeral = filteredGastos.reduce((acc, g) => acc + (parseFloat(g.valor) || 0), 0);
-  const totalPago = filteredGastos.filter(g => g.status === 'pago').reduce((acc, g) => acc + (parseFloat(g.valor) || 0), 0);
+  const totalGeral = filteredGastos.reduce((acc, g) => acc + (parseFloat(g.valor_pago_real !== undefined ? g.valor_pago_real : g.valor) || 0), 0);
+  const totalPago = filteredGastos.filter(g => g.status === 'pago').reduce((acc, g) => acc + (parseFloat(g.valor_pago_real !== undefined ? g.valor_pago_real : g.valor) || 0), 0);
   const totalPendente = filteredGastos.filter(g => getComputedStatus(g).code === 'pendente').reduce((acc, g) => acc + (parseFloat(g.valor) || 0), 0);
   const totalAtrasado = filteredGastos.filter(g => getComputedStatus(g).code === 'atrasado').reduce((acc, g) => acc + (parseFloat(g.valor) || 0), 0);
 
@@ -344,7 +347,7 @@ export default function GastosFixos() {
             📌 Gestão de Gastos Fixos & Recorrentes
           </h2>
           <p style={{ color: '#aaa', margin: '4px 0 0 0', fontSize: '0.85rem' }}>
-            Cadastre contas fixas, aluguéis e licenças. Acompanhe vencimentos, recorrências e dê baixa com saída automática no caixa.
+            Cadastre contas fixas e variáveis (Energia, Água, Aluguel). Ao dar baixa, você pode confirmar ou ajustar o valor real pago!
           </p>
         </div>
 
@@ -436,7 +439,7 @@ export default function GastosFixos() {
                   <th style={{ padding: '14px 12px' }}>Vencimento</th>
                   <th style={{ padding: '14px 12px' }}>Data Final</th>
                   <th style={{ padding: '14px 12px' }}>Recorrência</th>
-                  <th style={{ padding: '14px 12px' }}>Valor</th>
+                  <th style={{ padding: '14px 12px' }}>Valor (Estimado / Pago)</th>
                   <th style={{ padding: '14px 12px' }}>Status</th>
                   <th style={{ padding: '14px 12px', textAlign: 'right' }}>Ações</th>
                 </tr>
@@ -444,6 +447,7 @@ export default function GastosFixos() {
               <tbody>
                 {filteredGastos.map((item) => {
                   const compStatus = getComputedStatus(item);
+                  const valorExibicao = item.status === 'pago' && item.valor_pago_real !== undefined ? item.valor_pago_real : item.valor;
 
                   return (
                     <tr key={item.id} style={{ borderBottom: '1px solid #22222a' }}>
@@ -473,8 +477,13 @@ export default function GastosFixos() {
                         </span>
                       </td>
 
-                      <td style={{ padding: '14px 12px', fontWeight: 'bold', color: '#10b981', fontSize: '1rem' }}>
-                        {formatCurrency(item.valor)}
+                      <td style={{ padding: '14px 12px', fontWeight: 'bold', color: item.status === 'pago' ? '#10b981' : '#f59e0b', fontSize: '1rem' }}>
+                        {formatCurrency(valorExibicao)}
+                        {item.status === 'pago' && item.valor_pago_real !== undefined && item.valor_pago_real !== item.valor && (
+                          <span style={{ display: 'block', fontSize: '0.7rem', color: '#888', fontWeight: 'normal' }}>
+                            Estimado era: {formatCurrency(item.valor)}
+                          </span>
+                        )}
                       </td>
 
                       <td style={{ padding: '14px 12px' }}>
@@ -498,7 +507,7 @@ export default function GastosFixos() {
                               color: item.status === 'pago' ? '#aaa' : '#000',
                               border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.78rem'
                             }}
-                            title={item.status === 'pago' ? 'Reabrir pendência' : 'Marcar como Pago e lançar saída no caixa'}
+                            title={item.status === 'pago' ? 'Reabrir pendência' : 'Marcar como Pago e confirmar valor real'}
                           >
                             {item.status === 'pago' ? '↩️ Reabrir' : '✅ Pagar'}
                           </button>
@@ -575,15 +584,15 @@ export default function GastosFixos() {
                 </div>
 
                 <div>
-                  <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Valor do Gasto (R$) *</label>
+                  <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Valor Estimado ou Fixo (R$)</label>
                   <input 
                     type="number" step="0.01" 
-                    placeholder="0.00" 
+                    placeholder="0.00 (Ex: Se for variável como energia, coloque uma estimativa ou 0)" 
                     value={valor} 
                     onChange={e => setValor(e.target.value)} 
                     style={{ ...inputStyle, color: '#10b981', fontWeight: 'bold' }} 
-                    required 
                   />
+                  <span style={{ fontSize: '0.7rem', color: '#777' }}>Para Energia/Água, você poderá digitar o valor exato no momento de pagar!</span>
                 </div>
               </div>
 
@@ -654,7 +663,7 @@ export default function GastosFixos() {
         </div>
       )}
 
-      {/* Modal de Baixa de Pagamento de Gasto Fixo */}
+      {/* Modal de Baixa de Pagamento de Gasto Fixo com Valor Real Editável */}
       {payingGasto && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -663,12 +672,12 @@ export default function GastosFixos() {
           zIndex: 9999, padding: '20px'
         }}>
           <div style={{
-            maxWidth: '480px', width: '100%', background: '#141418',
+            maxWidth: '520px', width: '100%', background: '#141418',
             border: '1px solid #2a2a35', borderRadius: '14px', padding: '22px', color: '#fff'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '1px solid #222', paddingBottom: '10px' }}>
               <h3 style={{ margin: 0, color: '#10b981', fontSize: '1.15rem' }}>
-                ✅ Dar Baixa no Gasto Fixo
+                ✅ Confirmar Pagamento do Gasto Fixo
               </h3>
               <button onClick={() => setPayingGasto(null)} style={{ background: 'transparent', color: '#aaa', border: 'none', fontSize: '1.3rem', cursor: 'pointer' }}>
                 ✕
@@ -676,32 +685,62 @@ export default function GastosFixos() {
             </div>
 
             <div style={{ background: '#1a1a20', padding: '12px', borderRadius: '8px', marginBottom: '15px', fontSize: '0.85rem' }}>
-              <p style={{ margin: '0 0 4px 0', color: '#fff', fontWeight: 'bold' }}>{payingGasto.descricao}</p>
-              <p style={{ margin: '0 0 4px 0', color: '#f59e0b' }}>Categoria: {payingGasto.categoria}</p>
-              <p style={{ margin: 0, color: '#10b981', fontWeight: 'bold', fontSize: '1.1rem' }}>
-                Valor: {formatCurrency(payingGasto.valor)}
-              </p>
+              <p style={{ margin: '0 0 4px 0', color: '#fff', fontWeight: 'bold', fontSize: '0.95rem' }}>{payingGasto.descricao}</p>
+              <p style={{ margin: 0, color: '#f59e0b' }}>Categoria: {payingGasto.categoria}</p>
             </div>
 
             <form onSubmit={handleConfirmPayGasto}>
-              <div style={{ marginBottom: '15px' }}>
-                <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Forma de Pagamento</label>
-                <select value={metodoPagamento} onChange={e => setMetodoPagamento(e.target.value)} style={inputStyle}>
-                  <option value="PIX">PIX</option>
-                  <option value="Boleto">Boleto Bancário</option>
-                  <option value="Cartão Crédito">Cartão de Crédito</option>
-                  <option value="Cartão Débito">Cartão de Débito</option>
-                  <option value="Dinheiro">Dinheiro Espécie</option>
-                </select>
+              
+              {/* CAMPO DE VALOR REAL EDITÁVEL AO PAGAR */}
+              <div style={{ marginBottom: '18px', background: '#10b98115', border: '1px solid #10b981', padding: '14px', borderRadius: '10px' }}>
+                <label style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>
+                  💵 Valor Realmente Pago nesta Conta (R$) *
+                </label>
+                <input 
+                  type="number" step="0.01"
+                  value={payingValorReal} 
+                  onChange={e => setPayingValorReal(e.target.value)} 
+                  style={{ ...inputStyle, fontSize: '1.25rem', fontWeight: 'bold', color: '#10b981', border: '1px solid #10b981', background: '#0a0a0c' }} 
+                  required 
+                />
+                <span style={{ fontSize: '0.75rem', color: '#aaa', marginTop: '6px', display: 'block' }}>
+                  💡 Para contas variáveis (Energia, Água, Telefone), altere o valor exato cobrado na fatura deste mês!
+                </span>
+
+                <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px', borderTop: '1px dashed #10b98144', paddingTop: '8px' }}>
+                  <input 
+                    type="checkbox"
+                    id="chk-update-estimate"
+                    checked={updateDefaultEstimate}
+                    onChange={e => setUpdateDefaultEstimate(e.target.checked)}
+                    style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                  />
+                  <label htmlFor="chk-update-estimate" style={{ fontSize: '0.78rem', color: '#fff', cursor: 'pointer' }}>
+                    Atualizar valor padrão estimado para as próximas recorrências
+                  </label>
+                </div>
               </div>
 
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Conta de Saída</label>
-                <select value={contaDestino} onChange={e => setContaDestino(e.target.value)} style={inputStyle}>
-                  <option value="Mercado Pago KADOSH">Mercado Pago KADOSH (Reserva)</option>
-                  <option value="Mercado Pago ROMANOS">Mercado Pago ROMANOS (Fundo de Caixa)</option>
-                  <option value="Caixa da Empresa">Caixa da Empresa (Cofre/Espécie)</option>
-                </select>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+                <div>
+                  <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Forma de Pagamento</label>
+                  <select value={metodoPagamento} onChange={e => setMetodoPagamento(e.target.value)} style={inputStyle}>
+                    <option value="PIX">PIX</option>
+                    <option value="Boleto">Boleto Bancário</option>
+                    <option value="Cartão Crédito">Cartão de Crédito</option>
+                    <option value="Cartão Débito">Cartão de Débito</option>
+                    <option value="Dinheiro">Dinheiro Espécie</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Conta de Saída</label>
+                  <select value={contaDestino} onChange={e => setContaDestino(e.target.value)} style={inputStyle}>
+                    <option value="Mercado Pago KADOSH">Mercado Pago KADOSH (Reserva)</option>
+                    <option value="Mercado Pago ROMANOS">Mercado Pago ROMANOS (Fundo de Caixa)</option>
+                    <option value="Caixa da Empresa">Caixa da Empresa (Cofre/Espécie)</option>
+                  </select>
+                </div>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
