@@ -30,7 +30,7 @@ export default function GastosFixos() {
   const [gastos, setGastos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('todos'); // 'todos', 'pago', 'pendente', 'atrasado', 'alerta7dias'
+  const [statusFilter, setStatusFilter] = useState('todos'); // 'todos', 'em_aberto', 'vencido', 'pago', 'alerta7dias'
   const [categoriaFilter, setCategoriaFilter] = useState('todas');
   
   const [showModal, setShowModal] = useState(false);
@@ -43,7 +43,7 @@ export default function GastosFixos() {
   const [dataVencimento, setDataVencimento] = useState(new Date().toISOString().split('T')[0]);
   const [dataFinal, setDataFinal] = useState('');
   const [recorrencia, setRecorrencia] = useState('mensal');
-  const [status, setStatus] = useState('pendente'); // 'pago' ou 'pendente'
+  const [status, setStatus] = useState('em_aberto'); // 'pago' ou 'em_aberto'
   const [observacoes, setObservacoes] = useState('');
 
   // Modal de Baixa de Pagamento com Valor Editável
@@ -96,7 +96,7 @@ export default function GastosFixos() {
     const hojeStr = new Date().toISOString().split('T')[0];
     const lastSent = localStorage.getItem(ALERT_STORAGE_KEY);
 
-    if (lastSent === hojeStr) return; // Já checou e disparou hoje
+    if (lastSent === hojeStr) return;
 
     const hasAlerts = lista.some(g => {
       const dv = getDaysDiff(g.data_vencimento);
@@ -187,7 +187,7 @@ export default function GastosFixos() {
       setDataVencimento(item.data_vencimento || new Date().toISOString().split('T')[0]);
       setDataFinal(item.data_final || '');
       setRecorrencia(item.recorrencia || 'mensal');
-      setStatus(item.status || 'pendente');
+      setStatus(item.status === 'pago' ? 'pago' : 'em_aberto');
       setObservacoes(item.observacoes || '');
     } else {
       setEditingGasto(null);
@@ -197,7 +197,7 @@ export default function GastosFixos() {
       setDataVencimento(new Date().toISOString().split('T')[0]);
       setDataFinal('');
       setRecorrencia('mensal');
-      setStatus('pendente');
+      setStatus('em_aberto');
       setObservacoes('');
     }
     setShowModal(true);
@@ -221,7 +221,7 @@ export default function GastosFixos() {
       data_vencimento: dataVencimento,
       data_final: dataFinal || null,
       recorrencia,
-      status,
+      status: status === 'pago' ? 'pago' : 'em_aberto',
       data_pagamento: status === 'pago' ? (editingGasto?.data_pagamento || new Date().toISOString().split('T')[0]) : null,
       observacoes: observacoes.trim(),
       updated_at: new Date().toISOString()
@@ -363,7 +363,7 @@ export default function GastosFixos() {
     } else {
       if (!window.confirm(`Deseja reabrir a pendência do gasto "${gasto.descricao}"?`)) return;
 
-      const updated = { ...gasto, status: 'pendente', data_pagamento: null };
+      const updated = { ...gasto, status: 'em_aberto', data_pagamento: null };
       try {
         await supabase.from('gastos_fixos').update(updated).eq('id', gasto.id);
       } catch (e) {}
@@ -373,7 +373,7 @@ export default function GastosFixos() {
     }
   };
 
-  // Auxiliares de Datas e Status
+  // Auxiliares de Datas e Status Automáticos
   const hojeStr = new Date().toISOString().split('T')[0];
 
   const getDaysDiff = (dateStr) => {
@@ -389,10 +389,32 @@ export default function GastosFixos() {
     return Math.ceil(diffTempo / (1000 * 60 * 60 * 24));
   };
 
+  // CÁLCULO AUTOMÁTICO DE STATUS EM TEMPO REAL:
+  // 1. Pago: se marcado como pago
+  // 2. Vencido: se data_vencimento < hoje e não foi pago
+  // 3. Vence em até 7d: se faltam de 0 a 7 dias
+  // 4. Em Aberto: se data_vencimento >= hoje
   const getComputedStatus = (item) => {
-    if (item.status === 'pago') return { label: '🟢 Pago', code: 'pago', color: '#10b981', bg: '#10b98115', border: '#10b981' };
+    if (item.status === 'pago') {
+      return { 
+        label: '🟢 Pago', 
+        code: 'pago', 
+        color: '#10b981', 
+        bg: '#10b98115', 
+        border: '#10b981',
+        title: 'Conta quitada' 
+      };
+    }
+
     if (item.data_vencimento && item.data_vencimento < hojeStr) {
-      return { label: '🔴 Atrasado', code: 'atrasado', color: '#ef4444', bg: '#ef444415', border: '#ef4444' };
+      return { 
+        label: '🔴 Vencido', 
+        code: 'vencido', 
+        color: '#ef4444', 
+        bg: '#ef444415', 
+        border: '#ef4444',
+        title: 'Data limite de vencimento ultrapassada!' 
+      };
     }
 
     const diffVenc = getDaysDiff(item.data_vencimento);
@@ -402,11 +424,19 @@ export default function GastosFixos() {
         code: 'alerta7dias', 
         color: '#f59e0b', 
         bg: '#f59e0b20', 
-        border: '#f59e0b' 
+        border: '#f59e0b',
+        title: 'Em aberto (Vence nos próximos 7 dias)'
       };
     }
 
-    return { label: '⏳ Pendente', code: 'pendente', color: '#3b82f6', bg: '#3b82f615', border: '#3b82f6' };
+    return { 
+      label: '⏳ Em Aberto', 
+      code: 'em_aberto', 
+      color: '#3b82f6', 
+      bg: '#3b82f615', 
+      border: '#3b82f6',
+      title: 'Em aberto a vencer no prazo' 
+    };
   };
 
   // Filtragem
@@ -419,8 +449,12 @@ export default function GastosFixos() {
       const isVenc7 = item.status !== 'pago' && dv !== null && dv >= 0 && dv <= 7;
       const isFinal7 = df !== null && df >= 0 && df <= 7;
       if (!isVenc7 && !isFinal7) return false;
-    } else if (statusFilter !== 'todos' && comp.code !== statusFilter) {
-      return false;
+    } else if (statusFilter === 'em_aberto') {
+      if (item.status === 'pago' || (item.data_vencimento && item.data_vencimento < hojeStr)) return false;
+    } else if (statusFilter === 'vencido') {
+      if (comp.code !== 'vencido') return false;
+    } else if (statusFilter === 'pago') {
+      if (comp.code !== 'pago') return false;
     }
 
     if (categoriaFilter !== 'todas' && item.categoria !== categoriaFilter) return false;
@@ -435,11 +469,12 @@ export default function GastosFixos() {
     return true;
   });
 
-  // Métricas
+  // Métricas Automáticas
   const totalGeral = filteredGastos.reduce((acc, g) => acc + (parseFloat(g.valor_pago_real !== undefined ? g.valor_pago_real : g.valor) || 0), 0);
   const totalPago = filteredGastos.filter(g => g.status === 'pago').reduce((acc, g) => acc + (parseFloat(g.valor_pago_real !== undefined ? g.valor_pago_real : g.valor) || 0), 0);
-  const totalPendente = filteredGastos.filter(g => g.status !== 'pago' && (!g.data_vencimento || g.data_vencimento >= hojeStr)).reduce((acc, g) => acc + (parseFloat(g.valor) || 0), 0);
-  const totalAtrasado = filteredGastos.filter(g => getComputedStatus(g).code === 'atrasado').reduce((acc, g) => acc + (parseFloat(g.valor) || 0), 0);
+  const totalEmAberto = filteredGastos.filter(g => g.status !== 'pago' && (!g.data_vencimento || g.data_vencimento >= hojeStr)).reduce((acc, g) => acc + (parseFloat(g.valor) || 0), 0);
+  const totalVencido = filteredGastos.filter(g => getComputedStatus(g).code === 'vencido').reduce((acc, g) => acc + (parseFloat(g.valor) || 0), 0);
+  
   const totalAlertas7d = gastos.filter(g => {
     const dv = getDaysDiff(g.data_vencimento);
     const df = g.data_final ? getDaysDiff(g.data_final) : null;
@@ -466,7 +501,7 @@ export default function GastosFixos() {
             📌 Gestão de Gastos Fixos & Recorrentes
           </h2>
           <p style={{ color: '#aaa', margin: '4px 0 0 0', fontSize: '0.85rem' }}>
-            Acompanhe vencimentos, faturas variáveis e notificações automáticas de 7 dias no e-mail dos administradores.
+            Status 100% automáticos (<strong>Em Aberto</strong>, <strong>Vencido</strong> e <strong>Pago</strong>) com cálculo diário em tempo real.
           </p>
         </div>
 
@@ -537,7 +572,7 @@ export default function GastosFixos() {
         </div>
       )}
 
-      {/* Cards KPI de Resumo Sólido */}
+      {/* Cards KPI de Resumo Sólido com Status Automáticos */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '15px', marginBottom: '25px' }}>
         <div style={{ background: '#16161a', border: '1px solid #2a2a35', padding: '18px', borderRadius: '12px', borderLeft: '4px solid #3b82f6' }}>
           <span style={{ fontSize: '0.78rem', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total de Gastos Fixos</span>
@@ -548,20 +583,20 @@ export default function GastosFixos() {
         <div style={{ background: '#16161a', border: '1px solid #2a2a35', padding: '18px', borderRadius: '12px', borderLeft: '4px solid #10b981' }}>
           <span style={{ fontSize: '0.78rem', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🟢 Total Pago</span>
           <h3 style={{ margin: '6px 0 0 0', fontSize: '1.7rem', color: '#10b981' }}>{formatCurrency(totalPago)}</h3>
-          <span style={{ fontSize: '0.72rem', color: '#888' }}>Contas quitadas no período</span>
+          <span style={{ fontSize: '0.72rem', color: '#888' }}>Contas quitadas</span>
         </div>
 
-        <div style={{ background: '#16161a', border: '1px solid #2a2a35', padding: '18px', borderRadius: '12px', borderLeft: '4px solid #f59e0b' }}>
-          <span style={{ fontSize: '0.78rem', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.5px' }}>⏳ A Vencer (Pendente)</span>
-          <h3 style={{ margin: '6px 0 0 0', fontSize: '1.7rem', color: '#f59e0b' }}>{formatCurrency(totalPendente)}</h3>
-          <span style={{ fontSize: '0.72rem', color: '#888' }}>Contas a vencer no prazo</span>
+        <div style={{ background: '#16161a', border: '1px solid #2a2a35', padding: '18px', borderRadius: '12px', borderLeft: '4px solid #3b82f6' }}>
+          <span style={{ fontSize: '0.78rem', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.5px' }}>⏳ Em Aberto</span>
+          <h3 style={{ margin: '6px 0 0 0', fontSize: '1.7rem', color: '#3b82f6' }}>{formatCurrency(totalEmAberto)}</h3>
+          <span style={{ fontSize: '0.72rem', color: '#888' }}>A vencer dentro do prazo</span>
         </div>
 
         <div style={{ background: '#16161a', border: '1px solid #2a2a35', padding: '18px', borderRadius: '12px', borderLeft: '4px solid #ef4444' }}>
-          <span style={{ fontSize: '0.78rem', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🔴 Atrasado (Vencidos)</span>
-          <h3 style={{ margin: '6px 0 0 0', fontSize: '1.7rem', color: '#ef4444' }}>{formatCurrency(totalAtrasado)}</h3>
-          <span style={{ fontSize: '0.72rem', color: totalAtrasado > 0 ? '#ef4444' : '#888', fontWeight: totalAtrasado > 0 ? 'bold' : 'normal' }}>
-            {totalAtrasado > 0 ? '⚠️ Atenção: Contas vencidas!' : 'Nenhuma conta atrasada'}
+          <span style={{ fontSize: '0.78rem', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🔴 Vencido (Automático)</span>
+          <h3 style={{ margin: '6px 0 0 0', fontSize: '1.7rem', color: '#ef4444' }}>{formatCurrency(totalVencido)}</h3>
+          <span style={{ fontSize: '0.72rem', color: totalVencido > 0 ? '#ef4444' : '#888', fontWeight: totalVencido > 0 ? 'bold' : 'normal' }}>
+            {totalVencido > 0 ? '⚠️ Atenção: Contas vencidas!' : 'Nenhuma conta vencida'}
           </span>
         </div>
       </div>
@@ -578,13 +613,13 @@ export default function GastosFixos() {
           />
         </div>
 
-        <div style={{ width: '200px' }}>
+        <div style={{ width: '220px' }}>
           <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={inputStyle}>
             <option value="todos">Todos os Status</option>
+            <option value="em_aberto">⏳ Em Aberto</option>
             <option value="alerta7dias">🔔 Vencem em até 7 dias</option>
-            <option value="pago">🟢 Apenas Pagos</option>
-            <option value="pendente">⏳ Apenas Pendentes</option>
-            <option value="atrasado">🔴 Apenas Atrasados</option>
+            <option value="vencido">🔴 Vencidos</option>
+            <option value="pago">🟢 Pagos</option>
           </select>
         </div>
 
@@ -618,7 +653,7 @@ export default function GastosFixos() {
                   <th style={{ padding: '14px 12px' }}>Data Final</th>
                   <th style={{ padding: '14px 12px' }}>Recorrência</th>
                   <th style={{ padding: '14px 12px' }}>Valor (Estimado / Pago)</th>
-                  <th style={{ padding: '14px 12px' }}>Status / Alerta</th>
+                  <th style={{ padding: '14px 12px' }}>Status Automático</th>
                   <th style={{ padding: '14px 12px', textAlign: 'right' }}>Ações</th>
                 </tr>
               </thead>
@@ -676,7 +711,19 @@ export default function GastosFixos() {
                       </td>
 
                       <td style={{ padding: '14px 12px' }}>
-                        <span style={{ background: compStatus.bg, color: compStatus.color, border: `1px solid ${compStatus.border}`, padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 'bold', display: 'inline-block' }}>
+                        <span 
+                          title={compStatus.title}
+                          style={{ 
+                            background: compStatus.bg, 
+                            color: compStatus.color, 
+                            border: `1px solid ${compStatus.border}`, 
+                            padding: '4px 10px', 
+                            borderRadius: '6px', 
+                            fontSize: '0.78rem', 
+                            fontWeight: 'bold', 
+                            display: 'inline-block' 
+                          }}
+                        >
                           {compStatus.label}
                         </span>
                         {item.status === 'pago' && item.data_pagamento && (
@@ -696,7 +743,7 @@ export default function GastosFixos() {
                               color: item.status === 'pago' ? '#aaa' : '#000',
                               border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.78rem'
                             }}
-                            title={item.status === 'pago' ? 'Reabrir pendência' : 'Marcar como Pago e confirmar valor real'}
+                            title={item.status === 'pago' ? 'Reabrir pendência (Em Aberto)' : 'Marcar como Pago e confirmar valor real'}
                           >
                             {item.status === 'pago' ? '↩️ Reabrir' : '✅ Pagar'}
                           </button>
@@ -822,8 +869,8 @@ export default function GastosFixos() {
                 <div>
                   <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Status Inicial</label>
                   <select value={status} onChange={e => setStatus(e.target.value)} style={inputStyle}>
-                    <option value="pendente">⏳ Pendente</option>
-                    <option value="pago">🟢 Pago</option>
+                    <option value="em_aberto">⏳ Em Aberto (Automático)</option>
+                    <option value="pago">🟢 Já Pago</option>
                   </select>
                 </div>
               </div>
