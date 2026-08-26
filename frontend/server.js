@@ -432,6 +432,183 @@ app.post('/api/send-budget-notification', async (req, res) => {
 });
 
 // ======================================================
+// ALERTA DE GASTOS FIXOS & CONTRATOS A VENCER (7 DIAS ANTES)
+// ======================================================
+app.post('/api/send-gastos-fixos-alert', async (req, res) => {
+  const { gastosList } = req.body;
+
+  try {
+    console.log('🔍 Checando contas e contratos a vencer nos próximos 7 dias...');
+
+    // 1. Buscar gastos fixos (se não vierem no body, busca no Supabase)
+    let lista = gastosList;
+    if (!lista || lista.length === 0) {
+      const { data, error } = await supabase
+        .from('gastos_fixos')
+        .select('*');
+      if (!error && data) {
+        lista = data;
+      }
+    }
+
+    if (!lista || lista.length === 0) {
+      return res.json({ success: true, message: 'Nenhum gasto cadastrado para checar.', count: 0 });
+    }
+
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+
+    const alertas = [];
+
+    lista.forEach(g => {
+      // 1. Checar data_vencimento (se não estiver pago)
+      if (g.status !== 'pago' && g.data_vencimento) {
+        const [anoV, mesV, diaV] = g.data_vencimento.split('-').map(Number);
+        const dtVenc = new Date(anoV, mesV - 1, diaV);
+        dtVenc.setHours(0, 0, 0, 0);
+
+        const diffTempo = dtVenc.getTime() - hoje.getTime();
+        const diffDias = Math.ceil(diffTempo / (1000 * 60 * 60 * 24));
+
+        if (diffDias >= 0 && diffDias <= 7) {
+          alertas.push({
+            tipo: 'vencimento',
+            descricao: g.descricao,
+            categoria: g.categoria,
+            valor: g.valor || 0,
+            data: g.data_vencimento,
+            diasRestantes: diffDias,
+            dataFormatada: `${String(diaV).padStart(2, '0')}/${String(mesV).padStart(2, '0')}/${anoV}`
+          });
+        }
+      }
+
+      // 2. Checar data_final (se existir e estiver a 7 dias do término)
+      if (g.data_final) {
+        const [anoF, mesF, diaF] = g.data_final.split('-').map(Number);
+        const dtFinal = new Date(anoF, mesF - 1, diaF);
+        dtFinal.setHours(0, 0, 0, 0);
+
+        const diffTempoF = dtFinal.getTime() - hoje.getTime();
+        const diffDiasF = Math.ceil(diffTempoF / (1000 * 60 * 60 * 24));
+
+        if (diffDiasF >= 0 && diffDiasF <= 7) {
+          alertas.push({
+            tipo: 'termino_contrato',
+            descricao: g.descricao,
+            categoria: g.categoria,
+            valor: g.valor || 0,
+            data: g.data_final,
+            diasRestantes: diffDiasF,
+            dataFormatada: `${String(diaF).padStart(2, '0')}/${String(mesF).padStart(2, '0')}/${anoF}`
+          });
+        }
+      }
+    });
+
+    if (alertas.length === 0) {
+      return res.json({ success: true, message: 'Nenhuma conta ou contrato a vencer nos próximos 7 dias.', count: 0 });
+    }
+
+    // 2. Buscar administradores
+    const { data: admins } = await supabase
+      .from('clientes')
+      .select('email, nome')
+      .eq('is_admin', true);
+    
+    let adminEmails = admins?.map(a => a.email).filter(e => !!e) || [];
+    if (adminEmails.length === 0) {
+      adminEmails = ['isaqueduarte07@gmail.com'];
+    }
+
+    console.log(`📧 Enviando alerta de ${alertas.length} gasto(s) a vencer para: ${adminEmails.join(', ')}`);
+
+    // 3. Montar HTML do e-mail
+    const rowsHtml = alertas.map(a => {
+      const isTermino = a.tipo === 'termino_contrato';
+      const badgeColor = a.diasRestantes <= 2 ? '#ef4444' : '#f59e0b';
+      const statusTexto = isTermino 
+        ? `⚠️ Contrato Encerra em ${a.diasRestantes === 0 ? 'HOJE' : a.diasRestantes + ' dia(s)'}`
+        : `🔔 Vence em ${a.diasRestantes === 0 ? 'HOJE' : a.diasRestantes + ' dia(s)'}`;
+
+      return `
+        <tr style="border-bottom: 1px solid #2a2a35;">
+          <td style="padding: 12px; color: #fff; font-weight: bold;">
+            ${a.descricao}
+            <span style="display: block; font-size: 12px; color: #aaa; font-weight: normal;">${a.categoria}</span>
+          </td>
+          <td style="padding: 12px; color: #10b981; font-weight: bold; font-size: 15px;">
+            ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(a.valor)}
+          </td>
+          <td style="padding: 12px; color: #ddd;">
+            ${a.dataFormatada}
+          </td>
+          <td style="padding: 12px;">
+            <span style="background: ${badgeColor}22; color: ${badgeColor}; border: 1px solid ${badgeColor}; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; display: inline-block;">
+              ${statusTexto}
+            </span>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    const emailHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; background-color: #0d0d11; color: #fff; padding: 30px; border-radius: 12px; border: 1px solid #2a2a35;">
+        <div style="text-align: center; margin-bottom: 25px; border-bottom: 2px solid #dc2743; padding-bottom: 15px;">
+          <h2 style="color: #dc2743; margin: 0; text-transform: uppercase; letter-spacing: 1px;">KADOSH AUTO CENTER</h2>
+          <p style="color: #aaa; margin: 5px 0 0 0; font-size: 14px;">Alerta Financeiro: Contas e Contratos a Vencer em até 7 Dias</p>
+        </div>
+
+        <p style="font-size: 15px; color: #ddd;">
+          Olá, <strong>Administrador</strong>!
+        </p>
+        <p style="font-size: 14px; color: #bbb; line-height: 1.5;">
+          Identificamos <strong>${alertas.length} despesa(s)</strong> no sistema que estão próximas da data de vencimento ou encerramento de contrato nos próximos 7 dias. Confira o resumo abaixo para programar o pagamento ou renovação:
+        </p>
+
+        <div style="background-color: #14141a; border-radius: 8px; overflow: hidden; border: 1px solid #2a2a35; margin: 20px 0;">
+          <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+            <thead>
+              <tr style="background: #1c1c24; color: #888; border-bottom: 1px solid #2a2a35;">
+                <th style="padding: 10px 12px;">Despesa</th>
+                <th style="padding: 10px 12px;">Valor</th>
+                <th style="padding: 10px 12px;">Data</th>
+                <th style="padding: 10px 12px;">Prazo</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+        </div>
+
+        <div style="text-align: center; margin: 35px 0 20px 0;">
+          <a href="https://kadoshautocenter.com/admin" style="background-color: #dc2743; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px; display: inline-block;">
+            Abrir Gastos Fixos no Painel
+          </a>
+        </div>
+
+        <p style="text-align: center; font-size: 12px; color: #666; margin-top: 30px; border-top: 1px solid #222; padding-top: 15px;">
+          Notificação Automática do Sistema Financeiro • Kadosh Auto Center
+        </p>
+      </div>
+    `;
+
+    const data = await resend.emails.send({
+      from: 'Kadosh Auto Center <contato@kadoshautocenter.com>',
+      to: adminEmails,
+      subject: `🔔 Alerta Financeiro: ${alertas.length} conta(s) a vencer nos próximos 7 dias - Kadosh`,
+      html: emailHtml
+    });
+
+    res.json({ success: true, count: alertas.length, recipients: adminEmails, data });
+  } catch (error) {
+    console.error('❌ Erro ao enviar alerta de gastos fixos:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ======================================================
 // ASAAS — EMISSÃO DE NOTA FISCAL DE SERVIÇO (NFS-e)
 // ======================================================
 // Endpoint para completar cadastro (bypassa RLS porque o usuário ainda não confirmou o e-mail)

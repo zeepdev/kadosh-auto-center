@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { registrarLog } from '../../services/logService';
 
 const STORAGE_KEY = 'kadosh_gastos_fixos';
+const ALERT_STORAGE_KEY = 'kadosh_gastos_alert_sent_date';
 
 const CATEGORIAS = [
   'Instalações & Aluguel',
@@ -29,7 +30,7 @@ export default function GastosFixos() {
   const [gastos, setGastos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('todos'); // 'todos', 'pago', 'pendente', 'atrasado'
+  const [statusFilter, setStatusFilter] = useState('todos'); // 'todos', 'pago', 'pendente', 'atrasado', 'alerta7dias'
   const [categoriaFilter, setCategoriaFilter] = useState('todas');
   
   const [showModal, setShowModal] = useState(false);
@@ -52,6 +53,10 @@ export default function GastosFixos() {
   const [metodoPagamento, setMetodoPagamento] = useState('PIX');
   const [contaDestino, setContaDestino] = useState('Mercado Pago KADOSH');
 
+  // Estado de envio de alerta de e-mail
+  const [sendingAlert, setSendingAlert] = useState(false);
+  const [alertStatusMessage, setAlertStatusMessage] = useState(null);
+
   // Carregar Gastos Fixos (Supabase + localStorage fallback)
   const fetchGastos = async () => {
     setLoading(true);
@@ -64,16 +69,91 @@ export default function GastosFixos() {
       if (!error && data) {
         setGastos(data);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        checkAndSendDailyAlert(data);
       } else {
         const local = localStorage.getItem(STORAGE_KEY);
-        if (local) setGastos(JSON.parse(local));
+        if (local) {
+          const parsed = JSON.parse(local);
+          setGastos(parsed);
+          checkAndSendDailyAlert(parsed);
+        }
       }
     } catch (err) {
       console.warn('Usando armazenamento local para Gastos Fixos:', err);
       const local = localStorage.getItem(STORAGE_KEY);
-      if (local) setGastos(JSON.parse(local));
+      if (local) {
+        const parsed = JSON.parse(local);
+        setGastos(parsed);
+        checkAndSendDailyAlert(parsed);
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Checagem automática 1x por dia ao abrir
+  const checkAndSendDailyAlert = async (lista) => {
+    const hojeStr = new Date().toISOString().split('T')[0];
+    const lastSent = localStorage.getItem(ALERT_STORAGE_KEY);
+
+    if (lastSent === hojeStr) return; // Já checou e disparou hoje
+
+    const hasAlerts = lista.some(g => {
+      const dv = getDaysDiff(g.data_vencimento);
+      const df = g.data_final ? getDaysDiff(g.data_final) : null;
+      const vencAlerta = g.status !== 'pago' && dv !== null && dv >= 0 && dv <= 7;
+      const finalAlerta = df !== null && df >= 0 && df <= 7;
+      return vencAlerta || finalAlerta;
+    });
+
+    if (hasAlerts) {
+      console.log('🔔 Disparando verificação diária de e-mail (7 dias antes)...');
+      try {
+        await fetch('/api/send-gastos-fixos-alert', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ gastosList: lista })
+        });
+        localStorage.setItem(ALERT_STORAGE_KEY, hojeStr);
+      } catch (e) {
+        console.warn('Alerta diário por e-mail falhou:', e.message);
+      }
+    }
+  };
+
+  // Disparo manual do alerta por e-mail
+  const handleTriggerEmailAlertsManual = async () => {
+    setSendingAlert(true);
+    setAlertStatusMessage(null);
+
+    try {
+      const res = await fetch('/api/send-gastos-fixos-alert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gastosList: gastos })
+      });
+      const json = await res.json();
+
+      if (json.success) {
+        if (json.count > 0) {
+          const msg = `📧 E-mail de alerta enviado com sucesso para ${json.recipients?.join(', ') || 'os administradores'} contendo ${json.count} conta(s)/contrato(s) a vencer em até 7 dias!`;
+          setAlertStatusMessage({ type: 'success', text: msg });
+          alert(msg);
+        } else {
+          const msg = `✅ Nenhuma conta ou contrato a vencer nos próximos 7 dias! Tudo em dia.`;
+          setAlertStatusMessage({ type: 'info', text: msg });
+          alert(msg);
+        }
+        localStorage.setItem(ALERT_STORAGE_KEY, new Date().toISOString().split('T')[0]);
+      } else {
+        throw new Error(json.error || 'Erro ao disparar alertas.');
+      }
+    } catch (err) {
+      console.error('Erro ao enviar alertas:', err);
+      alert('Erro ao enviar e-mail de alerta: ' + err.message);
+      setAlertStatusMessage({ type: 'error', text: 'Falha ao enviar e-mail: ' + err.message });
+    } finally {
+      setSendingAlert(false);
     }
   };
 
@@ -296,19 +376,53 @@ export default function GastosFixos() {
   // Auxiliares de Datas e Status
   const hojeStr = new Date().toISOString().split('T')[0];
 
+  const getDaysDiff = (dateStr) => {
+    if (!dateStr) return null;
+    const [ano, mes, dia] = dateStr.split('-').map(Number);
+    const dt = new Date(ano, mes - 1, dia);
+    dt.setHours(0, 0, 0, 0);
+
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+
+    const diffTempo = dt.getTime() - hoje.getTime();
+    return Math.ceil(diffTempo / (1000 * 60 * 60 * 24));
+  };
+
   const getComputedStatus = (item) => {
     if (item.status === 'pago') return { label: '🟢 Pago', code: 'pago', color: '#10b981', bg: '#10b98115', border: '#10b981' };
     if (item.data_vencimento && item.data_vencimento < hojeStr) {
       return { label: '🔴 Atrasado', code: 'atrasado', color: '#ef4444', bg: '#ef444415', border: '#ef4444' };
     }
-    return { label: '⏳ Pendente', code: 'pendente', color: '#f59e0b', bg: '#f59e0b15', border: '#f59e0b' };
+
+    const diffVenc = getDaysDiff(item.data_vencimento);
+    if (diffVenc !== null && diffVenc >= 0 && diffVenc <= 7) {
+      return { 
+        label: diffVenc === 0 ? '🔔 Vence HOJE' : `🔔 Vence em ${diffVenc}d`, 
+        code: 'alerta7dias', 
+        color: '#f59e0b', 
+        bg: '#f59e0b20', 
+        border: '#f59e0b' 
+      };
+    }
+
+    return { label: '⏳ Pendente', code: 'pendente', color: '#3b82f6', bg: '#3b82f615', border: '#3b82f6' };
   };
 
   // Filtragem
   const filteredGastos = gastos.filter(item => {
     const comp = getComputedStatus(item);
 
-    if (statusFilter !== 'todos' && comp.code !== statusFilter) return false;
+    if (statusFilter === 'alerta7dias') {
+      const dv = getDaysDiff(item.data_vencimento);
+      const df = item.data_final ? getDaysDiff(item.data_final) : null;
+      const isVenc7 = item.status !== 'pago' && dv !== null && dv >= 0 && dv <= 7;
+      const isFinal7 = df !== null && df >= 0 && df <= 7;
+      if (!isVenc7 && !isFinal7) return false;
+    } else if (statusFilter !== 'todos' && comp.code !== statusFilter) {
+      return false;
+    }
+
     if (categoriaFilter !== 'todas' && item.categoria !== categoriaFilter) return false;
 
     if (search.trim()) {
@@ -324,8 +438,13 @@ export default function GastosFixos() {
   // Métricas
   const totalGeral = filteredGastos.reduce((acc, g) => acc + (parseFloat(g.valor_pago_real !== undefined ? g.valor_pago_real : g.valor) || 0), 0);
   const totalPago = filteredGastos.filter(g => g.status === 'pago').reduce((acc, g) => acc + (parseFloat(g.valor_pago_real !== undefined ? g.valor_pago_real : g.valor) || 0), 0);
-  const totalPendente = filteredGastos.filter(g => getComputedStatus(g).code === 'pendente').reduce((acc, g) => acc + (parseFloat(g.valor) || 0), 0);
+  const totalPendente = filteredGastos.filter(g => g.status !== 'pago' && (!g.data_vencimento || g.data_vencimento >= hojeStr)).reduce((acc, g) => acc + (parseFloat(g.valor) || 0), 0);
   const totalAtrasado = filteredGastos.filter(g => getComputedStatus(g).code === 'atrasado').reduce((acc, g) => acc + (parseFloat(g.valor) || 0), 0);
+  const totalAlertas7d = gastos.filter(g => {
+    const dv = getDaysDiff(g.data_vencimento);
+    const df = g.data_final ? getDaysDiff(g.data_final) : null;
+    return (g.status !== 'pago' && dv !== null && dv >= 0 && dv <= 7) || (df !== null && df >= 0 && df <= 7);
+  }).length;
 
   const formatCurrency = (val) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
@@ -340,25 +459,83 @@ export default function GastosFixos() {
   return (
     <div style={{ padding: '20px 0' }}>
       
-      {/* Header com Ações */}
+      {/* Header com Ações e Alerta de E-mail */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px', flexWrap: 'wrap', gap: '15px' }}>
         <div>
           <h2 style={{ color: '#fff', margin: 0, fontSize: '1.4rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
             📌 Gestão de Gastos Fixos & Recorrentes
           </h2>
           <p style={{ color: '#aaa', margin: '4px 0 0 0', fontSize: '0.85rem' }}>
-            Cadastre contas fixas e variáveis (Energia, Água, Aluguel). Ao dar baixa, você pode confirmar ou ajustar o valor real pago!
+            Acompanhe vencimentos, faturas variáveis e notificações automáticas de 7 dias no e-mail dos administradores.
           </p>
         </div>
 
-        <button 
-          onClick={() => handleOpenModal(null)}
-          className="btn"
-          style={{ background: '#f59e0b', color: '#000', fontWeight: 'bold', padding: '12px 20px', borderRadius: '8px', fontSize: '0.9rem', boxShadow: '0 4px 14px rgba(245, 158, 11, 0.3)' }}
-        >
-          + Novo Gasto Fixo
-        </button>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <button 
+            onClick={handleTriggerEmailAlertsManual}
+            disabled={sendingAlert}
+            className="btn"
+            style={{ 
+              background: '#222', 
+              color: '#f59e0b', 
+              border: '1px solid #f59e0b66', 
+              fontWeight: 'bold', 
+              padding: '12px 18px', 
+              borderRadius: '8px', 
+              fontSize: '0.88rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              cursor: sendingAlert ? 'wait' : 'pointer'
+            }}
+            title="Checa e envia e-mail com as contas que vencem ou encerram em até 7 dias"
+          >
+            {sendingAlert ? '📧 Enviando Alerta...' : `🔔 Notificar Vencimentos por E-mail (${totalAlertas7d})`}
+          </button>
+
+          <button 
+            onClick={() => handleOpenModal(null)}
+            className="btn"
+            style={{ background: '#f59e0b', color: '#000', fontWeight: 'bold', padding: '12px 20px', borderRadius: '8px', fontSize: '0.9rem', boxShadow: '0 4px 14px rgba(245, 158, 11, 0.3)' }}
+          >
+            + Novo Gasto Fixo
+          </button>
+        </div>
       </div>
+
+      {/* Alerta de 7 Dias em Destaque */}
+      {totalAlertas7d > 0 && (
+        <div style={{ 
+          background: 'linear-gradient(90deg, rgba(245, 158, 11, 0.15) 0%, rgba(220, 39, 67, 0.15) 100%)', 
+          border: '1px solid #f59e0b88', 
+          padding: '14px 18px', 
+          borderRadius: '10px', 
+          marginBottom: '20px', 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          flexWrap: 'wrap', 
+          gap: '10px' 
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '1.4rem' }}>🔔</span>
+            <div>
+              <strong style={{ color: '#f59e0b', fontSize: '0.95rem' }}>
+                Atenção: {totalAlertas7d} conta(s) ou contrato(s) vencem nos próximos 7 dias!
+              </strong>
+              <span style={{ display: 'block', fontSize: '0.8rem', color: '#ccc' }}>
+                O sistema notifica automaticamente os e-mails dos administradores para garantir o pagamento em dia.
+              </span>
+            </div>
+          </div>
+          <button 
+            onClick={() => setStatusFilter('alerta7dias')}
+            style={{ padding: '6px 14px', background: '#f59e0b', color: '#000', border: 'none', borderRadius: '6px', fontWeight: 'bold', fontSize: '0.8rem', cursor: 'pointer' }}
+          >
+            Filtrar Vencimentos de 7 Dias
+          </button>
+        </div>
+      )}
 
       {/* Cards KPI de Resumo Sólido */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '15px', marginBottom: '25px' }}>
@@ -401,9 +578,10 @@ export default function GastosFixos() {
           />
         </div>
 
-        <div style={{ width: '180px' }}>
+        <div style={{ width: '200px' }}>
           <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={inputStyle}>
             <option value="todos">Todos os Status</option>
+            <option value="alerta7dias">🔔 Vencem em até 7 dias</option>
             <option value="pago">🟢 Apenas Pagos</option>
             <option value="pendente">⏳ Apenas Pendentes</option>
             <option value="atrasado">🔴 Apenas Atrasados</option>
@@ -440,7 +618,7 @@ export default function GastosFixos() {
                   <th style={{ padding: '14px 12px' }}>Data Final</th>
                   <th style={{ padding: '14px 12px' }}>Recorrência</th>
                   <th style={{ padding: '14px 12px' }}>Valor (Estimado / Pago)</th>
-                  <th style={{ padding: '14px 12px' }}>Status</th>
+                  <th style={{ padding: '14px 12px' }}>Status / Alerta</th>
                   <th style={{ padding: '14px 12px', textAlign: 'right' }}>Ações</th>
                 </tr>
               </thead>
@@ -448,6 +626,8 @@ export default function GastosFixos() {
                 {filteredGastos.map((item) => {
                   const compStatus = getComputedStatus(item);
                   const valorExibicao = item.status === 'pago' && item.valor_pago_real !== undefined ? item.valor_pago_real : item.valor;
+                  const diffFinal = item.data_final ? getDaysDiff(item.data_final) : null;
+                  const isFinalAlerta = diffFinal !== null && diffFinal >= 0 && diffFinal <= 7;
 
                   return (
                     <tr key={item.id} style={{ borderBottom: '1px solid #22222a' }}>
@@ -468,7 +648,16 @@ export default function GastosFixos() {
                       </td>
 
                       <td style={{ padding: '14px 12px', color: '#888' }}>
-                        {item.data_final ? formatDate(item.data_final) : '∞ Contínuo'}
+                        {item.data_final ? (
+                          <div>
+                            <span>{formatDate(item.data_final)}</span>
+                            {isFinalAlerta && (
+                              <span style={{ display: 'block', fontSize: '0.72rem', color: '#8b5cf6', fontWeight: 'bold' }}>
+                                ⚠️ Encerra em {diffFinal === 0 ? 'HOJE' : `${diffFinal}d`}
+                              </span>
+                            )}
+                          </div>
+                        ) : '∞ Contínuo'}
                       </td>
 
                       <td style={{ padding: '14px 12px' }}>
@@ -616,7 +805,7 @@ export default function GastosFixos() {
                     onChange={e => setDataFinal(e.target.value)} 
                     style={inputStyle} 
                   />
-                  <span style={{ fontSize: '0.7rem', color: '#777' }}>Deixe vazio se for contrato sem prazo fixo.</span>
+                  <span style={{ fontSize: '0.7rem', color: '#777' }}>Avisa no e-mail 7 dias antes do término.</span>
                 </div>
               </div>
 
