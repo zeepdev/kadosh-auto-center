@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import PDFGenerator from './PDFGenerator';
 import UpdatePhotoModal from './UpdatePhotoModal';
 import ViewVehicleModal from './ViewVehicleModal';
@@ -11,6 +11,7 @@ import EditBudgetModal from './EditBudgetModal';
 import MecanicosManager from './MecanicosManager';
 import FluxoCaixa from './FluxoCaixa';
 import GastosFixos from './GastosFixos';
+import ErrorBoundary from '../ErrorBoundary';
 import { supabase } from '../../lib/supabase';
 import { calcularPrioridade, PRIORIDADES } from '../../lib/prioridade';
 import { registrarLog, fetchLogs } from '../../services/logService';
@@ -157,7 +158,10 @@ const parseProgresso = (status, avaliacaoSite) => {
   return { passo: 0, ponto: 'Orçamento Recebido' };
 };
 
-const AdminDashboard = () => {
+const AdminDashboard = ({ initialTab = 'atendimentos' }) => {
+  const [searchParams] = useSearchParams();
+  const urlTab = searchParams.get('tab');
+
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
   const [emailInput, setEmailInput] = useState('');
@@ -183,8 +187,13 @@ const AdminDashboard = () => {
   const [selectedForEdit, setSelectedForEdit] = useState(null);
   const [showDirectBudget, setShowDirectBudget] = useState(false);
   const [depoimentos, setDepoimentos] = useState([]);
-  const [activeTab, setActiveTab] = useState('atendimentos'); // 'atendimentos', 'agenda', 'fluxo_caixa', 'mecanicos', 'depoimentos'
+  const [activeTab, setActiveTab] = useState(urlTab || initialTab); // 'atendimentos', 'agenda', 'fluxo_caixa', 'gastos_fixos', 'mecanicos', 'depoimentos', 'logs'
   const [showQuickRegister, setShowQuickRegister] = useState(false);
+
+  useEffect(() => {
+    if (urlTab) setActiveTab(urlTab);
+    else if (initialTab && initialTab !== 'atendimentos') setActiveTab(initialTab);
+  }, [urlTab, initialTab]);
 
   // Ao montar, verifica se já existe sessão Supabase válida e se o usuário é admin.
   useEffect(() => {
@@ -828,18 +837,6 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {activeTab === 'fluxo_caixa' && (
-          <div className="glass" style={{ padding: '30px', marginBottom: '30px' }}>
-            <FluxoCaixa />
-          </div>
-        )}
-
-        {activeTab === 'mecanicos' && (
-          <div className="glass" style={{ padding: '30px', marginBottom: '30px' }}>
-            <MecanicosManager />
-          </div>
-        )}
-
         {activeTab === 'depoimentos' && (
           <div className="glass" style={{ padding: '30px', marginBottom: '30px' }}>
             <h3 style={{ color: '#f59e0b', marginBottom: '20px' }}>⭐ Moderação de Depoimentos</h3>
@@ -888,9 +885,25 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {activeTab === 'fluxo_caixa' && <FluxoCaixa />}
-        {activeTab === 'gastos_fixos' && <GastosFixos />}
-        {activeTab === 'mecanicos' && <MecanicosManager />}
+        {activeTab === 'fluxo_caixa' && (
+          <ErrorBoundary moduleName="Fluxo de Caixa">
+            <div className="glass" style={{ padding: '30px', marginBottom: '30px' }}>
+              <FluxoCaixa />
+            </div>
+          </ErrorBoundary>
+        )}
+        {activeTab === 'gastos_fixos' && (
+          <ErrorBoundary moduleName="Gastos Fixos">
+            <GastosFixos />
+          </ErrorBoundary>
+        )}
+        {activeTab === 'mecanicos' && (
+          <ErrorBoundary moduleName="Mecânicos">
+            <div className="glass" style={{ padding: '30px', marginBottom: '30px' }}>
+              <MecanicosManager />
+            </div>
+          </ErrorBoundary>
+        )}
         {activeTab === 'logs' && <LogsSistemaView />}
 
         {(activeTab === 'atendimentos' || activeTab === 'agenda') && (

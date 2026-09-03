@@ -485,3 +485,22 @@ Botão fica `disabled` se o cliente não tem nenhum veículo cadastrado, com tex
 
 5. **Deploy**:
    - Realizado deploy das alterações na Vercel (frontend) e no Render (backend) com sincronização em tempo real no branch `main` do GitHub.
+
+### 2026-09-03 — Correção de Tela Preta no Fluxo de Caixa e Resiliência
+
+**Contexto**: Diagnóstico e resolução de tela preta / travamento de renderização ao entrar no Fluxo de Caixa.
+
+**Causas Identificadas e Corrigidas**:
+1. **Duplicação de Renderização (`AdminDashboard.jsx`)**:
+   - Removida a duplicação dos blocos de abas de `<FluxoCaixa />` e `<MecanicosManager />`.
+   - Implementado suporte a `initialTab` e sincronização automática com parâmetros de busca na URL (`?tab=fluxo_caixa`).
+2. **Rotas Dedicadas e Wildcard (`App.jsx`)**:
+   - Adicionadas rotas `/fluxo-de-caixa`, `/fluxo_caixa` e `/caixa` apontando para `<AdminDashboard initialTab="fluxo_caixa" />`.
+   - Adicionada rota de fallback `<Route path="*" element={<Navigate to="/" replace />} />`.
+3. **Blindagem Contra Dados Nulos/Corrompidos (`FluxoCaixa.jsx`)**:
+   - Implementados os helpers `safeArray` e `formatIsoDate`.
+   - Sanitizadas todas as chamadas a `.split('-')`, `.reduce()`, `.filter()` e `.forEach()`.
+   - Corrigido `loadDraft` para checagens seguras (`!= null` e `String(...)`).
+   - Gerados IDs de canal únicos para evitar conflitos de Realtime no Supabase.
+4. **Novo Componente de Recuperação (`ErrorBoundary.jsx`)**:
+   - Criado componente de captura de erro para isolar falhas de renderização, com botões para tentar novamente e limpar cache local corrompido (`kadosh_fluxo_caixa_draft` / `kadosh_fluxo_caixa`).

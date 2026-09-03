@@ -1,5 +1,5 @@
 import React from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import Hero from './components/Hero'
 import AboutUs from './components/AboutUs'
 import Services from './components/Services'
@@ -45,6 +45,9 @@ function App() {
           </>
         } />
       <Route path="/admin" element={<AdminDashboard />} />
+      <Route path="/fluxo-de-caixa" element={<AdminDashboard initialTab="fluxo_caixa" />} />
+      <Route path="/fluxo_caixa" element={<AdminDashboard initialTab="fluxo_caixa" />} />
+      <Route path="/caixa" element={<AdminDashboard initialTab="fluxo_caixa" />} />
       <Route path="/tv" element={<TvDashboard />} />
       <Route path="/login" element={<><Login /><Footer theme="dark" /></>} />
       <Route path="/cadastro" element={<><Cadastro /><Footer theme="dark" /></>} />
@@ -55,6 +58,7 @@ function App() {
       <Route path="/cafe-com-graxa" element={<CafeComGraxa />} />
       <Route path="/revisoes" element={<Revisoes />} />
       <Route path="/revisoes/:id" element={<RevisaoDetalhes />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
     </>
   )

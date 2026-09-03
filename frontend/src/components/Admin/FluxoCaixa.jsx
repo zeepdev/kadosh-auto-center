@@ -4,9 +4,40 @@ import { pdf } from '@react-pdf/renderer';
 import { FluxoCaixaPDF } from './FluxoCaixaPDF';
 import { registrarLog } from '../../services/logService';
 
+// Funções utilitárias seguras para blindagem contra dados nulos/corrompidos
+const safeArray = (val) => {
+  if (!val) return [];
+  if (Array.isArray(val)) return val;
+  if (typeof val === 'string') {
+    try {
+      const parsed = JSON.parse(val);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
+const formatIsoDate = (d) => {
+  if (!d) return '--/--/----';
+  try {
+    const clean = String(d).split('T')[0];
+    const parts = clean.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return String(d);
+  } catch {
+    return '--/--/----';
+  }
+};
+
 // Sub-componente do Gráfico Anual Animado
-const AnnualBarChart = ({ monthsData, selectedYear, maxMonthValue, formatCurrency, onSelectMonth, expandedMonth }) => {
+const AnnualBarChart = ({ monthsData = [], selectedYear, maxMonthValue = 1, formatCurrency, onSelectMonth, expandedMonth }) => {
   const [hoveredMonth, setHoveredMonth] = useState(null);
+
+  const safeMonths = safeArray(monthsData);
 
   return (
     <div style={{ background: '#111116', border: '1px solid #2a2a35', borderRadius: '12px', padding: '20px', marginBottom: '30px' }}>
@@ -43,7 +74,7 @@ const AnnualBarChart = ({ monthsData, selectedYear, maxMonthValue, formatCurrenc
           <div style={{ borderTop: '1px dashed #22222a', width: '100%' }} />
         </div>
 
-        {monthsData.map((m) => {
+        {safeMonths.map((m) => {
           const isExpanded = expandedMonth === m.monthIndex;
           const isHovered = hoveredMonth === m.monthIndex;
 
@@ -144,20 +175,21 @@ const AnnualBarChart = ({ monthsData, selectedYear, maxMonthValue, formatCurrenc
 };
 
 // Sub-componente do Gráfico Diário Animado
-const DailyBarChart = ({ fechamentos, selectedYear, monthIndex, formatCurrency }) => {
+const DailyBarChart = ({ fechamentos = [], selectedYear, monthIndex, formatCurrency }) => {
   const [hoveredDay, setHoveredDay] = useState(null);
 
   const daysInMonth = new Date(selectedYear, monthIndex + 1, 0).getDate();
   const monthStr = (monthIndex + 1).toString().padStart(2, '0');
+  const validFechamentos = safeArray(fechamentos);
 
   const dailyData = Array.from({ length: daysInMonth }, (_, i) => {
     const dayNum = i + 1;
     const dayStr = dayNum.toString().padStart(2, '0');
     const dateStr = `${selectedYear}-${monthStr}-${dayStr}`;
 
-    const closure = fechamentos.find(f => f.data === dateStr);
-    const ent = closure?.entradas?.reduce((a, c) => a + (parseFloat(c.valor) || 0), 0) || 0;
-    const sai = closure?.saidas?.reduce((a, c) => a + (parseFloat(c.valor) || 0), 0) || 0;
+    const closure = validFechamentos.find(f => f && f.data === dateStr);
+    const ent = safeArray(closure?.entradas).reduce((a, c) => a + (parseFloat(c?.valor) || 0), 0);
+    const sai = safeArray(closure?.saidas).reduce((a, c) => a + (parseFloat(c?.valor) || 0), 0);
 
     return {
       day: dayNum,
@@ -284,9 +316,12 @@ const FluxoCaixa = () => {
 
   // Carregar histórico e rascunho no mount
   useEffect(() => {
+    let isMounted = true;
     const init = async () => {
       const hData = await fetchHistorico();
-      loadDraft();
+      if (!isMounted) return;
+      await loadDraft();
+      if (!isMounted) return;
 
       const hoje = new Date().toISOString().split('T')[0];
       const draftStr = localStorage.getItem('kadosh_fluxo_caixa_draft');
@@ -296,19 +331,21 @@ const FluxoCaixa = () => {
       syncPaidBudgets(hoje);
     };
     init();
+    return () => { isMounted = false; };
   }, []);
 
   // Buscar o último fechamento do dia anterior para preencher os saldos anteriores
   const applyPreviousClosureBalances = (targetDate, historyList = historico) => {
-    if (!historyList || historyList.length === 0) return;
+    const validList = safeArray(historyList).filter(item => item && item.data);
+    if (validList.length === 0) return;
 
-    const sorted = [...historyList].sort((a, b) => b.data.localeCompare(a.data));
+    const sorted = [...validList].sort((a, b) => String(b.data).localeCompare(String(a.data)));
     const prevClosure = sorted.find(item => item.data < targetDate) || sorted[0];
 
     if (prevClosure) {
-      setFundoCaixaAnterior((prevClosure.fundo_caixa || 0).toString());
-      setDinheiroEmpresaAnterior((prevClosure.dinheiro_empresa || 0).toString());
-      setFundoReservaAnterior((prevClosure.fundo_reserva || 0).toString());
+      setFundoCaixaAnterior(String(prevClosure.fundo_caixa || 0));
+      setDinheiroEmpresaAnterior(String(prevClosure.dinheiro_empresa || 0));
+      setFundoReservaAnterior(String(prevClosure.fundo_reserva || 0));
     }
   };
 
@@ -320,17 +357,17 @@ const FluxoCaixa = () => {
         .select('*')
         .eq('pago', true);
 
-      if (error || !paidBudgets) return;
+      if (error || !paidBudgets || !Array.isArray(paidBudgets)) return;
 
-      const matching = paidBudgets.filter(b => b.data_pagamento === targetDate);
+      const matching = paidBudgets.filter(b => b && b.data_pagamento === targetDate);
       if (matching.length === 0) return;
 
       setEntradas(currentEntradas => {
-        let updated = [...currentEntradas];
+        let updated = safeArray(currentEntradas);
 
         matching.forEach(b => {
           const desc = `Orçamento #${b.id} - ${b.nome || 'Cliente Balcão'} (${b.placa || 'Sem placa'})`;
-          const exists = updated.some(e => e.descricao && e.descricao.includes(`Orçamento #${b.id}`));
+          const exists = updated.some(e => e && e.descricao && e.descricao.includes(`Orçamento #${b.id}`));
 
           if (!exists) {
             const newEntry = {
@@ -340,7 +377,7 @@ const FluxoCaixa = () => {
               conta: b.conta_destino || 'Mercado Pago KADOSH'
             };
 
-            if (updated.length === 1 && !updated[0].descricao && !updated[0].valor) {
+            if (updated.length === 1 && !updated[0]?.descricao && !updated[0]?.valor) {
               updated = [newEntry];
             } else {
               updated = [newEntry, ...updated];
@@ -364,9 +401,10 @@ const FluxoCaixa = () => {
       const pDate = detail.data_pagamento || new Date().toISOString().split('T')[0];
       if (pDate === dataCaixa) {
         setEntradas(current => {
+          const currentList = safeArray(current);
           const desc = detail.descricao || `Orçamento #${detail.budget_id} - ${detail.nome || 'Cliente Balcão'} (${detail.placa || 'Sem placa'})`;
-          const exists = current.some(e => e.descricao && e.descricao.includes(`Orçamento #${detail.budget_id}`));
-          if (exists) return current;
+          const exists = currentList.some(e => e && e.descricao && e.descricao.includes(`Orçamento #${detail.budget_id}`));
+          if (exists) return currentList;
 
           const newEntry = {
             descricao: desc,
@@ -375,10 +413,10 @@ const FluxoCaixa = () => {
             conta: detail.conta || 'Mercado Pago KADOSH'
           };
 
-          if (current.length === 1 && !current[0].descricao && !current[0].valor) {
+          if (currentList.length === 1 && !currentList[0]?.descricao && !currentList[0]?.valor) {
             return [newEntry];
           }
-          return [newEntry, ...current];
+          return [newEntry, ...currentList];
         });
       }
     };
@@ -403,26 +441,34 @@ const FluxoCaixa = () => {
         .order('data', { ascending: false });
 
       if (error) throw error;
-      setHistorico(data || []);
-      return data || [];
+      const cleanData = Array.isArray(data) ? data : [];
+      setHistorico(cleanData);
+      return cleanData;
     } catch (err) {
-      console.warn('Erro ao carregar do Supabase. Carregando dados locais:', err.message);
-      const localData = localStorage.getItem('kadosh_fluxo_caixa');
-      if (localData) {
-        const parsed = JSON.parse(localData);
-        setHistorico(parsed);
-        return parsed;
+      console.warn('Erro ao carregar do Supabase. Carregando dados locais:', err?.message || err);
+      try {
+        const localData = localStorage.getItem('kadosh_fluxo_caixa');
+        if (localData) {
+          const parsed = JSON.parse(localData);
+          const cleanParsed = Array.isArray(parsed) ? parsed : [];
+          setHistorico(cleanParsed);
+          return cleanParsed;
+        }
+      } catch (parseErr) {
+        console.warn('Erro ao ler kadosh_fluxo_caixa local:', parseErr);
       }
+      setHistorico([]);
       return [];
     } finally {
       setLoading(false);
     }
   };
 
-  // Inscrição no Supabase Realtime para sincronização de orçamentos pagos e histórico de fechamentos
+  // Inscrição no Supabase Realtime com canal único por montagem para evitar colisões
   useEffect(() => {
+    const channelId = `kadosh_cashflow_${Math.random().toString(36).substring(2, 9)}`;
     const channel = supabase
-      .channel('kadosh_realtime_cashflow')
+      .channel(channelId)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orcamentos' }, () => {
         syncPaidBudgets(dataCaixa);
       })
@@ -446,16 +492,16 @@ const FluxoCaixa = () => {
         .maybeSingle();
 
       if (!error && data) {
-        if (data.data_caixa) setDataCaixa(data.data_caixa);
-        if (data.fundo_caixa_anterior !== undefined) setFundoCaixaAnterior(data.fundo_caixa_anterior.toString());
-        if (data.dinheiro_empresa_anterior !== undefined) setDinheiroEmpresaAnterior(data.dinheiro_empresa_anterior.toString());
-        if (data.fundo_reserva_anterior !== undefined) setFundoReservaAnterior(data.fundo_reserva_anterior.toString());
+        if (data.data_caixa) setDataCaixa(String(data.data_caixa));
+        if (data.fundo_caixa_anterior != null) setFundoCaixaAnterior(String(data.fundo_caixa_anterior));
+        if (data.dinheiro_empresa_anterior != null) setDinheiroEmpresaAnterior(String(data.dinheiro_empresa_anterior));
+        if (data.fundo_reserva_anterior != null) setFundoReservaAnterior(String(data.fundo_reserva_anterior));
         if (data.entradas && Array.isArray(data.entradas)) setEntradas(data.entradas);
         if (data.saidas && Array.isArray(data.saidas)) setSaidas(data.saidas);
-        if (data.fundo_caixa_final !== undefined) setFundoCaixaFinal(data.fundo_caixa_final.toString());
-        if (data.dinheiro_empresa_final !== undefined) setDinheiroEmpresaFinal(data.dinheiro_empresa_final.toString());
-        if (data.fundo_reserva_final !== undefined) setFundoReservaFinal(data.fundo_reserva_final.toString());
-        if (data.observacoes) setObservacoes(data.observacoes);
+        if (data.fundo_caixa_final != null) setFundoCaixaFinal(String(data.fundo_caixa_final));
+        if (data.dinheiro_empresa_final != null) setDinheiroEmpresaFinal(String(data.dinheiro_empresa_final));
+        if (data.fundo_reserva_final != null) setFundoReservaFinal(String(data.fundo_reserva_final));
+        if (data.observacoes != null) setObservacoes(String(data.observacoes));
         console.log('✅ Rascunho online do Fluxo de Caixa sincronizado do Supabase!');
         return;
       }
@@ -464,23 +510,25 @@ const FluxoCaixa = () => {
     }
 
     // Fallback para localStorage
-    const draftStr = localStorage.getItem('kadosh_fluxo_caixa_draft');
-    if (draftStr) {
-      try {
+    try {
+      const draftStr = localStorage.getItem('kadosh_fluxo_caixa_draft');
+      if (draftStr) {
         const draft = JSON.parse(draftStr);
-        if (draft.dataCaixa) setDataCaixa(draft.dataCaixa);
-        if (draft.fundoCaixaAnterior) setFundoCaixaAnterior(draft.fundoCaixaAnterior);
-        if (draft.dinheiroEmpresaAnterior) setDinheiroEmpresaAnterior(draft.dinheiroEmpresaAnterior);
-        if (draft.fundoReservaAnterior) setFundoReservaAnterior(draft.fundoReservaAnterior);
-        if (draft.entradas) setEntradas(draft.entradas);
-        if (draft.saidas) setSaidas(draft.saidas);
-        if (draft.fundoCaixaFinal !== undefined) setFundoCaixaFinal(draft.fundoCaixaFinal);
-        if (draft.dinheiroEmpresaFinal !== undefined) setDinheiroEmpresaFinal(draft.dinheiroEmpresaFinal);
-        if (draft.fundoReservaFinal !== undefined) setFundoReservaFinal(draft.fundoReservaFinal);
-        if (draft.observacoes) setObservacoes(draft.observacoes);
-      } catch (e) {
-        console.error('Erro ao ler rascunho local:', e);
+        if (draft && typeof draft === 'object') {
+          if (draft.dataCaixa) setDataCaixa(String(draft.dataCaixa));
+          if (draft.fundoCaixaAnterior != null) setFundoCaixaAnterior(String(draft.fundoCaixaAnterior));
+          if (draft.dinheiroEmpresaAnterior != null) setDinheiroEmpresaAnterior(String(draft.dinheiroEmpresaAnterior));
+          if (draft.fundoReservaAnterior != null) setFundoReservaAnterior(String(draft.fundoReservaAnterior));
+          if (Array.isArray(draft.entradas)) setEntradas(draft.entradas);
+          if (Array.isArray(draft.saidas)) setSaidas(draft.saidas);
+          if (draft.fundoCaixaFinal != null) setFundoCaixaFinal(String(draft.fundoCaixaFinal));
+          if (draft.dinheiroEmpresaFinal != null) setDinheiroEmpresaFinal(String(draft.dinheiroEmpresaFinal));
+          if (draft.fundoReservaFinal != null) setFundoReservaFinal(String(draft.fundoReservaFinal));
+          if (draft.observacoes != null) setObservacoes(String(draft.observacoes));
+        }
       }
+    } catch (e) {
+      console.error('Erro ao ler rascunho local:', e);
     }
   };
 
@@ -531,29 +579,32 @@ const FluxoCaixa = () => {
   ]);
 
   // Cálculos Automáticos Baseados nos Lançamentos
-  const inflowROMANOS = entradas
-    .filter(item => item.conta === 'Mercado Pago ROMANOS')
-    .reduce((acc, item) => acc + (parseFloat(item.valor) || 0), 0);
+  const safeEntradasList = safeArray(entradas);
+  const safeSaidasList = safeArray(saidas);
 
-  const inflowDinheiro = entradas
-    .filter(item => item.conta === 'Caixa da Empresa')
-    .reduce((acc, item) => acc + (parseFloat(item.valor) || 0), 0);
+  const inflowROMANOS = safeEntradasList
+    .filter(item => item && item.conta === 'Mercado Pago ROMANOS')
+    .reduce((acc, item) => acc + (parseFloat(item?.valor) || 0), 0);
 
-  const inflowReserva = entradas
-    .filter(item => item.conta === 'Mercado Pago KADOSH')
-    .reduce((acc, item) => acc + (parseFloat(item.valor) || 0), 0);
+  const inflowDinheiro = safeEntradasList
+    .filter(item => item && item.conta === 'Caixa da Empresa')
+    .reduce((acc, item) => acc + (parseFloat(item?.valor) || 0), 0);
 
-  const outflowFundoCaixa = saidas
-    .filter(item => item.conta === 'Mercado Pago ROMANOS')
-    .reduce((acc, item) => acc + (parseFloat(item.valor) || 0), 0);
+  const inflowReserva = safeEntradasList
+    .filter(item => item && item.conta === 'Mercado Pago KADOSH')
+    .reduce((acc, item) => acc + (parseFloat(item?.valor) || 0), 0);
 
-  const outflowDinheiro = saidas
-    .filter(item => item.conta === 'Caixa da Empresa')
-    .reduce((acc, item) => acc + (parseFloat(item.valor) || 0), 0);
+  const outflowFundoCaixa = safeSaidasList
+    .filter(item => item && item.conta === 'Mercado Pago ROMANOS')
+    .reduce((acc, item) => acc + (parseFloat(item?.valor) || 0), 0);
 
-  const outflowReserva = saidas
-    .filter(item => item.conta === 'Mercado Pago KADOSH')
-    .reduce((acc, item) => acc + (parseFloat(item.valor) || 0), 0);
+  const outflowDinheiro = safeSaidasList
+    .filter(item => item && item.conta === 'Caixa da Empresa')
+    .reduce((acc, item) => acc + (parseFloat(item?.valor) || 0), 0);
+
+  const outflowReserva = safeSaidasList
+    .filter(item => item && item.conta === 'Mercado Pago KADOSH')
+    .reduce((acc, item) => acc + (parseFloat(item?.valor) || 0), 0);
 
   // Valores Esperados (Anterior + Entrada - Saída)
   const expFundoCaixa = (parseFloat(fundoCaixaAnterior) || 0) + inflowROMANOS - outflowFundoCaixa;
@@ -877,35 +928,41 @@ const FluxoCaixa = () => {
     let anoEntradas = 0;
     let anoSaidas = 0;
 
-    // Filtra o histórico pelo ano selecionado
-    historico.forEach(fechamento => {
-      const date = new Date(fechamento.data + 'T00:00:00');
+    // Filtra o histórico pelo ano selecionado com proteção contra nulos
+    safeArray(historico).forEach(fechamento => {
+      if (!fechamento || !fechamento.data) return;
+      const cleanDate = String(fechamento.data).split('T')[0];
+      const date = new Date(cleanDate + 'T00:00:00');
       if (date.getFullYear() === selectedYear) {
         const mIdx = date.getMonth();
-        monthsData[mIdx].fechamentos.push(fechamento);
-        const entList = fechamento.entradas || [];
-        const saiList = fechamento.saidas || [];
+        if (monthsData[mIdx]) {
+          monthsData[mIdx].fechamentos.push(fechamento);
+          const entList = safeArray(fechamento.entradas);
+          const saiList = safeArray(fechamento.saidas);
 
-        // Somar entradas do dia
-        entList.forEach(ent => {
-          const val = parseFloat(ent.valor) || 0;
-          monthsData[mIdx].entradas += val;
-          anoEntradas += val;
+          // Somar entradas do dia
+          entList.forEach(ent => {
+            if (!ent) return;
+            const val = parseFloat(ent.valor) || 0;
+            monthsData[mIdx].entradas += val;
+            anoEntradas += val;
 
-          // Separar por canal/conta
-          if (ent.conta === 'Dinheiro') monthsData[mIdx].totalDinheiro += val;
-          else if (ent.conta === 'PIX') monthsData[mIdx].totalPIX += val;
-          else if (ent.conta === 'Mercado Pago KADOSH') monthsData[mIdx].totalMPKadosh += val;
-          else if (ent.conta === 'Mercado Pago ROMANOS') monthsData[mIdx].totalMPRomanos += val;
-          else monthsData[mIdx].totalOutros += val;
-        });
+            // Separar por canal/conta
+            if (ent.conta === 'Dinheiro') monthsData[mIdx].totalDinheiro += val;
+            else if (ent.conta === 'PIX') monthsData[mIdx].totalPIX += val;
+            else if (ent.conta === 'Mercado Pago KADOSH') monthsData[mIdx].totalMPKadosh += val;
+            else if (ent.conta === 'Mercado Pago ROMANOS') monthsData[mIdx].totalMPRomanos += val;
+            else monthsData[mIdx].totalOutros += val;
+          });
 
-        // Somar saídas do dia
-        saiList.forEach(sai => {
-          const val = parseFloat(sai.valor) || 0;
-          monthsData[mIdx].saidas += val;
-          anoSaidas += val;
-        });
+          // Somar saídas do dia
+          saiList.forEach(sai => {
+            if (!sai) return;
+            const val = parseFloat(sai.valor) || 0;
+            monthsData[mIdx].saidas += val;
+            anoSaidas += val;
+          });
+        }
       }
     });
 
@@ -1290,13 +1347,11 @@ const FluxoCaixa = () => {
                 <p style={{ color: '#555', fontSize: '0.85rem' }}>Nenhum fechamento salvo.</p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '350px', overflowY: 'auto' }}>
-                  {historico.slice(0, 10).map(item => {
-                    const tEnt = item.entradas?.reduce((a, c) => a + (parseFloat(c.valor) || 0), 0) || 0;
-                    const tSai = item.saidas?.reduce((a, c) => a + (parseFloat(c.valor) || 0), 0) || 0;
-                    const sReal = (item.fundo_caixa || 0) + (item.dinheiro_empresa || 0) + (item.fundo_reserva || 0);
-                    
-                    const [year, month, day] = item.data.split('-');
-                    const formattedD = `${day}/${month}/${year}`;
+                  {safeArray(historico).slice(0, 10).map(item => {
+                    const tEnt = safeArray(item?.entradas).reduce((a, c) => a + (parseFloat(c?.valor) || 0), 0);
+                    const tSai = safeArray(item?.saidas).reduce((a, c) => a + (parseFloat(c?.valor) || 0), 0);
+                    const sReal = (item?.fundo_caixa || 0) + (item?.dinheiro_empresa || 0) + (item?.fundo_reserva || 0);
+                    const formattedD = formatIsoDate(item?.data);
 
                     return (
                       <div key={item.id} className="glass" style={{ padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1508,15 +1563,16 @@ const FluxoCaixa = () => {
                         </p>
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                          {m.fechamentos.sort((a,b) => b.data.localeCompare(a.data)).map(item => {
-                            const tEnt = item.entradas?.reduce((a, c) => a + (parseFloat(c.valor) || 0), 0) || 0;
-                            const tSai = item.saidas?.reduce((a, c) => a + (parseFloat(c.valor) || 0), 0) || 0;
-                            const sReal = (item.fundo_caixa || 0) + (item.dinheiro_empresa || 0) + (item.fundo_reserva || 0);
+                          {safeArray(m.fechamentos)
+                            .filter(item => item && item.data)
+                            .sort((a,b) => String(b.data).localeCompare(String(a.data)))
+                            .map(item => {
+                            const tEnt = safeArray(item?.entradas).reduce((a, c) => a + (parseFloat(c?.valor) || 0), 0);
+                            const tSai = safeArray(item?.saidas).reduce((a, c) => a + (parseFloat(c?.valor) || 0), 0);
+                            const sReal = (item?.fundo_caixa || 0) + (item?.dinheiro_empresa || 0) + (item?.fundo_reserva || 0);
                             const saldoLiquidoDia = tEnt - tSai;
                             const isItemExpanded = expandedDayItems[item.id];
-
-                            const [year, month, day] = item.data.split('-');
-                            const formattedD = `${day}/${month}/${year}`;
+                            const formattedD = formatIsoDate(item.data);
 
                             return (
                               <div key={item.id} style={{ background: '#16161a', border: '1px solid #2a2a35', borderRadius: '8px', overflow: 'hidden' }}>
@@ -1672,20 +1728,19 @@ const FluxoCaixa = () => {
 
             {/* Lista Filtrada */}
             <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', paddingRight: '5px' }}>
-              {historico
+              {safeArray(historico)
                 .filter(item => {
+                  if (!item) return false;
                   if (!searchHistoryModal) return true;
-                  const [y, m, d] = item.data.split('-');
-                  const formattedStr = `${d}/${m}/${y}`;
-                  return item.data.includes(searchHistoryModal) || formattedStr.includes(searchHistoryModal);
+                  const formattedStr = formatIsoDate(item.data);
+                  return (item.data && String(item.data).includes(searchHistoryModal)) || formattedStr.includes(searchHistoryModal);
                 })
                 .map(item => {
-                  const tEnt = item.entradas?.reduce((a, c) => a + (parseFloat(c.valor) || 0), 0) || 0;
-                  const tSai = item.saidas?.reduce((a, c) => a + (parseFloat(c.valor) || 0), 0) || 0;
-                  const sReal = (item.fundo_caixa || 0) + (item.dinheiro_empresa || 0) + (item.fundo_reserva || 0);
-                  const isItemExpanded = expandedDayItems[item.id];
-                  const [year, month, day] = item.data.split('-');
-                  const formattedD = `${day}/${month}/${year}`;
+                  const tEnt = safeArray(item?.entradas).reduce((a, c) => a + (parseFloat(c?.valor) || 0), 0);
+                  const tSai = safeArray(item?.saidas).reduce((a, c) => a + (parseFloat(c?.valor) || 0), 0);
+                  const sReal = (item?.fundo_caixa || 0) + (item?.dinheiro_empresa || 0) + (item?.fundo_reserva || 0);
+                  const isItemExpanded = expandedDayItems[item?.id];
+                  const formattedD = formatIsoDate(item?.data);
 
                   return (
                     <div key={item.id} style={{ background: '#18181f', border: '1px solid #2a2a35', borderRadius: '10px', overflow: 'hidden' }}>

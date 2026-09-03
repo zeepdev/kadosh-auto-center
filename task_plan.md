@@ -59,6 +59,11 @@
    - Adicionado o parâmetro `supportsAllDrives: true` para compatibilidade total com Drives Compartilhados.
 9. ✅ **Integração do Google reCAPTCHA v3**: Site Key instalada no `index.html` e scripts de token adicionados aos formulários públicos (`BudgetForm.jsx` e `RevisaoDetalhes.jsx`). Criado o endpoint `/api/verify-recaptcha` no backend para validar os envios usando a `RECAPTCHA_SECRET_KEY` (com bypass de segurança caso a chave não esteja configurada localmente, para não travar o desenvolvimento).
 10. ✅ **Foto de Perfil do Cliente e Depoimentos**: Desenvolvida a funcionalidade que permite aos clientes fazerem upload de suas próprias fotos de perfil (até 5MB) na área de edição de dados do painel do cliente (`ClientDashboard.jsx`), armazenando a foto no bucket público do Supabase. Modificada a listagem de depoimentos da página inicial (`Testimonials.jsx`) para buscar e exibir automaticamente as fotos reais dos autores (com fallback para a inicial estilizada do nome).
+11. ✅ **Correção de Tela Preta no Fluxo de Caixa**:
+   - Eliminada a duplicação de renderização de `<FluxoCaixa />` e `<MecanicosManager />` em `AdminDashboard.jsx`.
+   - Adicionadas rotas diretas `/fluxo-de-caixa`, `/fluxo_caixa`, `/caixa` e rota curinga de fallback no `App.jsx`.
+   - Blindado o componente `FluxoCaixa.jsx` contra dados nulos, campos corrompidos e formatos de data inválidos com helpers `safeArray` e `formatIsoDate`.
+   - Implementado `ErrorBoundary.jsx` com botões de auto-recuperação e limpeza de cache local (`kadosh_fluxo_caixa_draft` / `kadosh_fluxo_caixa`).
 
 ### 🟡 Média Prioridade
 1. ⏭️ **Reativar confirmação de e-mail** no Supabase com SMTP próprio + template customizado.
