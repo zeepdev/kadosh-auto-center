@@ -158,9 +158,10 @@ const parseProgresso = (status, avaliacaoSite) => {
   return { passo: 0, ponto: 'Orçamento Recebido' };
 };
 
-const AdminDashboard = ({ initialTab = 'atendimentos' }) => {
+const AdminDashboard = ({ initialTab = 'atendimentos', initialSubTab = 'diario' }) => {
   const [searchParams] = useSearchParams();
   const urlTab = searchParams.get('tab');
+  const urlSubTab = searchParams.get('subtab') || initialSubTab;
 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
@@ -888,7 +889,7 @@ const AdminDashboard = ({ initialTab = 'atendimentos' }) => {
         {activeTab === 'fluxo_caixa' && (
           <ErrorBoundary moduleName="Fluxo de Caixa">
             <div className="glass" style={{ padding: '30px', marginBottom: '30px' }}>
-              <FluxoCaixa />
+              <FluxoCaixa initialSubTab={urlSubTab} />
             </div>
           </ErrorBoundary>
         )}

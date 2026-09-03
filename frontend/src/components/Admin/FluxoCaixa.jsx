@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { pdf } from '@react-pdf/renderer';
 import { FluxoCaixaPDF } from './FluxoCaixaPDF';
@@ -278,9 +278,13 @@ const DailyBarChart = ({ fechamentos = [], selectedYear, monthIndex, formatCurre
   );
 };
 
-const FluxoCaixa = () => {
-  // Sub-abas do Fluxo de Caixa: 'diario' ou 'consolidado'
-  const [subTab, setSubTab] = useState('diario');
+const FluxoCaixa = ({ initialSubTab = 'diario' }) => {
+  // Sub-abas do Fluxo de Caixa: 'diario', 'consolidado' ou 'extrato'
+  const [subTab, setSubTab] = useState(initialSubTab);
+
+  useEffect(() => {
+    if (initialSubTab) setSubTab(initialSubTab);
+  }, [initialSubTab]);
 
   // Estados do rascunho / novo fechamento
   const [dataCaixa, setDataCaixa] = useState(new Date().toISOString().split('T')[0]);
@@ -302,7 +306,18 @@ const FluxoCaixa = () => {
   const [observacoes, setObservacoes] = useState('');
 
   // Histórico de fechamentos e controles
-  const [historico, setHistorico] = useState([]);
+  const [historico, setHistorico] = useState(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const local = localStorage.getItem('kadosh_fluxo_caixa');
+        if (local) {
+          const parsed = JSON.parse(local);
+          return Array.isArray(parsed) ? parsed : [];
+        }
+      }
+    } catch {}
+    return [];
+  });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [driveUploadStatus, setDriveUploadStatus] = useState('idle'); // 'idle' | 'loading' | 'success' | 'error'
@@ -313,6 +328,16 @@ const FluxoCaixa = () => {
   const [expandedDayItems, setExpandedDayItems] = useState({});
   const [showFullHistoryModal, setShowFullHistoryModal] = useState(false);
   const [searchHistoryModal, setSearchHistoryModal] = useState('');
+
+  // Estados do Extrato Geral / Consulta Unificada de Lançamentos
+  const [extratoTipo, setExtratoTipo] = useState('todos'); // 'todos' | 'entradas' | 'saidas'
+  const [extratoPeriodo, setExtratoPeriodo] = useState('mes_atual'); // 'todos' | 'hoje' | 'mes_atual' | 'mes_anterior' | 'ano_atual' | 'custom'
+  const [extratoDataInicio, setExtratoDataInicio] = useState('');
+  const [extratoDataFim, setExtratoDataFim] = useState('');
+  const [extratoConta, setExtratoConta] = useState('todas'); // 'todas' | 'Mercado Pago KADOSH' | 'Mercado Pago ROMANOS' | 'Caixa da Empresa'
+  const [extratoBusca, setExtratoBusca] = useState('');
+  const [extratoPagina, setExtratoPagina] = useState(1);
+  const [incluirRascunhoHoje, setIncluirRascunhoHoje] = useState(true);
 
   // Carregar histórico e rascunho no mount
   useEffect(() => {
@@ -977,11 +1002,185 @@ const FluxoCaixa = () => {
   const { monthsData, anoEntradas, anoSaidas, anoSaldo } = processConsolidado();
   const maxMonthValue = Math.max(...monthsData.map(m => Math.max(m.entradas, m.saidas)), 1);
 
+  // ----------------------------------------------------
+  // PROCESSAMENTO DO EXTRATO GERAL DE LANÇAMENTOS
+  // ----------------------------------------------------
+  const allTransactions = useMemo(() => {
+    const list = [];
+
+    // 1. Fechamentos do histórico
+    safeArray(historico).forEach(fechamento => {
+      if (!fechamento || !fechamento.data) return;
+      const fData = String(fechamento.data).split('T')[0];
+      const fId = fechamento.id;
+
+      // Entradas
+      safeArray(fechamento.entradas).forEach((ent, idx) => {
+        if (!ent || (!ent.descricao && !ent.valor)) return;
+        list.push({
+          id: `${fId}-ent-${idx}`,
+          closure: fechamento,
+          tipo: 'entrada',
+          data: fData,
+          descricao: ent.descricao || 'Entrada sem descrição',
+          valor: parseFloat(ent.valor) || 0,
+          metodo: ent.metodo || 'PIX',
+          conta: ent.conta || 'Não especificada',
+          origem: 'fechamento'
+        });
+      });
+
+      // Saídas
+      safeArray(fechamento.saidas).forEach((sai, idx) => {
+        if (!sai || (!sai.descricao && !sai.valor)) return;
+        list.push({
+          id: `${fId}-sai-${idx}`,
+          closure: fechamento,
+          tipo: 'saida',
+          data: fData,
+          descricao: sai.descricao || 'Saída sem descrição',
+          valor: parseFloat(sai.valor) || 0,
+          metodo: sai.metodo || 'Outro',
+          conta: sai.conta || 'Não especificada',
+          origem: 'fechamento'
+        });
+      });
+    });
+
+    // 2. Rascunho de hoje (se ainda não houver fechamento salvo para hoje)
+    if (incluirRascunhoHoje && dataCaixa) {
+      const cleanHoje = String(dataCaixa).split('T')[0];
+      const jaExisteHoje = safeArray(historico).some(f => f && String(f.data).split('T')[0] === cleanHoje);
+      if (!jaExisteHoje) {
+        safeArray(entradas).forEach((ent, idx) => {
+          if (!ent || (!ent.descricao && !ent.valor)) return;
+          list.push({
+            id: `draft-ent-${idx}`,
+            closure: null,
+            tipo: 'entrada',
+            data: cleanHoje,
+            descricao: ent.descricao || 'Entrada em andamento',
+            valor: parseFloat(ent.valor) || 0,
+            metodo: ent.metodo || 'PIX',
+            conta: ent.conta || 'Não especificada',
+            origem: 'rascunho'
+          });
+        });
+        safeArray(saidas).forEach((sai, idx) => {
+          if (!sai || (!sai.descricao && !sai.valor)) return;
+          list.push({
+            id: `draft-sai-${idx}`,
+            closure: null,
+            tipo: 'saida',
+            data: cleanHoje,
+            descricao: sai.descricao || 'Saída em andamento',
+            valor: parseFloat(sai.valor) || 0,
+            metodo: sai.metodo || 'Outro',
+            conta: sai.conta || 'Não especificada',
+            origem: 'rascunho'
+          });
+        });
+      }
+    }
+
+    return list.sort((a, b) => String(b.data).localeCompare(String(a.data)));
+  }, [historico, incluirRascunhoHoje, dataCaixa, entradas, saidas]);
+
+  const filteredTransactions = useMemo(() => {
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    const currentYear = today.getFullYear();
+    const currentMonth = (today.getMonth() + 1).toString().padStart(2, '0');
+    const currentYearMonth = `${currentYear}-${currentMonth}`;
+
+    const prevMonthDate = new Date(currentYear, today.getMonth() - 1, 1);
+    const prevYear = prevMonthDate.getFullYear();
+    const prevMonth = (prevMonthDate.getMonth() + 1).toString().padStart(2, '0');
+    const prevYearMonth = `${prevYear}-${prevMonth}`;
+
+    return allTransactions.filter(item => {
+      // Tipo
+      if (extratoTipo === 'entradas' && item.tipo !== 'entrada') return false;
+      if (extratoTipo === 'saidas' && item.tipo !== 'saida') return false;
+
+      // Conta
+      if (extratoConta !== 'todas' && item.conta !== extratoConta) return false;
+
+      // Período
+      if (extratoPeriodo === 'hoje' && item.data !== todayStr) return false;
+      if (extratoPeriodo === 'mes_atual' && !item.data.startsWith(currentYearMonth)) return false;
+      if (extratoPeriodo === 'mes_anterior' && !item.data.startsWith(prevYearMonth)) return false;
+      if (extratoPeriodo === 'ano_atual' && !item.data.startsWith(String(currentYear))) return false;
+      if (extratoPeriodo === 'custom') {
+        if (extratoDataInicio && item.data < extratoDataInicio) return false;
+        if (extratoDataFim && item.data > extratoDataFim) return false;
+      }
+
+      // Busca textual
+      if (extratoBusca.trim()) {
+        const q = extratoBusca.toLowerCase();
+        const matchDesc = (item.descricao || '').toLowerCase().includes(q);
+        const matchConta = (item.conta || '').toLowerCase().includes(q);
+        const matchMetodo = (item.metodo || '').toLowerCase().includes(q);
+        const matchData = formatIsoDate(item.data).includes(q) || item.data.includes(q);
+        const matchValor = (item.valor || 0).toString().includes(q);
+        if (!matchDesc && !matchConta && !matchMetodo && !matchData && !matchValor) return false;
+      }
+
+      return true;
+    });
+  }, [allTransactions, extratoTipo, extratoConta, extratoPeriodo, extratoDataInicio, extratoDataFim, extratoBusca]);
+
+  const totalFiltradoEntradas = useMemo(() => {
+    return filteredTransactions
+      .filter(t => t.tipo === 'entrada')
+      .reduce((acc, t) => acc + (t.valor || 0), 0);
+  }, [filteredTransactions]);
+
+  const totalFiltradoSaidas = useMemo(() => {
+    return filteredTransactions
+      .filter(t => t.tipo === 'saida')
+      .reduce((acc, t) => acc + (t.valor || 0), 0);
+  }, [filteredTransactions]);
+
+  const saldoFiltradoLiquido = totalFiltradoEntradas - totalFiltradoSaidas;
+
+  const ITENS_POR_PAGINA = 50;
+  const totalPaginas = Math.max(1, Math.ceil(filteredTransactions.length / ITENS_POR_PAGINA));
+  const transacoesPaginadas = useMemo(() => {
+    const inicio = (extratoPagina - 1) * ITENS_POR_PAGINA;
+    return filteredTransactions.slice(inicio, inicio + ITENS_POR_PAGINA);
+  }, [filteredTransactions, extratoPagina]);
+
+  const handleExportarCSV = () => {
+    const headers = ['Data', 'Tipo', 'Descrição', 'Forma de Pagamento', 'Conta', 'Valor (R$)', 'Origem'];
+    const rows = filteredTransactions.map(t => [
+      formatIsoDate(t.data),
+      t.tipo === 'entrada' ? 'Recebido' : 'Pago',
+      `"${(t.descricao || '').replace(/"/g, '""')}"`,
+      `"${(t.metodo || '').replace(/"/g, '""')}"`,
+      `"${(t.conta || '').replace(/"/g, '""')}"`,
+      (t.tipo === 'entrada' ? t.valor : -t.valor).toFixed(2).replace('.', ','),
+      t.origem === 'rascunho' ? 'Rascunho de Hoje' : 'Fechamento Salvo'
+    ]);
+
+    const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map(r => r.join(';'))].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Extrato_Lancamentos_Kadosh_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div style={{ color: '#fff' }}>
       
       {/* Sub-Abas Nav */}
-      <div style={{ display: 'flex', gap: '15px', borderBottom: '1px solid #333', paddingBottom: '12px', marginBottom: '25px' }}>
+      <div style={{ display: 'flex', gap: '15px', borderBottom: '1px solid #333', paddingBottom: '12px', marginBottom: '25px', flexWrap: 'wrap' }}>
         <button 
           onClick={() => setSubTab('diario')}
           style={{ 
@@ -1000,9 +1199,18 @@ const FluxoCaixa = () => {
         >
           📊 Consolidado Mensal / Anual
         </button>
+        <button 
+          onClick={() => { setSubTab('extrato'); setExtratoPagina(1); }}
+          style={{ 
+            background: 'transparent', border: 'none', color: subTab === 'extrato' ? '#10b981' : '#888',
+            fontSize: '1.1rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px'
+          }}
+        >
+          🔍 Consultar Lançamentos (Extrato Geral)
+        </button>
       </div>
 
-      {subTab === 'diario' ? (
+      {subTab === 'diario' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1.24fr 0.76fr', gap: '30px', alignItems: 'start' }}>
           
           {/* Formulário Principal */}
@@ -1412,7 +1620,9 @@ const FluxoCaixa = () => {
           </div>
 
         </div>
-      ) : (
+      )}
+
+      {subTab === 'consolidado' && (
         /* Aba de Relatório Consolidado */
         <div className="panel" style={{ padding: '30px', background: '#16161a', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px', flexWrap: 'wrap', gap: '15px' }}>
@@ -1681,6 +1891,356 @@ const FluxoCaixa = () => {
             })}
           </div>
 
+        </div>
+      )}
+
+      {/* Sub-Aba: Extrato Geral e Consulta de Lançamentos */}
+      {subTab === 'extrato' && (
+        <div className="panel" style={{ padding: '30px', background: '#16161a', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px', flexWrap: 'wrap', gap: '15px' }}>
+            <div>
+              <h3 style={{ margin: 0, color: '#fff', fontSize: '1.4rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                🔍 Consulta Geral de Lançamentos
+              </h3>
+              <p style={{ margin: '5px 0 0 0', color: '#aaa', fontSize: '0.85rem' }}>
+                Histórico unificado de tudo o que foi recebido e pago na oficina, sem precisar abrir dia a dia.
+              </p>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={handleExportarCSV}
+                style={{
+                  padding: '10px 18px', background: '#10b981', border: 'none',
+                  borderRadius: '8px', color: '#000', fontWeight: 'bold', fontSize: '0.88rem',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
+                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)'
+                }}
+              >
+                📥 Exportar Planilha (CSV)
+              </button>
+            </div>
+          </div>
+
+          {/* Cards de Resumo Financeiro do Filtro Atual */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '15px', marginBottom: '25px' }}>
+            <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '10px', padding: '16px' }}>
+              <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#10b981', fontWeight: 'bold' }}>
+                🟢 Total Recebido (Entradas)
+              </span>
+              <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#10b981', marginTop: '6px' }}>
+                +{formatCurrency(totalFiltradoEntradas)}
+              </div>
+              <span style={{ fontSize: '0.75rem', color: '#aaa' }}>
+                {filteredTransactions.filter(t => t.tipo === 'entrada').length} recebimento(s) filtrado(s)
+              </span>
+            </div>
+
+            <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: '10px', padding: '16px' }}>
+              <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#ef4444', fontWeight: 'bold' }}>
+                🔴 Total Pago (Saídas)
+              </span>
+              <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#ef4444', marginTop: '6px' }}>
+                -{formatCurrency(totalFiltradoSaidas)}
+              </div>
+              <span style={{ fontSize: '0.75rem', color: '#aaa' }}>
+                {filteredTransactions.filter(t => t.tipo === 'saida').length} pagamento(s) filtrado(s)
+              </span>
+            </div>
+
+            <div style={{ background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '10px', padding: '16px' }}>
+              <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#60a5fa', fontWeight: 'bold' }}>
+                ⚖️ Saldo Líquido do Período
+              </span>
+              <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: saldoFiltradoLiquido >= 0 ? '#10b981' : '#ef4444', marginTop: '6px' }}>
+                {formatCurrency(saldoFiltradoLiquido)}
+              </div>
+              <span style={{ fontSize: '0.75rem', color: '#aaa' }}>
+                (Recebidos − Pagos no filtro)
+              </span>
+            </div>
+
+            <div style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.25)', borderRadius: '10px', padding: '16px' }}>
+              <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#f59e0b', fontWeight: 'bold' }}>
+                📊 Quantidade de Lançamentos
+              </span>
+              <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#fff', marginTop: '6px' }}>
+                {filteredTransactions.length}
+              </div>
+              <span style={{ fontSize: '0.75rem', color: '#aaa' }}>
+                Página {extratoPagina} de {totalPaginas}
+              </span>
+            </div>
+          </div>
+
+          {/* Painel de Filtros */}
+          <div style={{ background: '#0f0f13', border: '1px solid #2a2a35', borderRadius: '10px', padding: '18px', marginBottom: '25px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            
+            {/* Linha 1: Período Rápido */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.8rem', color: '#888', fontWeight: 'bold', minWidth: '70px' }}>Período:</span>
+              {[
+                { id: 'mes_atual', label: '📅 Este Mês' },
+                { id: 'hoje', label: '☀️ Hoje' },
+                { id: 'mes_anterior', label: '⏮️ Mês Passado' },
+                { id: 'ano_atual', label: '📈 Este Ano' },
+                { id: 'todos', label: '🌐 Todo o Histórico' },
+                { id: 'custom', label: '🗓️ Personalizado...' }
+              ].map(p => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => { setExtratoPeriodo(p.id); setExtratoPagina(1); }}
+                  style={{
+                    padding: '6px 12px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer',
+                    background: extratoPeriodo === p.id ? '#3b82f6' : '#181820',
+                    color: extratoPeriodo === p.id ? '#fff' : '#aaa',
+                    border: `1px solid ${extratoPeriodo === p.id ? '#3b82f6' : '#2a2a35'}`
+                  }}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Linha Opcional: Datas Customizadas */}
+            {extratoPeriodo === 'custom' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap', padding: '10px', background: '#16161e', borderRadius: '8px', border: '1px dashed #3b82f6' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <label style={{ fontSize: '0.78rem', color: '#aaa' }}>De:</label>
+                  <input
+                    type="date"
+                    value={extratoDataInicio}
+                    onChange={(e) => { setExtratoDataInicio(e.target.value); setExtratoPagina(1); }}
+                    style={{ padding: '6px 10px', background: '#0a0a0c', border: '1px solid #333', borderRadius: '6px', color: '#fff', fontSize: '0.8rem' }}
+                  />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <label style={{ fontSize: '0.78rem', color: '#aaa' }}>Até:</label>
+                  <input
+                    type="date"
+                    value={extratoDataFim}
+                    onChange={(e) => { setExtratoDataFim(e.target.value); setExtratoPagina(1); }}
+                    style={{ padding: '6px 10px', background: '#0a0a0c', border: '1px solid #333', borderRadius: '6px', color: '#fff', fontSize: '0.8rem' }}
+                  />
+                </div>
+                {(extratoDataInicio || extratoDataFim) && (
+                  <button
+                    type="button"
+                    onClick={() => { setExtratoDataInicio(''); setExtratoDataFim(''); }}
+                    style={{ padding: '4px 8px', background: 'transparent', border: 'none', color: '#ef4444', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline' }}
+                  >
+                    Limpar datas
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Linha 2: Tipo, Conta, Busca e Checkbox */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'auto auto 1fr auto', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
+              
+              {/* Botões Tipo */}
+              <div style={{ display: 'flex', gap: '6px' }}>
+                {[
+                  { id: 'todos', label: 'Todos' },
+                  { id: 'entradas', label: '🟢 Recebidos' },
+                  { id: 'saidas', label: '🔴 Pagos' }
+                ].map(t => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => { setExtratoTipo(t.id); setExtratoPagina(1); }}
+                    style={{
+                      padding: '7px 12px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer',
+                      background: extratoTipo === t.id ? (t.id === 'entradas' ? '#10b981' : t.id === 'saidas' ? '#ef4444' : '#fff') : '#181820',
+                      color: extratoTipo === t.id ? '#000' : '#aaa',
+                      border: `1px solid ${extratoTipo === t.id ? 'transparent' : '#2a2a35'}`
+                    }}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Seletor de Conta */}
+              <select
+                value={extratoConta}
+                onChange={(e) => { setExtratoConta(e.target.value); setExtratoPagina(1); }}
+                style={{ padding: '7px 12px', background: '#181820', border: '1px solid #2a2a35', borderRadius: '6px', color: '#fff', fontSize: '0.8rem', fontWeight: 'bold' }}
+              >
+                <option value="todas">🏦 Todas as Contas</option>
+                <option value="Mercado Pago KADOSH">Mercado Pago KADOSH</option>
+                <option value="Mercado Pago ROMANOS">Mercado Pago ROMANOS</option>
+                <option value="Caixa da Empresa">Caixa da Empresa</option>
+              </select>
+
+              {/* Campo de Busca */}
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  value={extratoBusca}
+                  onChange={(e) => { setExtratoBusca(e.target.value); setExtratoPagina(1); }}
+                  placeholder="🔍 Buscar por cliente, placa, serviço, peça, conta, valor..."
+                  style={{ width: '100%', padding: '8px 12px', background: '#181820', border: '1px solid #2a2a35', borderRadius: '6px', color: '#fff', fontSize: '0.85rem' }}
+                />
+                {extratoBusca && (
+                  <button
+                    type="button"
+                    onClick={() => { setExtratoBusca(''); setExtratoPagina(1); }}
+                    style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: '#aaa', cursor: 'pointer' }}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {/* Checkbox Rascunho */}
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#bbb', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                <input
+                  type="checkbox"
+                  checked={incluirRascunhoHoje}
+                  onChange={(e) => setIncluirRascunhoHoje(e.target.checked)}
+                />
+                Incluir rascunho de hoje
+              </label>
+
+            </div>
+
+          </div>
+
+          {/* Tabela de Lançamentos */}
+          <div style={{ overflowX: 'auto', border: '1px solid #2a2a35', borderRadius: '10px', background: '#0f0f13' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+              <thead>
+                <tr style={{ background: '#181820', borderBottom: '1px solid #2a2a35', color: '#aaa', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  <th style={{ padding: '12px 15px' }}>Data</th>
+                  <th style={{ padding: '12px 15px' }}>Tipo</th>
+                  <th style={{ padding: '12px 15px' }}>Descrição do Lançamento</th>
+                  <th style={{ padding: '12px 15px' }}>Forma / Método</th>
+                  <th style={{ padding: '12px 15px' }}>Conta</th>
+                  <th style={{ padding: '12px 15px', textAlign: 'right' }}>Valor</th>
+                  <th style={{ padding: '12px 15px', textAlign: 'center' }}>Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {transacoesPaginadas.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" style={{ padding: '40px 20px', textAlign: 'center', color: '#777' }}>
+                      Nenhum lançamento encontrado com os filtros selecionados.
+                    </td>
+                  </tr>
+                ) : (
+                  transacoesPaginadas.map((item, idx) => {
+                    const isEntrada = item.tipo === 'entrada';
+                    return (
+                      <tr 
+                        key={item.id || idx}
+                        style={{ 
+                          borderBottom: '1px solid #1a1a24',
+                          background: idx % 2 === 0 ? 'transparent' : 'rgba(255, 255, 255, 0.015)'
+                        }}
+                      >
+                        <td style={{ padding: '12px 15px', whiteSpace: 'nowrap', fontWeight: '500', color: '#ccc' }}>
+                          📅 {formatIsoDate(item.data)}
+                          {item.origem === 'rascunho' && (
+                            <span style={{ marginLeft: '6px', fontSize: '0.68rem', background: '#f59e0b20', color: '#f59e0b', border: '1px solid #f59e0b40', borderRadius: '4px', padding: '1px 5px' }}>
+                              Hoje
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ padding: '12px 15px', whiteSpace: 'nowrap' }}>
+                          <span style={{
+                            fontSize: '0.75rem', fontWeight: 'bold', padding: '3px 8px', borderRadius: '4px',
+                            background: isEntrada ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                            color: isEntrada ? '#10b981' : '#ef4444',
+                            border: `1px solid ${isEntrada ? '#10b98140' : '#ef444440'}`
+                          }}>
+                            {isEntrada ? '🟢 Recebido' : '🔴 Pago'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 15px', color: '#fff', fontWeight: '500' }}>
+                          {item.descricao}
+                        </td>
+                        <td style={{ padding: '12px 15px', color: '#aaa', whiteSpace: 'nowrap' }}>
+                          {item.metodo || '—'}
+                        </td>
+                        <td style={{ padding: '12px 15px', color: '#aaa', whiteSpace: 'nowrap' }}>
+                          <span style={{ 
+                            fontSize: '0.75rem', padding: '2px 8px', borderRadius: '4px', 
+                            background: item.conta === 'Caixa da Empresa' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+                            color: item.conta === 'Caixa da Empresa' ? '#f59e0b' : '#60a5fa',
+                            border: `1px solid ${item.conta === 'Caixa da Empresa' ? '#f59e0b30' : '#3b82f630'}`
+                          }}>
+                            {item.conta}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 15px', textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 'bold', fontSize: '0.92rem', color: isEntrada ? '#10b981' : '#ef4444' }}>
+                          {isEntrada ? `+${formatCurrency(item.valor)}` : `-${formatCurrency(item.valor)}`}
+                        </td>
+                        <td style={{ padding: '12px 15px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                          {item.closure ? (
+                            <button
+                              type="button"
+                              onClick={() => handleGeneratePDFManual(item.closure)}
+                              style={{
+                                padding: '4px 8px', background: '#3b82f615', border: '1px solid #3b82f6',
+                                borderRadius: '4px', color: '#60a5fa', fontSize: '0.72rem', fontWeight: 'bold',
+                                cursor: 'pointer'
+                              }}
+                              title={`Gerar PDF do fechamento de ${formatIsoDate(item.data)}`}
+                            >
+                              📄 PDF
+                            </button>
+                          ) : (
+                            <span style={{ fontSize: '0.72rem', color: '#666' }}>Em edição</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Paginação */}
+          {totalPaginas > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', flexWrap: 'wrap', gap: '10px' }}>
+              <span style={{ fontSize: '0.8rem', color: '#888' }}>
+                Mostrando {((extratoPagina - 1) * ITENS_POR_PAGINA) + 1} a {Math.min(extratoPagina * ITENS_POR_PAGINA, filteredTransactions.length)} de {filteredTransactions.length} lançamentos
+              </span>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  disabled={extratoPagina === 1}
+                  onClick={() => setExtratoPagina(p => Math.max(1, p - 1))}
+                  style={{
+                    padding: '6px 12px', borderRadius: '6px', background: extratoPagina === 1 ? '#111' : '#222',
+                    border: '1px solid #333', color: extratoPagina === 1 ? '#555' : '#fff',
+                    cursor: extratoPagina === 1 ? 'not-allowed' : 'pointer', fontSize: '0.8rem'
+                  }}
+                >
+                  ◀ Anterior
+                </button>
+                <span style={{ fontSize: '0.8rem', color: '#aaa', padding: '0 8px' }}>
+                  {extratoPagina} de {totalPaginas}
+                </span>
+                <button
+                  type="button"
+                  disabled={extratoPagina === totalPaginas}
+                  onClick={() => setExtratoPagina(p => Math.min(totalPaginas, p + 1))}
+                  style={{
+                    padding: '6px 12px', borderRadius: '6px', background: extratoPagina === totalPaginas ? '#111' : '#222',
+                    border: '1px solid #333', color: extratoPagina === totalPaginas ? '#555' : '#fff',
+                    cursor: extratoPagina === totalPaginas ? 'not-allowed' : 'pointer', fontSize: '0.8rem'
+                  }}
+                >
+                  Próxima ▶
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

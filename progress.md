@@ -504,3 +504,21 @@ Botão fica `disabled` se o cliente não tem nenhum veículo cadastrado, com tex
    - Gerados IDs de canal únicos para evitar conflitos de Realtime no Supabase.
 4. **Novo Componente de Recuperação (`ErrorBoundary.jsx`)**:
    - Criado componente de captura de erro para isolar falhas de renderização, com botões para tentar novamente e limpar cache local corrompido (`kadosh_fluxo_caixa_draft` / `kadosh_fluxo_caixa`).
+
+### 2026-09-03 — Consulta Geral de Lançamentos (Extrato de Entradas e Saídas)
+
+**Contexto**: Demanda da gerência/cliente para consultar todos os pagamentos e recebimentos em uma única visão centralizada, sem precisar abrir cada fechamento diário individualmente.
+
+**Mudanças**:
+1. **Nova Sub-Aba no Fluxo de Caixa (`FluxoCaixa.jsx`)**:
+   - Implementada a sub-aba **🔍 Consultar Lançamentos (Extrato Geral)**.
+   - Unificação de todas as entradas e saídas de todos os fechamentos passados + lançamentos do dia atual em tempo real.
+   - Tabela responsiva com badges `🟢 Recebido` e `🔴 Pago`, data, forma de pagamento, conta e link para o PDF do fechamento.
+2. **Filtros e Totalizadores Dinâmicos**:
+   - Filtros por Tipo (Todos, Recebidos, Pagos), Período (Hoje, Este Mês, Mês Passado, Este Ano, Todo o Histórico ou Personalizado com range de datas), Conta bancária e Busca textual ampla.
+   - Cards KPI em tempo real calculando Total Recebido, Total Pago, Saldo Líquido e Quantidade de Operações.
+   - Paginação de alta performance com 50 itens por página.
+3. **Exportação de Relatório (CSV)**:
+   - Exportador nativo de planilha CSV/Excel formatada para auditorias e conferências financeiras.
+4. **Rotas Dedicadas**:
+   - Adicionadas rotas `/extrato` e `/lancamentos` no `App.jsx` com suporte a `initialSubTab` no `AdminDashboard.jsx`.

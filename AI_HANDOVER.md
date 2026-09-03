@@ -345,9 +345,10 @@ RESEND_API_KEY, SUPABASE_SERVICE_ROLE_KEY, VITE_SUPABASE_URL, VITE_SUPABASE_ANON
 - Esqueleto visual criado em `Pacotes.jsx` e `PacoteDetalhes.jsx`.
 - **Atenção Próxima IA:** Os pacotes usam dados mockados (R$299, R$799) aguardando regras financeiras (descontos, combos). O botão de envio simula alerta, precisa ser integrado para envio ao admin.
 
-### 10. Fluxo de Caixa & Resiliência (`FluxoCaixa.jsx`, `ErrorBoundary.jsx`)
-- **Rotas Diretas**: Suporta `/fluxo-de-caixa`, `/fluxo_caixa`, `/caixa` e `/admin?tab=fluxo_caixa`.
+### 10. Fluxo de Caixa & Extrato Geral (`FluxoCaixa.jsx`, `ErrorBoundary.jsx`)
+- **Rotas Diretas**: Suporta `/fluxo-de-caixa`, `/fluxo_caixa`, `/caixa`, `/extrato`, `/lancamentos` e `/admin?tab=fluxo_caixa`.
 - **Fechamento Diário & Consolidado**: Conciliação de 3 contas (Caixa Empresa, MP Kadosh, MP Romanos), persistência de rascunhos online (`fluxo_caixa_draft`) e local (`kadosh_fluxo_caixa_draft`), geração de PDF e envio ao Drive.
+- **Extrato Geral de Lançamentos**: Sub-aba unificada que achata todas as entradas e saídas de todos os fechamentos, com filtros por tipo (Recebidos/Pagos), períodos, conta e busca textual, totalizadores KPI e exportação CSV.
 - **Resiliência a Falhas**: Helpers `safeArray` e `formatIsoDate` previnem quebras por dados nulos ou malformados. Envolvido em `ErrorBoundary.jsx` com suporte a reset e limpeza de cache local.
 
 ---

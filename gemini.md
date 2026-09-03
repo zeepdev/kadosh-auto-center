@@ -165,7 +165,7 @@ A constituição original mandava enviar pro Google Sheets. **Hoje a persistênc
   - Passo 2: Manutenção
   - Passo 3: Fase Final
   - Passo 4: Finalizado (quando status é "Finalizado")
-- **Fluxo de Caixa & ErrorBoundary**: Abas do painel admin devem ser envolvidas em `<ErrorBoundary moduleName="...">` para prevenir tela preta no React 19. Sempre utilizar `safeArray()` e `formatIsoDate()` para ler listas e datas de lançamentos financeiros.
+- **Fluxo de Caixa & ErrorBoundary**: Abas do painel admin devem ser envolvidas em `<ErrorBoundary moduleName="...">` para prevenir tela preta no React 19. Sempre utilizar `safeArray()` e `formatIsoDate()` para ler listas e datas de lançamentos financeiros. O Extrato Geral (`subTab === 'extrato'`) unifica todos os lançamentos passados e o rascunho de hoje em lista plana para busca ágil.
 
 ---
 

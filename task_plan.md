@@ -64,6 +64,12 @@
    - Adicionadas rotas diretas `/fluxo-de-caixa`, `/fluxo_caixa`, `/caixa` e rota curinga de fallback no `App.jsx`.
    - Blindado o componente `FluxoCaixa.jsx` contra dados nulos, campos corrompidos e formatos de data inválidos com helpers `safeArray` e `formatIsoDate`.
    - Implementado `ErrorBoundary.jsx` com botões de auto-recuperação e limpeza de cache local (`kadosh_fluxo_caixa_draft` / `kadosh_fluxo_caixa`).
+12. ✅ **Consulta Geral de Lançamentos (Extrato de Entradas e Saídas)**:
+   - Adicionada a sub-aba '🔍 Consultar Lançamentos (Extrato Geral)' no Fluxo de Caixa (`FluxoCaixa.jsx`).
+   - Lista unificada de todas as entradas e saídas sem precisar abrir fechamento por fechamento.
+   - Filtros por tipo (Recebidos/Pagos), períodos (Hoje, Mês Atual, Mês Anterior, Ano, Personalizado), conta e busca textual por placa/cliente/descrição.
+   - Cards com totais dinâmicos (Recebido, Pago, Saldo Líquido, Qtd Lançamentos).
+   - Exportação em formato CSV (Excel) e rotas diretas `/extrato` e `/lancamentos`.
 
 ### 🟡 Média Prioridade
 1. ⏭️ **Reativar confirmação de e-mail** no Supabase com SMTP próprio + template customizado.

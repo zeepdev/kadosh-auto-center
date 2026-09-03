@@ -48,6 +48,8 @@ function App() {
       <Route path="/fluxo-de-caixa" element={<AdminDashboard initialTab="fluxo_caixa" />} />
       <Route path="/fluxo_caixa" element={<AdminDashboard initialTab="fluxo_caixa" />} />
       <Route path="/caixa" element={<AdminDashboard initialTab="fluxo_caixa" />} />
+      <Route path="/extrato" element={<AdminDashboard initialTab="fluxo_caixa" initialSubTab="extrato" />} />
+      <Route path="/lancamentos" element={<AdminDashboard initialTab="fluxo_caixa" initialSubTab="extrato" />} />
       <Route path="/tv" element={<TvDashboard />} />
       <Route path="/login" element={<><Login /><Footer theme="dark" /></>} />
       <Route path="/cadastro" element={<><Cadastro /><Footer theme="dark" /></>} />
