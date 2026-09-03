@@ -522,3 +522,18 @@ Botão fica `disabled` se o cliente não tem nenhum veículo cadastrado, com tex
    - Exportador nativo de planilha CSV/Excel formatada para auditorias e conferências financeiras.
 4. **Rotas Dedicadas**:
    - Adicionadas rotas `/extrato` e `/lancamentos` no `App.jsx` com suporte a `initialSubTab` no `AdminDashboard.jsx`.
+
+### 2026-09-03 — Relatório em PDF e Impressão de Comissões de Mecânicos
+
+**Contexto**: Demanda da gerência para gerar e imprimir relatórios mensais de comissões (ex: mecânico Eduardo, período 01 a 30) para conferência e acerto com assinatura física.
+
+**Mudanças**:
+1. **Componente de Relatório em PDF (`ComissaoPDF.jsx`)**:
+   - Desenvolvido documento profissional A4 via `@react-pdf/renderer`.
+   - Cabeçalho oficial com dados da Kadosh Auto Center, identificação do mecânico com Chave PIX/CPF para facilitar transferência, cards de resumo e tabela analítica.
+   - Termo de quitação formal com campos de assinatura do mecânico e da gerência.
+2. **Integração no Painel (`MecanicosManager.jsx`)**:
+   - Botões de ação **`📄 Baixar PDF`** e **`🖨️ Imprimir`** no topo dos filtros e no cabeçalho da tabela.
+   - Opções de período: **Mês Fechado (01 a 30/31)** ou **Personalizado** (datas início e fim).
+   - Cálculo individualizado e exato de comissão da cota-parte do mecânico selecionado.
+

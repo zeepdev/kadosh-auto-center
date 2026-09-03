@@ -351,6 +351,11 @@ RESEND_API_KEY, SUPABASE_SERVICE_ROLE_KEY, VITE_SUPABASE_URL, VITE_SUPABASE_ANON
 - **Extrato Geral de Lançamentos**: Sub-aba unificada que achata todas as entradas e saídas de todos os fechamentos, com filtros por tipo (Recebidos/Pagos), períodos, conta e busca textual, totalizadores KPI e exportação CSV.
 - **Resiliência a Falhas**: Helpers `safeArray` e `formatIsoDate` previnem quebras por dados nulos ou malformados. Envolvido em `ErrorBoundary.jsx` com suporte a reset e limpeza de cache local.
 
+### 11. Relatório de Comissões de Mecânicos (`MecanicosManager.jsx`, `ComissaoPDF.jsx`)
+- **PDF de Comissões e Impressão**: Geração de relatório oficial A4 em PDF (`ComissaoPDF.jsx`) com cabeçalho oficial, dados do mecânico, Chave PIX/CPF, tabela analítica e termo de quitação com assinatura do mecânico e visto da gerência.
+- **Botões e Filtros**: Botões "Baixar PDF" e "Imprimir" integrados ao módulo. Filtro por "Mês Fechado (01 a 30/31)" ou período "Personalizado".
+- **Cálculo da Cota-Parte**: Extração precisa da comissão individual de cada mecânico em orçamentos compartilhados.
+
 ---
 
 ## 📋 Pendências & TODO

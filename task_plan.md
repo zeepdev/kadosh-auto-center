@@ -70,6 +70,11 @@
    - Filtros por tipo (Recebidos/Pagos), períodos (Hoje, Mês Atual, Mês Anterior, Ano, Personalizado), conta e busca textual por placa/cliente/descrição.
    - Cards com totais dinâmicos (Recebido, Pago, Saldo Líquido, Qtd Lançamentos).
    - Exportação em formato CSV (Excel) e rotas diretas `/extrato` e `/lancamentos`.
+13. ✅ **Relatório em PDF e Impressão de Comissões de Mecânicos**:
+   - Criado componente `ComissaoPDF.jsx` com layout A4 oficial, dados da oficina, identificação do mecânico, chave PIX/CPF, resumo financeiro, tabela analítica e termo de quitação com assinaturas.
+   - Adicionados botões '📄 Baixar PDF' e '🖨️ Imprimir' no módulo de comissões (`MecanicosManager.jsx`).
+   - Filtros por 'Mês Fechado (01 a 30/31)' e período 'Personalizado'.
+   - Cálculo individualizado e preciso da cota-parte de cada mecânico (ex: Eduardo).
 
 ### 🟡 Média Prioridade
 1. ⏭️ **Reativar confirmação de e-mail** no Supabase com SMTP próprio + template customizado.

@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import EditBudgetModal from './EditBudgetModal';
+import { pdf } from '@react-pdf/renderer';
+import { ComissaoPDF } from './ComissaoPDF';
 
 const MecanicosManager = () => {
   const [subTab, setSubTab] = useState('comissoes'); // 'comissoes' ou 'cadastro'
@@ -23,8 +25,12 @@ const MecanicosManager = () => {
   // Filtros de Comissões
   const [selectedMecanicoId, setSelectedMecanicoId] = useState('todos');
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().substring(0, 7)); // 'YYYY-MM'
+  const [tipoPeriodo, setTipoPeriodo] = useState('mes'); // 'mes' | 'custom'
+  const [dataInicio, setDataInicio] = useState('');
+  const [dataFim, setDataFim] = useState('');
   const [orcamentosPagos, setOrcamentosPagos] = useState([]);
   const [loadingComissoes, setLoadingComissoes] = useState(false);
+  const [gerandoPDF, setGerandoPDF] = useState(false);
 
   useEffect(() => {
     fetchMecanicos();
@@ -48,7 +54,7 @@ const MecanicosManager = () => {
     if (subTab === 'comissoes') {
       fetchComissoes();
     }
-  }, [subTab, selectedMecanicoId, selectedMonth]);
+  }, [subTab, selectedMecanicoId, selectedMonth, tipoPeriodo, dataInicio, dataFim]);
 
   const fetchMecanicos = async () => {
     setLoadingMecanicos(true);
@@ -113,9 +119,16 @@ const MecanicosManager = () => {
 
       if (error) throw error;
 
-      // Filtrar pelo mês selecionado (YYYY-MM) e pelo mecânico selecionado
+      // Filtrar pelo período selecionado e pelo mecânico selecionado
       const filtrados = (data || []).filter(item => {
-        if (!item.data_pagamento || !item.data_pagamento.startsWith(selectedMonth)) return false;
+        if (!item.data_pagamento) return false;
+        
+        if (tipoPeriodo === 'mes') {
+          if (!item.data_pagamento.startsWith(selectedMonth)) return false;
+        } else {
+          if (dataInicio && item.data_pagamento < dataInicio) return false;
+          if (dataFim && item.data_pagamento > dataFim) return false;
+        }
         
         if (selectedMecanicoId === 'todos') return true;
 
@@ -185,9 +198,128 @@ const MecanicosManager = () => {
     setAtivo(true);
   };
 
-  // Cálculos do Relatório de Comissões
+  // Cálculos Detalhados do Relatório de Comissões
+  const getComissaoDoMecanicoNoOrcamento = (item, mecanicoId) => {
+    if (!item) return { valor: 0, taxa: '', nome: '' };
+    const atribs = extractMecanicosAtribuidos(item);
+    if (mecanicoId !== 'todos') {
+      const found = atribs.find(m => m.mecanico_id === mecanicoId);
+      if (found) {
+        return {
+          valor: parseFloat(found.valor_comissao) || 0,
+          taxa: found.comissao_tipo === 'porcentagem' ? `${found.comissao_taxa}%` : 'R$ Fixo',
+          nome: found.mecanico_nome || 'Mecânico'
+        };
+      }
+      if (item.mecanico_id === mecanicoId) {
+        return {
+          valor: parseFloat(item.valor_comissao) || 0,
+          taxa: item.comissao_tipo === 'porcentagem' ? `${item.comissao_taxa}%` : 'R$ Fixo',
+          nome: item.mecanico_nome || 'Mecânico'
+        };
+      }
+      return { valor: 0, taxa: '', nome: '' };
+    } else {
+      const nomes = atribs.length > 0 ? atribs.map(m => m.mecanico_nome).join(', ') : (item.mecanico_nome || 'Mecânico');
+      const taxa = item.comissao_tipo === 'porcentagem' ? `${item.comissao_taxa}%` : 'R$ Fixo';
+      return {
+        valor: parseFloat(item.valor_comissao) || 0,
+        taxa,
+        nome: nomes
+      };
+    }
+  };
+
+  const orcamentosComCalculos = useMemo(() => {
+    return orcamentosPagos.map(item => {
+      const info = getComissaoDoMecanicoNoOrcamento(item, selectedMecanicoId);
+      return {
+        ...item,
+        _valorComissaoCalculada: info.valor,
+        _regraComissao: info.taxa,
+        _nomeMecanicoCalculado: info.nome
+      };
+    });
+  }, [orcamentosPagos, selectedMecanicoId]);
+
   const totalMaoObra = orcamentosPagos.reduce((acc, item) => acc + (parseFloat(item.valor_mao_obra) || 0), 0);
-  const totalComissao = orcamentosPagos.reduce((acc, item) => acc + (parseFloat(item.valor_comissao) || 0), 0);
+  const totalComissao = orcamentosComCalculos.reduce((acc, item) => acc + (parseFloat(item._valorComissaoCalculada) || 0), 0);
+
+  const currentMecanico = useMemo(() => {
+    if (selectedMecanicoId === 'todos') {
+      return { id: 'todos', nome: 'Todos os Mecânicos' };
+    }
+    return mecanicos.find(m => m.id === selectedMecanicoId) || { id: selectedMecanicoId, nome: 'Mecânico' };
+  }, [selectedMecanicoId, mecanicos]);
+
+  const periodoStr = useMemo(() => {
+    if (tipoPeriodo === 'mes') {
+      const parts = (selectedMonth || '').split('-');
+      if (parts.length === 2) {
+        const ano = parseInt(parts[0]);
+        const mes = parseInt(parts[1]);
+        const ultimoDia = new Date(ano, mes, 0).getDate();
+        const mesPad = String(mes).padStart(2, '0');
+        return `01/${mesPad}/${ano} a ${ultimoDia}/${mesPad}/${ano}`;
+      }
+      return selectedMonth;
+    } else {
+      const dIni = dataInicio ? formatDate(dataInicio) : 'Início';
+      const dFim = dataFim ? formatDate(dataFim) : 'Fim';
+      return `${dIni} a ${dFim}`;
+    }
+  }, [tipoPeriodo, selectedMonth, dataInicio, dataFim]);
+
+  const handleGeneratePDF = async (shouldPrint = false) => {
+    if (orcamentosComCalculos.length === 0) {
+      alert('Não há serviços com comissão no período selecionado para gerar o relatório.');
+      return;
+    }
+    setGerandoPDF(true);
+    try {
+      const doc = (
+        <ComissaoPDF
+          mecanico={currentMecanico}
+          periodoStr={periodoStr}
+          orcamentos={orcamentosComCalculos}
+          totalMaoObra={totalMaoObra}
+          totalComissao={totalComissao}
+          formatCurrency={formatCurrency}
+        />
+      );
+      const blob = await pdf(doc).toBlob();
+      const url = URL.createObjectURL(blob);
+
+      if (shouldPrint) {
+        const printWindow = window.open(url, '_blank');
+        if (printWindow) {
+          printWindow.focus();
+        } else {
+          const link = document.createElement('a');
+          link.href = url;
+          link.target = '_blank';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+      } else {
+        const link = document.createElement('a');
+        link.href = url;
+        const nomeMecSanitizado = (currentMecanico.nome || 'Geral').replace(/[^\w\d]/gi, '_');
+        const mesSanitizado = (selectedMonth || 'periodo').replace(/[^\w\d]/gi, '_');
+        link.download = `Relatorio_Comissao_${nomeMecSanitizado}_${mesSanitizado}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
+    } catch (err) {
+      console.error('Erro ao gerar PDF de comissão:', err);
+      alert('Erro ao gerar relatório em PDF: ' + err.message);
+    } finally {
+      setGerandoPDF(false);
+    }
+  };
 
   const formatCurrency = (val) => {
     const num = parseFloat(val) || 0;
@@ -258,59 +390,245 @@ const MecanicosManager = () => {
       {/* ABA 1: RELATÓRIO DE COMISSÕES */}
       {subTab === 'comissoes' && (
         <div>
-          {/* Filtros */}
-          <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', alignItems: 'center', background: '#16161a', padding: '15px 20px', borderRadius: '10px', border: '1px solid #2a2a35', marginBottom: '25px' }}>
-            <div style={{ flex: 1, minWidth: '200px' }}>
-              <label style={{ display: 'block', fontSize: '0.8rem', color: '#aaa', marginBottom: '4px' }}>Mecânico</label>
-              <select 
-                value={selectedMecanicoId} 
-                onChange={e => setSelectedMecanicoId(e.target.value)}
-                style={{ width: '100%', padding: '10px', background: '#0a0a0c', border: '1px solid #333', borderRadius: '8px', color: '#fff' }}
-              >
-                <option value="todos">Todos os Mecânicos</option>
-                {mecanicos.map(m => (
-                  <option key={m.id} value={m.id}>{m.nome}</option>
-                ))}
-              </select>
+          {/* Filtros e Ações de Relatório */}
+          <div style={{ background: '#16161a', padding: '20px', borderRadius: '12px', border: '1px solid #2a2a35', marginBottom: '25px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+              
+              {/* Seleção do Mecânico */}
+              <div style={{ flex: '1 1 240px', minWidth: '220px' }}>
+                <label style={{ display: 'block', fontSize: '0.82rem', color: '#aaa', marginBottom: '6px', fontWeight: 'bold' }}>
+                  👨‍🔧 Selecionar Mecânico
+                </label>
+                <select 
+                  value={selectedMecanicoId} 
+                  onChange={e => setSelectedMecanicoId(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', background: '#0a0a0c', border: '1px solid #333', borderRadius: '8px', color: '#fff', fontSize: '0.95rem' }}
+                >
+                  <option value="todos">Todos os Mecânicos (Geral)</option>
+                  {mecanicos.map(m => (
+                    <option key={m.id} value={m.id}>
+                      {m.nome} {m.especialidade ? `(${m.especialidade})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Modo de Período */}
+              <div style={{ flex: '0 1 auto' }}>
+                <label style={{ display: 'block', fontSize: '0.82rem', color: '#aaa', marginBottom: '6px', fontWeight: 'bold' }}>
+                  Tipo de Período
+                </label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setTipoPeriodo('mes')}
+                    style={{
+                      padding: '8px 14px',
+                      borderRadius: '8px',
+                      border: tipoPeriodo === 'mes' ? '1px solid #f59e0b' : '1px solid #333',
+                      background: tipoPeriodo === 'mes' ? '#f59e0b' : '#0a0a0c',
+                      color: tipoPeriodo === 'mes' ? '#000' : '#ccc',
+                      fontWeight: 'bold',
+                      fontSize: '0.85rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    📅 Mês Fechado
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTipoPeriodo('custom')}
+                    style={{
+                      padding: '8px 14px',
+                      borderRadius: '8px',
+                      border: tipoPeriodo === 'custom' ? '1px solid #f59e0b' : '1px solid #333',
+                      background: tipoPeriodo === 'custom' ? '#f59e0b' : '#0a0a0c',
+                      color: tipoPeriodo === 'custom' ? '#000' : '#ccc',
+                      fontWeight: 'bold',
+                      fontSize: '0.85rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    🗓️ Personalizado
+                  </button>
+                </div>
+              </div>
+
+              {/* Seletor de Mês ou Datas */}
+              {tipoPeriodo === 'mes' ? (
+                <div style={{ flex: '1 1 180px', minWidth: '160px' }}>
+                  <label style={{ display: 'block', fontSize: '0.82rem', color: '#aaa', marginBottom: '6px', fontWeight: 'bold' }}>
+                    Mês de Apuração (01 a 30/31)
+                  </label>
+                  <input 
+                    type="month" 
+                    value={selectedMonth} 
+                    onChange={e => setSelectedMonth(e.target.value)}
+                    style={{ width: '100%', padding: '10px', background: '#0a0a0c', border: '1px solid #333', borderRadius: '8px', color: '#fff' }}
+                  />
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: '10px', flex: '1 1 280px' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', fontSize: '0.82rem', color: '#aaa', marginBottom: '6px', fontWeight: 'bold' }}>Data Inicial</label>
+                    <input 
+                      type="date" 
+                      value={dataInicio} 
+                      onChange={e => setDataInicio(e.target.value)}
+                      style={{ width: '100%', padding: '10px', background: '#0a0a0c', border: '1px solid #333', borderRadius: '8px', color: '#fff' }}
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', fontSize: '0.82rem', color: '#aaa', marginBottom: '6px', fontWeight: 'bold' }}>Data Final</label>
+                    <input 
+                      type="date" 
+                      value={dataFim} 
+                      onChange={e => setDataFim(e.target.value)}
+                      style={{ width: '100%', padding: '10px', background: '#0a0a0c', border: '1px solid #333', borderRadius: '8px', color: '#fff' }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Botões de Ação para Imprimir / Salvar PDF */}
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  disabled={gerandoPDF || orcamentosComCalculos.length === 0}
+                  onClick={() => handleGeneratePDF(false)}
+                  style={{
+                    padding: '10px 18px',
+                    background: '#f59e0b',
+                    border: 'none',
+                    borderRadius: '8px',
+                    color: '#000',
+                    fontWeight: 'bold',
+                    fontSize: '0.9rem',
+                    cursor: orcamentosComCalculos.length === 0 ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    opacity: orcamentosComCalculos.length === 0 ? 0.5 : 1,
+                    boxShadow: '0 4px 12px rgba(245, 158, 11, 0.25)',
+                    transition: 'all 0.2s'
+                  }}
+                  title={orcamentosComCalculos.length === 0 ? 'Não há dados para gerar PDF' : 'Baixar relatório em PDF pronto para arquivar ou imprimir'}
+                >
+                  {gerandoPDF ? '⏳ Gerando...' : '📄 Baixar PDF'}
+                </button>
+
+                <button
+                  type="button"
+                  disabled={gerandoPDF || orcamentosComCalculos.length === 0}
+                  onClick={() => handleGeneratePDF(true)}
+                  style={{
+                    padding: '10px 18px',
+                    background: '#3b82f6',
+                    border: 'none',
+                    borderRadius: '8px',
+                    color: '#fff',
+                    fontWeight: 'bold',
+                    fontSize: '0.9rem',
+                    cursor: orcamentosComCalculos.length === 0 ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    opacity: orcamentosComCalculos.length === 0 ? 0.5 : 1,
+                    boxShadow: '0 4px 12px rgba(59, 130, 246, 0.25)',
+                    transition: 'all 0.2s'
+                  }}
+                  title={orcamentosComCalculos.length === 0 ? 'Não há dados para imprimir' : 'Abrir relatório formatado para impressão direta'}
+                >
+                  🖨️ Imprimir
+                </button>
+              </div>
+
             </div>
 
-            <div style={{ flex: 1, minWidth: '180px' }}>
-              <label style={{ display: 'block', fontSize: '0.8rem', color: '#aaa', marginBottom: '4px' }}>Mês do Pagamento</label>
-              <input 
-                type="month" 
-                value={selectedMonth} 
-                onChange={e => setSelectedMonth(e.target.value)}
-                style={{ width: '100%', padding: '10px', background: '#0a0a0c', border: '1px solid #333', borderRadius: '8px', color: '#fff' }}
-              />
-            </div>
+            {/* Informações Rápidas do Mecânico Selecionado */}
+            {selectedMecanicoId !== 'todos' && currentMecanico && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '15px', background: '#1c1c24', padding: '10px 15px', borderRadius: '8px', fontSize: '0.85rem', flexWrap: 'wrap', borderLeft: '3px solid #f59e0b' }}>
+                <span style={{ color: '#aaa' }}>Beneficiário: <strong style={{ color: '#fff' }}>{currentMecanico.nome}</strong></span>
+                {currentMecanico.especialidade && <span style={{ color: '#888' }}>• Especialidade: <strong style={{ color: '#ccc' }}>{currentMecanico.especialidade}</strong></span>}
+                {currentMecanico.cpf_pix && <span style={{ color: '#10b981' }}>• Chave PIX / CPF: <strong>{currentMecanico.cpf_pix}</strong></span>}
+                {currentMecanico.whatsapp && <span style={{ color: '#3b82f6' }}>• WhatsApp: <strong>{currentMecanico.whatsapp}</strong></span>}
+              </div>
+            )}
           </div>
 
           {/* Cards de Resumo Solidos */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '30px' }}>
             <div style={{ background: '#16161a', border: '1px solid #2a2a35', padding: '20px', borderRadius: '12px', borderLeft: '4px solid #3b82f6' }}>
               <span style={{ fontSize: '0.82rem', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Serviços Pagos</span>
-              <h3 style={{ margin: '8px 0 0 0', fontSize: '1.8rem', color: '#3b82f6' }}>{orcamentosPagos.length}</h3>
+              <h3 style={{ margin: '8px 0 0 0', fontSize: '1.8rem', color: '#3b82f6' }}>{orcamentosComCalculos.length}</h3>
+              <span style={{ fontSize: '0.75rem', color: '#666', marginTop: '4px', display: 'block' }}>Período: {periodoStr}</span>
             </div>
             
             <div style={{ background: '#16161a', border: '1px solid #2a2a35', padding: '20px', borderRadius: '12px', borderLeft: '4px solid #10b981' }}>
               <span style={{ fontSize: '0.82rem', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Mão de Obra</span>
               <h3 style={{ margin: '8px 0 0 0', fontSize: '1.8rem', color: '#10b981' }}>{formatCurrency(totalMaoObra)}</h3>
+              <span style={{ fontSize: '0.75rem', color: '#666', marginTop: '4px', display: 'block' }}>Valor bruto dos serviços</span>
             </div>
 
             <div style={{ background: '#16161a', border: '1px solid #2a2a35', padding: '20px', borderRadius: '12px', borderLeft: '4px solid #f59e0b' }}>
-              <span style={{ fontSize: '0.82rem', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Comissões a Pagar</span>
+              <span style={{ fontSize: '0.82rem', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                {selectedMecanicoId === 'todos' ? 'Total Comissões a Pagar (Geral)' : `Comissão de ${currentMecanico.nome}`}
+              </span>
               <h3 style={{ margin: '8px 0 0 0', fontSize: '1.8rem', color: '#f59e0b' }}>{formatCurrency(totalComissao)}</h3>
+              <span style={{ fontSize: '0.75rem', color: '#f59e0b', marginTop: '4px', display: 'block', fontWeight: 'bold' }}>
+                {selectedMecanicoId === 'todos' ? 'Soma de todos os mecânicos' : 'Valor líquido a pagar'}
+              </span>
             </div>
           </div>
 
           {/* Tabela de Comissões Sólida */}
           <div style={{ padding: '20px', background: '#16161a', borderRadius: '12px', border: '1px solid #2a2a35' }}>
-            <h4 style={{ margin: '0 0 15px 0', color: '#fff', fontSize: '1.1rem' }}>Detalhamento das Comissões do Mês</h4>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap', gap: '10px' }}>
+              <div>
+                <h4 style={{ margin: '0 0 4px 0', color: '#fff', fontSize: '1.1rem' }}>
+                  Detalhamento das Comissões — {periodoStr}
+                </h4>
+                <span style={{ fontSize: '0.8rem', color: '#888' }}>
+                  Beneficiário: <strong style={{ color: '#f59e0b' }}>{currentMecanico.nome}</strong>
+                  {currentMecanico.cpf_pix && ` • PIX: ${currentMecanico.cpf_pix}`}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  disabled={gerandoPDF || orcamentosComCalculos.length === 0}
+                  onClick={() => handleGeneratePDF(false)}
+                  style={{
+                    padding: '6px 14px', background: '#22222c', border: '1px solid #444', borderRadius: '6px',
+                    color: '#f59e0b', fontWeight: 'bold', fontSize: '0.8rem', cursor: orcamentosComCalculos.length === 0 ? 'not-allowed' : 'pointer',
+                    display: 'flex', alignItems: 'center', gap: '5px', opacity: orcamentosComCalculos.length === 0 ? 0.5 : 1
+                  }}
+                >
+                  📄 Exportar PDF
+                </button>
+                <button
+                  type="button"
+                  disabled={gerandoPDF || orcamentosComCalculos.length === 0}
+                  onClick={() => handleGeneratePDF(true)}
+                  style={{
+                    padding: '6px 14px', background: '#22222c', border: '1px solid #444', borderRadius: '6px',
+                    color: '#3b82f6', fontWeight: 'bold', fontSize: '0.8rem', cursor: orcamentosComCalculos.length === 0 ? 'not-allowed' : 'pointer',
+                    display: 'flex', alignItems: 'center', gap: '5px', opacity: orcamentosComCalculos.length === 0 ? 0.5 : 1
+                  }}
+                >
+                  🖨️ Imprimir
+                </button>
+              </div>
+            </div>
             
             {loadingComissoes ? (
               <p style={{ color: '#aaa', textAlign: 'center', padding: '20px' }}>Carregando relatórios...</p>
-            ) : orcamentosPagos.length === 0 ? (
-              <p style={{ color: '#888', textAlign: 'center', padding: '30px 0' }}>Nenhum orçamento pago localizado para os filtros selecionados.</p>
+            ) : orcamentosComCalculos.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px 0', color: '#888' }}>
+                <p style={{ fontSize: '1.05rem', marginBottom: '8px' }}>Nenhum serviço pago localizado para o filtro selecionado.</p>
+                <span style={{ fontSize: '0.85rem', color: '#666' }}>Selecione outro período ou mecânico para consultar.</span>
+              </div>
             ) : (
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
@@ -319,14 +637,16 @@ const MecanicosManager = () => {
                       <th style={{ padding: '12px 10px' }}>Data Baixa</th>
                       <th style={{ padding: '12px 10px' }}>Orçamento</th>
                       <th style={{ padding: '12px 10px' }}>Cliente / Placa</th>
-                      <th style={{ padding: '12px 10px' }}>Mecânico</th>
+                      <th style={{ padding: '12px 10px' }}>Mecânico / Regra</th>
                       <th style={{ padding: '12px 10px' }}>Mão de Obra</th>
-                      <th style={{ padding: '12px 10px' }}>Comissão Total</th>
+                      <th style={{ padding: '12px 10px' }}>
+                        {selectedMecanicoId === 'todos' ? 'Comissão Total' : `Comissão (${currentMecanico.nome})`}
+                      </th>
                       <th style={{ padding: '12px 10px' }}>Ações</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {orcamentosPagos.map((item, idx) => (
+                    {orcamentosComCalculos.map((item, idx) => (
                       <tr key={idx} style={{ borderBottom: '1px solid #22222a' }}>
                         <td style={{ padding: '12px 10px', color: '#ccc' }}>{formatDate(item.data_pagamento)}</td>
                         <td style={{ padding: '12px 10px', fontWeight: 'bold', color: '#fff' }}>#{item.id}</td>
@@ -335,21 +655,14 @@ const MecanicosManager = () => {
                           <span style={{ fontSize: '0.75rem', color: '#888' }}>{item.placa || 'Sem placa'}</span>
                         </td>
                         <td style={{ padding: '12px 10px' }}>
-                          {(() => {
-                            const atribs = extractMecanicosAtribuidos(item);
-                            if (atribs.length > 0) {
-                              return atribs.map((m, mIdx) => (
-                                <div key={mIdx} style={{ fontSize: '0.8rem', color: '#f59e0b', marginBottom: '2px' }}>
-                                  👨‍🔧 <strong>{m.mecanico_nome}</strong> ({m.comissao_tipo === 'porcentagem' ? `${m.comissao_taxa}%` : 'R$ Fixo'}: {formatCurrency(m.valor_comissao)})
-                                </div>
-                              ));
-                            }
-                            return <span style={{ color: '#f59e0b', fontWeight: 'bold' }}>{item.mecanico_nome || 'N/A'}</span>;
-                          })()}
+                          <div style={{ fontSize: '0.85rem', color: '#f59e0b', fontWeight: 'bold' }}>
+                            👨‍🔧 {item._nomeMecanicoCalculado}
+                          </div>
+                          <span style={{ fontSize: '0.75rem', color: '#888' }}>Regra: {item._regraComissao}</span>
                         </td>
                         <td style={{ padding: '12px 10px', color: '#10b981' }}>{formatCurrency(item.valor_mao_obra)}</td>
                         <td style={{ padding: '12px 10px', color: '#f59e0b', fontWeight: 'bold', fontSize: '0.95rem' }}>
-                          {formatCurrency(item.valor_comissao)}
+                          {formatCurrency(item._valorComissaoCalculada)}
                         </td>
                         <td style={{ padding: '12px 10px' }}>
                           <button 
