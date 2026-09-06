@@ -167,6 +167,7 @@ A constituição original mandava enviar pro Google Sheets. **Hoje a persistênc
   - Passo 4: Finalizado (quando status é "Finalizado")
 - **Fluxo de Caixa & ErrorBoundary**: Abas do painel admin devem ser envolvidas em `<ErrorBoundary moduleName="...">` para prevenir tela preta no React 19. Sempre utilizar `safeArray()` e `formatIsoDate()` para ler listas e datas de lançamentos financeiros. O Extrato Geral (`subTab === 'extrato'`) unifica todos os lançamentos passados e o rascunho de hoje em lista plana para busca ágil.
 - **Comissões de Mecânicos**: Utilizar `ComissaoPDF.jsx` com `@react-pdf/renderer` para exportar relatórios e impressão de comissões. Ao calcular comissões individuais, sempre extrair a cota-parte do mecânico (`extractMecanicosAtribuidos`) para manter precisão em orçamentos com múltiplos mecânicos.
+- **Valores Monetários & Inputs de Preço**: Evitar `<input type="number">` em formulários financeiros no padrão brasileiro (vírgula decimal), pois o navegador rejeita vírgula e retorna string vazia (`badInput`). Utilizar `<input type="text" inputMode="decimal">` com `parseNumberBr()` para suportar vírgula (`50,00`), ponto (`50.00`) e recálculo reativo imediato dos subtotais e totais.
 
 ---
 

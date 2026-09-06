@@ -2,6 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { consultarPlaca } from '../../lib/placaApi';
 
+export const parseNumberBr = (val) => {
+  if (val == null) return 0;
+  if (typeof val === 'number') return isNaN(val) ? 0 : val;
+  const str = String(val).trim();
+  if (!str) return 0;
+  if (str.includes(',')) {
+    return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0;
+  }
+  return parseFloat(str) || 0;
+};
+
+export const formatMoeda = (val) => {
+  const num = parseNumberBr(val);
+  return `R$ ${num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
 const DirectBudgetModal = ({ onClose, onBudgetCreated }) => {
   // Dados do Cliente
   const [nome, setNome] = useState('');
@@ -91,15 +107,11 @@ const DirectBudgetModal = ({ onClose, onBudgetCreated }) => {
   };
 
   const handleRemovePeca = (index) => {
-    const list = [...pecas];
-    list.splice(index, 1);
-    setPecas(list);
+    setPecas(pecas.filter((_, i) => i !== index));
   };
 
   const handlePecaChange = (index, field, value) => {
-    const list = [...pecas];
-    list[index][field] = value;
-    setPecas(list);
+    setPecas(prev => prev.map((item, i) => i === index ? { ...item, [field]: value } : item));
   };
 
   // Manipuladores de Serviços
@@ -109,20 +121,16 @@ const DirectBudgetModal = ({ onClose, onBudgetCreated }) => {
   };
 
   const handleRemoveServico = (index) => {
-    const list = [...servicos];
-    list.splice(index, 1);
-    setServicos(list);
+    setServicos(servicos.filter((_, i) => i !== index));
   };
 
   const handleServicoChange = (index, field, value) => {
-    const list = [...servicos];
-    list[index][field] = value;
-    setServicos(list);
+    setServicos(prev => prev.map((item, i) => i === index ? { ...item, [field]: value } : item));
   };
 
-  // Totais Calculados
-  const totalPecas = pecas.reduce((acc, item) => acc + ((parseFloat(item.qtd) || 0) * (parseFloat(item.unit) || 0)), 0);
-  const totalMaoObra = servicos.reduce((acc, item) => acc + ((parseFloat(item.qtd) || 0) * (parseFloat(item.unit) || 0)), 0);
+  // Totais Calculados em Tempo Real
+  const totalPecas = pecas.reduce((acc, item) => acc + ((parseNumberBr(item.qtd) || 0) * (parseNumberBr(item.unit) || 0)), 0);
+  const totalMaoObra = servicos.reduce((acc, item) => acc + ((parseNumberBr(item.qtd) || 0) * (parseNumberBr(item.unit) || 0)), 0);
   const totalGeral = totalPecas + totalMaoObra;
 
   // Cálculo de Comissões por Mecânico
@@ -132,8 +140,8 @@ const DirectBudgetModal = ({ onClose, onBudgetCreated }) => {
     const mec = mecanicos.find(m => m.id === mecId);
     const mecNome = mec ? mec.nome : 'Mecânico Desconhecido';
     
-    const valorServico = (parseFloat(item.qtd) || 0) * (parseFloat(item.unit) || 0);
-    const taxa = parseFloat(item.comissao_taxa) || 0;
+    const valorServico = (parseNumberBr(item.qtd) || 0) * (parseNumberBr(item.unit) || 0);
+    const taxa = parseNumberBr(item.comissao_taxa) || 0;
     const comissaoValor = (valorServico * taxa) / 100;
 
     if (!acc[mecId]) {
@@ -151,18 +159,30 @@ const DirectBudgetModal = ({ onClose, onBudgetCreated }) => {
     setErro('');
 
     // Prepara itens válidos de Peças e Serviços
-    const pecasValidas = pecas.filter(p => p.descricao && p.unit);
-    const servicosValidos = servicos.filter(s => s.descricao && s.unit).map(s => {
-      const mec = mecanicos.find(m => m.id === s.mecanico_id);
-      return {
-        ...s,
-        mecanico_nome: mec ? mec.nome : '',
-        unit: parseFloat(s.unit) || 0,
-        qtd: parseFloat(s.qtd) || 1,
-        comissao_taxa: parseFloat(s.comissao_taxa) || 0,
-        valor_comissao: ((parseFloat(s.unit) || 0) * (parseFloat(s.qtd) || 1) * (parseFloat(s.comissao_taxa) || 0)) / 100
-      };
-    });
+    const pecasValidas = pecas
+      .filter(p => p.descricao && parseNumberBr(p.unit) > 0)
+      .map(p => ({
+        ...p,
+        qtd: parseNumberBr(p.qtd) || 1,
+        unit: parseNumberBr(p.unit)
+      }));
+
+    const servicosValidos = servicos
+      .filter(s => s.descricao && parseNumberBr(s.unit) > 0)
+      .map(s => {
+        const mec = mecanicos.find(m => m.id === s.mecanico_id);
+        const unitVal = parseNumberBr(s.unit);
+        const qtdVal = parseNumberBr(s.qtd) || 1;
+        const taxaVal = parseNumberBr(s.comissao_taxa) || 0;
+        return {
+          ...s,
+          mecanico_nome: mec ? mec.nome : '',
+          unit: unitVal,
+          qtd: qtdVal,
+          comissao_taxa: taxaVal,
+          valor_comissao: (unitVal * qtdVal * taxaVal) / 100
+        };
+      });
 
     // Pega o mecânico principal (do primeiro serviço atribuído ou geral)
     const primeiroServico = servicosValidos.find(s => s.mecanico_id);
@@ -176,8 +196,8 @@ const DirectBudgetModal = ({ onClose, onBudgetCreated }) => {
       if (s.mecanico_id) {
         const mecObj = mecanicos.find(m => m.id === s.mecanico_id);
         const mNome = mecObj ? mecObj.nome : 'Mecânico';
-        const subVal = (parseFloat(s.unit) || 0) * (parseFloat(s.qtd) || 1);
-        const taxa = parseFloat(s.comissao_taxa) || 0;
+        const subVal = (parseNumberBr(s.unit) || 0) * (parseNumberBr(s.qtd) || 1);
+        const taxa = parseNumberBr(s.comissao_taxa) || 0;
         const vCom = (subVal * taxa) / 100;
 
         if (!mecanicosAtribuidosMap[s.mecanico_id]) {
@@ -383,7 +403,7 @@ const DirectBudgetModal = ({ onClose, onBudgetCreated }) => {
             </div>
 
             {pecas.map((item, idx) => (
-              <div key={idx} style={{ display: 'grid', gridTemplateColumns: '70px 1fr 120px 40px', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
+              <div key={idx} style={{ display: 'grid', gridTemplateColumns: '70px 1fr 130px 40px', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
                 <input 
                   type="number" min="1" placeholder="Qtd" value={item.qtd} 
                   onChange={e => handlePecaChange(idx, 'qtd', e.target.value)} 
@@ -395,9 +415,9 @@ const DirectBudgetModal = ({ onClose, onBudgetCreated }) => {
                   style={{ width: '100%', padding: '8px', background: '#0c0c0e', border: '1px solid #333', borderRadius: '6px', color: '#fff' }}
                 />
                 <input 
-                  type="number" step="0.01" placeholder="Valor (R$)" value={item.unit} 
+                  type="text" inputMode="decimal" placeholder="Valor (R$)" value={item.unit} 
                   onChange={e => handlePecaChange(idx, 'unit', e.target.value)} 
-                  style={{ width: '100%', padding: '8px', background: '#0c0c0e', border: '1px solid #333', borderRadius: '6px', color: '#fff' }}
+                  style={{ width: '100%', padding: '8px', background: '#0c0c0e', border: '1px solid #333', borderRadius: '6px', color: '#4ade80', fontWeight: 'bold' }}
                 />
                 <button 
                   type="button" onClick={() => handleRemovePeca(idx)} disabled={pecas.length === 1}
@@ -408,8 +428,8 @@ const DirectBudgetModal = ({ onClose, onBudgetCreated }) => {
               </div>
             ))}
 
-            <div style={{ textAlign: 'right', color: '#4ade80', fontWeight: 'bold', fontSize: '0.9rem', marginTop: '10px' }}>
-              Subtotal Peças: R$ {totalPecas.toFixed(2)}
+            <div style={{ textAlign: 'right', color: '#4ade80', fontWeight: 'bold', fontSize: '0.95rem', marginTop: '10px' }}>
+              Subtotal Peças: {formatMoeda(totalPecas)}
             </div>
           </div>
 
@@ -444,9 +464,9 @@ const DirectBudgetModal = ({ onClose, onBudgetCreated }) => {
                   style={{ width: '100%', padding: '8px', background: '#0c0c0e', border: '1px solid #333', borderRadius: '6px', color: '#fff' }}
                 />
                 <input 
-                  type="number" step="0.01" placeholder="Valor (R$)" value={item.unit} 
+                  type="text" inputMode="decimal" placeholder="Valor (R$)" value={item.unit} 
                   onChange={e => handleServicoChange(idx, 'unit', e.target.value)} 
-                  style={{ width: '100%', padding: '8px', background: '#0c0c0e', border: '1px solid #333', borderRadius: '6px', color: '#fff' }}
+                  style={{ width: '100%', padding: '8px', background: '#0c0c0e', border: '1px solid #333', borderRadius: '6px', color: '#60a5fa', fontWeight: 'bold' }}
                 />
                 <select 
                   value={item.mecanico_id} 
@@ -460,7 +480,7 @@ const DirectBudgetModal = ({ onClose, onBudgetCreated }) => {
                 </select>
                 <div style={{ display: 'flex', alignItems: 'center' }}>
                   <input 
-                    type="number" step="1" placeholder="Com. %" value={item.comissao_taxa} 
+                    type="text" inputMode="decimal" placeholder="Com. %" value={item.comissao_taxa} 
                     onChange={e => handleServicoChange(idx, 'comissao_taxa', e.target.value)} 
                     style={{ width: '100%', padding: '8px', background: '#0c0c0e', border: '1px solid #333', borderRadius: '6px', color: '#fff', fontSize: '0.85rem' }}
                     title="Porcentagem de comissão sobre a mão de obra"
@@ -476,8 +496,8 @@ const DirectBudgetModal = ({ onClose, onBudgetCreated }) => {
               </div>
             ))}
 
-            <div style={{ textAlign: 'right', color: '#60a5fa', fontWeight: 'bold', fontSize: '0.9rem', marginTop: '10px' }}>
-              Subtotal Mão de Obra: R$ {totalMaoObra.toFixed(2)}
+            <div style={{ textAlign: 'right', color: '#60a5fa', fontWeight: 'bold', fontSize: '0.95rem', marginTop: '10px' }}>
+              Subtotal Mão de Obra: {formatMoeda(totalMaoObra)}
             </div>
           </div>
 
@@ -493,7 +513,7 @@ const DirectBudgetModal = ({ onClose, onBudgetCreated }) => {
                 Object.values(comissoesPorMecanico).map((mInfo, i) => (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '4px' }}>
                     <span style={{ color: '#ccc' }}>{mInfo.nome}:</span>
-                    <span style={{ color: '#f59e0b', fontWeight: 'bold' }}>R$ {mInfo.comissao.toFixed(2)}</span>
+                    <span style={{ color: '#f59e0b', fontWeight: 'bold' }}>{formatMoeda(mInfo.comissao)}</span>
                   </div>
                 ))
               )}
@@ -502,7 +522,7 @@ const DirectBudgetModal = ({ onClose, onBudgetCreated }) => {
             <div style={{ background: '#1a1a20', padding: '15px', borderRadius: '10px', border: '1px solid #10b981', textAlign: 'right' }}>
               <span style={{ fontSize: '0.8rem', color: '#aaa', textTransform: 'uppercase' }}>Total Geral do Orçamento</span>
               <h2 style={{ margin: '5px 0 0 0', color: '#10b981', fontSize: '1.8rem' }}>
-                R$ {totalGeral.toFixed(2)}
+                {formatMoeda(totalGeral)}
               </h2>
             </div>
           </div>

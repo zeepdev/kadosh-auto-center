@@ -75,6 +75,10 @@
    - Adicionados botões '📄 Baixar PDF' e '🖨️ Imprimir' no módulo de comissões (`MecanicosManager.jsx`).
    - Filtros por 'Mês Fechado (01 a 30/31)' e período 'Personalizado'.
    - Cálculo individualizado e preciso da cota-parte de cada mecânico (ex: Eduardo).
+14. ✅ **Correção de Subtotais e Total Geral no Orçamento Direto**:
+   - Criados helpers `parseNumberBr` e `formatMoeda` para tratar vírgula decimal brasileira (`50,00`, `80,00`) e separadores de milhar.
+   - Substituídos os inputs `type="number"` por `type="text" inputMode="decimal"` em `DirectBudgetModal.jsx` e `EditBudgetModal.jsx` para evitar que o navegador limpe o valor digitado.
+   - Cálculo reativo imediato dos Subtotais de Peças, Mão de Obra, Comissões por Mecânico e Total Geral.
 
 ### 🟡 Média Prioridade
 1. ⏭️ **Reativar confirmação de e-mail** no Supabase com SMTP próprio + template customizado.

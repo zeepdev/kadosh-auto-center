@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { registrarLog } from '../../services/logService';
+import { parseNumberBr, formatMoeda } from './DirectBudgetModal';
 
 export default function EditBudgetModal({ atendimento, onClose, onSaveSuccess }) {
   const [nome, setNome] = useState(atendimento?.nome || '');
@@ -104,14 +105,14 @@ export default function EditBudgetModal({ atendimento, onClose, onSaveSuccess })
   // Recalcular soma da Mão de Obra e Total quando os itens de serviços mudarem
   useEffect(() => {
     const somaMaoObra = servicosItens.reduce((acc, s) => {
-      const q = parseFloat(s.qtd) || 1;
-      const u = parseFloat(s.unit) || 0;
+      const q = parseNumberBr(s.qtd) || 1;
+      const u = parseNumberBr(s.unit) || 0;
       return acc + (q * u);
     }, 0);
 
     setValorMaoObra(somaMaoObra.toFixed(2));
 
-    const p = parseFloat(valorPecas) || 0;
+    const p = parseNumberBr(valorPecas) || 0;
     setValorTotal((p + somaMaoObra).toFixed(2));
   }, [servicosItens, valorPecas]);
 
@@ -182,11 +183,11 @@ export default function EditBudgetModal({ atendimento, onClose, onSaveSuccess })
     }
 
     // Recalcular valor de comissão do item
-    const qtd = parseFloat(field === 'qtd' ? value : item.qtd) || 1;
-    const unit = parseFloat(field === 'unit' ? value : item.unit) || 0;
+    const qtd = parseNumberBr(field === 'qtd' ? value : item.qtd) || 1;
+    const unit = parseNumberBr(field === 'unit' ? value : item.unit) || 0;
     const subtotalItem = qtd * unit;
 
-    const taxaVal = parseFloat(field === 'comissao_taxa' ? value : item.comissao_taxa) || 0;
+    const taxaVal = parseNumberBr(field === 'comissao_taxa' ? value : item.comissao_taxa) || 0;
     const tipo = field === 'comissao_tipo' ? value : item.comissao_tipo;
 
     if (tipo === 'porcentagem') {
@@ -201,8 +202,8 @@ export default function EditBudgetModal({ atendimento, onClose, onSaveSuccess })
 
   const handlePecasChange = (val) => {
     setValorPecas(val);
-    const p = parseFloat(val) || 0;
-    const m = parseFloat(valorMaoObra) || 0;
+    const p = parseNumberBr(val) || 0;
+    const m = parseNumberBr(valorMaoObra) || 0;
     setValorTotal((p + m).toFixed(2));
   };
 
@@ -423,7 +424,7 @@ export default function EditBudgetModal({ atendimento, onClose, onSaveSuccess })
                     <div>
                       <label style={{ fontSize: '0.72rem', color: '#aaa' }}>Valor Serviço (R$)</label>
                       <input 
-                        type="number" step="0.01" 
+                        type="text" inputMode="decimal" 
                         value={item.unit || '0'} 
                         onChange={e => updateServicoItem(idx, 'unit', e.target.value)} 
                         style={{ ...inputStyle, color: '#10b981', fontWeight: 'bold' }} 

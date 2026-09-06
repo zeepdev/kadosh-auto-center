@@ -356,6 +356,11 @@ RESEND_API_KEY, SUPABASE_SERVICE_ROLE_KEY, VITE_SUPABASE_URL, VITE_SUPABASE_ANON
 - **Botões e Filtros**: Botões "Baixar PDF" e "Imprimir" integrados ao módulo. Filtro por "Mês Fechado (01 a 30/31)" ou período "Personalizado".
 - **Cálculo da Cota-Parte**: Extração precisa da comissão individual de cada mecânico em orçamentos compartilhados.
 
+### 12. Orçamento Direto & Formatação Monetária (`DirectBudgetModal.jsx`, `EditBudgetModal.jsx`)
+- **Tratamento de Moeda Brasileira**: Helpers `parseNumberBr` e `formatMoeda` tratam valores com vírgula (`50,00`), ponto (`50.00`) e separadores de milhar sem quebras.
+- **Inputs Textuais com InputMode Decimal**: Evita que o navegador limpe o estado (`badInput`) ao digitar vírgula em campos de preço de peças e mão de obra.
+- **Cálculo Reativo Imediato**: Atualização em tempo real dos subtotais de peças, mão de obra, comissões de mecânicos e total geral.
+
 ---
 
 ## 📋 Pendências & TODO

@@ -537,3 +537,15 @@ Botão fica `disabled` se o cliente não tem nenhum veículo cadastrado, com tex
    - Opções de período: **Mês Fechado (01 a 30/31)** ou **Personalizado** (datas início e fim).
    - Cálculo individualizado e exato de comissão da cota-parte do mecânico selecionado.
 
+### 2026-09-06 — Correção de Subtotais e Total Geral no Orçamento Direto
+
+**Contexto**: Relato do cliente de que os campos de subtotal e total geral do orçamento direto permaneciam em `R$ 0,00` ao preencher os valores das peças e mão de obra.
+
+**Causa**: O uso de `<input type="number">` faz com que navegadores em português rejeitem a vírgula `,` digitada pelo usuário, retornando `e.target.value = ""` e zerando a soma em JavaScript.
+
+**Mudanças**:
+1. **Helper `parseNumberBr` e `formatMoeda`**: Tratamento robusto para valores em formato brasileiro (`50,00`, `80,00`), com ou sem separador de milhar.
+2. **Inputs Flexíveis (`type="text" inputMode="decimal"`)**: Substituição do `type="number"` nos campos de valor em `DirectBudgetModal.jsx` e `EditBudgetModal.jsx`.
+3. **Imutabilidade e Reatividade**: Atualização das tabelas de peças e serviços com `prev.map` garantindo recálculo automático instantâneo dos subtotais, comissões de mecânicos e total geral.
+
+
