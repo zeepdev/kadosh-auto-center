@@ -89,12 +89,6 @@ export default function GastosFixos() {
   const [statusFilter, setStatusFilter] = useState('todos'); // 'todos', 'em_aberto', 'vencido', 'pago', 'alerta7dias'
   const [categoriaFilter, setCategoriaFilter] = useState('todas');
   
-  // Status de conexão e sincronização com o Supabase
-  const [supabaseOnline, setSupabaseOnline] = useState(null); // null = checando, true = sincronizado, false = erro/tabela ausente
-  const [showSqlModal, setShowSqlModal] = useState(false);
-  const [copiedSql, setCopiedSql] = useState(false);
-  const [migratingLocal, setMigratingLocal] = useState(false);
-
   // Controle de sanfonas (accordions) abertas
   const [expandedParents, setExpandedParents] = useState(new Set());
 
@@ -153,6 +147,7 @@ export default function GastosFixos() {
   };
 
   // Carregar Gastos Fixos (Supabase + localStorage fallback)
+  // Carregar Gastos Fixos (Supabase + localStorage fallback transparente)
   const fetchGastos = async () => {
     setLoading(true);
     try {
@@ -162,8 +157,7 @@ export default function GastosFixos() {
         .order('data_vencimento', { ascending: true });
 
       if (error) {
-        console.warn('Supabase gastos_fixos query error:', error.message);
-        setSupabaseOnline(false);
+        console.warn('Fallback local para gastos fixos:', error.message);
         const local = localStorage.getItem(STORAGE_KEY);
         if (local) {
           const parsed = JSON.parse(local);
@@ -173,15 +167,26 @@ export default function GastosFixos() {
           setGastos([]);
         }
       } else {
-        setSupabaseOnline(true);
         const list = data || [];
+        // Se houver dados locais não salvos no Supabase, sincroniza silenciosamente
+        try {
+          const localStr = localStorage.getItem(STORAGE_KEY);
+          if (localStr) {
+            const localList = JSON.parse(localStr);
+            const pendentes = localList.filter(l => !list.some(d => d.id === l.id));
+            if (pendentes.length > 0) {
+              await supabase.from('gastos_fixos').upsert(pendentes, { onConflict: 'id' });
+              list.push(...pendentes);
+            }
+          }
+        } catch (eSync) {}
+
         setGastos(list);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
         checkAndSendDailyAlert(list);
       }
     } catch (err) {
       console.warn('Usando armazenamento local para Gastos Fixos:', err);
-      setSupabaseOnline(false);
       const local = localStorage.getItem(STORAGE_KEY);
       if (local) {
         const parsed = JSON.parse(local);
@@ -275,34 +280,6 @@ export default function GastosFixos() {
   const saveLocalGastos = (newList) => {
     setGastos(newList);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(newList));
-  };
-
-  // Migrar dados salvos em LocalStorage para o Supabase (após o usuário rodar o SQL)
-  const handleMigrateLocalToSupabase = async () => {
-    setMigratingLocal(true);
-    try {
-      const localStr = localStorage.getItem(STORAGE_KEY);
-      if (!localStr) {
-        alert('Nenhum dado local para migrar.');
-        return;
-      }
-      const localList = JSON.parse(localStr);
-      if (!localList || localList.length === 0) {
-        alert('Nenhum dado local para migrar.');
-        return;
-      }
-
-      const { error } = await supabase.from('gastos_fixos').upsert(localList, { onConflict: 'id' });
-      if (error) {
-        throw error;
-      }
-      alert(`✅ Sucesso! ${localList.length} registro(s) sincronizados com o Supabase.`);
-      await fetchGastos();
-    } catch (err) {
-      alert('Erro ao sincronizar com o Supabase: ' + err.message);
-    } finally {
-      setMigratingLocal(false);
-    }
   };
 
   // Alternar visualização da sanfona (accordion)
@@ -938,155 +915,11 @@ export default function GastosFixos() {
     return { totalGeral, totalPago, totalEmAberto, totalVencido, totalAlertas };
   }, [gastos, hojeStr]);
 
-  // SQL Script para o Modal
-  const SQL_SCRIPT = `-- ==============================================================================
--- SCRIPT DE CRIAÇÃO E CONFIGURAÇÃO DA TABELA: gastos_fixos
--- Execute no Supabase SQL Editor (https://supabase.com/dashboard)
--- ==============================================================================
 
-CREATE TABLE IF NOT EXISTS public.gastos_fixos (
-  id TEXT PRIMARY KEY,
-  parent_id TEXT REFERENCES public.gastos_fixos(id) ON DELETE CASCADE,
-  is_parent BOOLEAN DEFAULT false,
-  parcela_numero INTEGER,
-  total_parcelas INTEGER,
-  descricao TEXT NOT NULL,
-  categoria TEXT NOT NULL,
-  valor NUMERIC NOT NULL DEFAULT 0,
-  valor_pago_real NUMERIC,
-  data_vencimento DATE NOT NULL,
-  data_final DATE,
-  recorrencia TEXT DEFAULT 'mensal',
-  status TEXT DEFAULT 'em_aberto',
-  data_pagamento DATE,
-  metodo_pagamento TEXT,
-  conta_destino TEXT,
-  observacoes TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_gastos_fixos_parent_id ON public.gastos_fixos(parent_id);
-CREATE INDEX IF NOT EXISTS idx_gastos_fixos_data_vencimento ON public.gastos_fixos(data_vencimento);
-CREATE INDEX IF NOT EXISTS idx_gastos_fixos_status ON public.gastos_fixos(status);
-
-ALTER TABLE public.gastos_fixos ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Permitir tudo em gastos_fixos" ON public.gastos_fixos;
-CREATE POLICY "Permitir tudo em gastos_fixos" ON public.gastos_fixos
-  FOR ALL USING (true) WITH CHECK (true);
-
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.gastos_fixos;
-  END IF;
-EXCEPTION
-  WHEN duplicate_object THEN NULL;
-END $$;`;
-
-  const copySqlToClipboard = () => {
-    navigator.clipboard.writeText(SQL_SCRIPT);
-    setCopiedSql(true);
-    setTimeout(() => setCopiedSql(false), 3000);
-  };
 
   return (
     <div style={{ padding: '20px 0' }}>
       
-      {/* Banner de Sincronização do Supabase */}
-      {supabaseOnline === false && (
-        <div style={{
-          background: 'rgba(239, 68, 68, 0.12)',
-          border: '1px solid #ef444488',
-          borderRadius: '12px',
-          padding: '14px 18px',
-          marginBottom: '20px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '12px'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '1.4rem' }}>⚠️</span>
-            <div>
-              <strong style={{ color: '#ef4444', fontSize: '0.95rem' }}>
-                Supabase: Tabela 'gastos_fixos' pendente de criação no banco
-              </strong>
-              <span style={{ display: 'block', fontSize: '0.8rem', color: '#ccc', marginTop: '2px' }}>
-                Os dados estão sendo salvos apenas localmente neste dispositivo (LocalStorage). Para que os gastos apareçam sincronizados entre todos os computadores e celulares em tempo real, execute o script SQL no Supabase.
-              </span>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button
-              onClick={() => setShowSqlModal(true)}
-              style={{
-                background: '#ef4444',
-                color: '#fff',
-                border: 'none',
-                padding: '8px 14px',
-                borderRadius: '8px',
-                fontWeight: 'bold',
-                fontSize: '0.82rem',
-                cursor: 'pointer'
-              }}
-            >
-              📋 Ver Script SQL & Instruções
-            </button>
-            <button
-              onClick={fetchGastos}
-              style={{
-                background: '#222',
-                color: '#aaa',
-                border: '1px solid #444',
-                padding: '8px 12px',
-                borderRadius: '8px',
-                fontSize: '0.82rem',
-                cursor: 'pointer'
-              }}
-            >
-              🔄 Testar Novamente
-            </button>
-          </div>
-        </div>
-      )}
-
-      {supabaseOnline === true && (
-        <div style={{
-          background: 'rgba(16, 185, 129, 0.08)',
-          border: '1px solid #10b98144',
-          borderRadius: '10px',
-          padding: '8px 14px',
-          marginBottom: '15px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          fontSize: '0.82rem'
-        }}>
-          <span style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            🟢 <strong>Supabase Online:</strong> Dados sincronizados em tempo real entre todos os computadores e celulares dos administradores.
-          </span>
-          <button
-            onClick={handleMigrateLocalToSupabase}
-            disabled={migratingLocal}
-            style={{
-              background: 'transparent',
-              color: '#10b981',
-              border: '1px dashed #10b98188',
-              padding: '4px 10px',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '0.75rem'
-            }}
-            title="Sincroniza os gastos salvos em cache deste navegador para o Supabase"
-          >
-            {migratingLocal ? 'Sincronizando...' : '🔄 Sincronizar Cache Local para a Nuvem'}
-          </button>
-        </div>
-      )}
-
       {/* Header com Ações e Alerta de E-mail */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px', flexWrap: 'wrap', gap: '15px' }}>
         <div>
@@ -1094,7 +927,7 @@ END $$;`;
             📌 Gestão de Gastos Fixos & Recorrentes
           </h2>
           <p style={{ color: '#aaa', margin: '4px 0 0 0', fontSize: '0.85rem' }}>
-            Organização com <strong>Parcela Mãe</strong> expansível (sanfona) e sincronização na nuvem para múltiplos administradores.
+            Organização de contas a pagar, parcelamentos e vencimentos com status automáticos.
           </p>
         </div>
 
@@ -1119,15 +952,6 @@ END $$;`;
             title="Checa e envia e-mail com as contas que vencem ou encerram em até 7 dias"
           >
             {sendingAlert ? '📧 Enviando Alerta...' : `🔔 Notificar Vencimentos (${metricas.totalAlertas})`}
-          </button>
-
-          <button 
-            onClick={() => setShowSqlModal(true)}
-            className="btn"
-            style={{ background: '#1c1c24', color: '#93c5fd', border: '1px solid #3b82f655', padding: '10px 14px', borderRadius: '8px', fontSize: '0.85rem' }}
-            title="Ver e copiar código SQL para criação das tabelas no Supabase"
-          >
-            📋 SQL Supabase
           </button>
 
           <button 
@@ -2068,96 +1892,6 @@ END $$;`;
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Informativo e Copiador do Script SQL do Supabase */}
-      {showSqlModal && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)',
-          display: 'flex', justifyContent: 'center', alignItems: 'center',
-          zIndex: 9999, padding: '20px'
-        }}>
-          <div style={{
-            maxWidth: '720px', width: '100%', background: '#121216',
-            border: '1px solid #333', borderRadius: '16px', padding: '25px', color: '#fff',
-            maxHeight: '90vh', overflowY: 'auto'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '1px solid #222', paddingBottom: '10px' }}>
-              <h3 style={{ margin: 0, color: '#3b82f6', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                ⚡ Configurar Sincronização no Supabase
-              </h3>
-              <button onClick={() => setShowSqlModal(false)} style={{ background: 'transparent', color: '#ef4444', border: 'none', fontSize: '1.3rem', cursor: 'pointer' }}>
-                ✕
-              </button>
-            </div>
-
-            <p style={{ color: '#ccc', fontSize: '0.88rem', lineHeight: '1.5', margin: '0 0 15px 0' }}>
-              Para que os <strong>Gastos Fixos e Parcelas</strong> sejam sincronizados automaticamente entre todos os administradores (seja no computador ou celular) e atualizados em tempo real sem precisar de F5, execute o script abaixo no Supabase:
-            </p>
-
-            <ol style={{ color: '#aaa', fontSize: '0.84rem', lineHeight: '1.6', margin: '0 0 15px 0', paddingLeft: '20px' }}>
-              <li>Acesse o painel do seu projeto no Supabase (<a href="https://supabase.com/dashboard" target="_blank" rel="noopener noreferrer" style={{ color: '#60a5fa' }}>supabase.com/dashboard</a>).</li>
-              <li>No menu lateral esquerdo, clique em <strong>SQL Editor</strong>.</li>
-              <li>Cole o código SQL abaixo e clique no botão verde <strong>RUN</strong>.</li>
-              <li>Pronto! O sistema passará a sincronizar todos os dispositivos instantaneamente.</li>
-            </ol>
-
-            <div style={{ position: 'relative', marginBottom: '15px' }}>
-              <pre style={{
-                background: '#09090c',
-                border: '1px solid #2a2a35',
-                borderRadius: '8px',
-                padding: '14px',
-                fontSize: '0.78rem',
-                color: '#a5f3fc',
-                maxHeight: '260px',
-                overflowY: 'auto',
-                whiteSpace: 'pre-wrap'
-              }}>
-                {SQL_SCRIPT}
-              </pre>
-              <button
-                onClick={copySqlToClipboard}
-                style={{
-                  position: 'absolute',
-                  top: '10px',
-                  right: '10px',
-                  background: copiedSql ? '#10b981' : '#3b82f6',
-                  color: '#fff',
-                  border: 'none',
-                  padding: '6px 14px',
-                  borderRadius: '6px',
-                  fontWeight: 'bold',
-                  fontSize: '0.78rem',
-                  cursor: 'pointer'
-                }}
-              >
-                {copiedSql ? '✅ Copiado!' : '📋 Copiar Código SQL'}
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button
-                onClick={() => {
-                  fetchGastos();
-                  setShowSqlModal(false);
-                }}
-                className="btn"
-                style={{ background: '#10b981', color: '#000', fontWeight: 'bold' }}
-              >
-                🔄 Já Executei no Supabase (Atualizar Conexão)
-              </button>
-              <button
-                onClick={() => setShowSqlModal(false)}
-                className="btn"
-                style={{ background: '#333', color: '#fff' }}
-              >
-                Fechar
-              </button>
-            </div>
           </div>
         </div>
       )}
