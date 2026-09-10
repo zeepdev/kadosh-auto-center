@@ -627,6 +627,20 @@ Botão fica `disabled` se o cliente não tem nenhum veículo cadastrado, com tex
    - Adicionado `debounceTimer` de 800ms para unificar eventos concorrentes de rede.
    - Chamadas subsequentes vindas do Realtime passam `showSpinner = false`, atualizando a tabela de forma suave e silenciosa sem piscar a tela ou exibir loading.
 
+### 2026-09-10 — Inclusão de Novos Destinatários de Notificação (Orçamentos & Gastos a Vencer)
+
+**Contexto**: O cliente solicitou a inclusão de dois novos e-mails (`thaiscb.engcivil@gmail.com` e `rafaedust@gmail.com`) para receberem notificações sempre que:
+1. Um novo orçamento for solicitado por um cliente no site.
+2. Contas, despesas fixas ou contratos estiverem a vencer nos próximos 7 dias.
+
+**Mudanças Implementadas**:
+- Criada a função unificada `getAdminNotificationEmails()` no `server.js` que consolida os administradores do Supabase com os e-mails configurados, eliminando duplicatas.
+- Adicionados os e-mails `thaiscb.engcivil@gmail.com` e `rafaedust@gmail.com` à lista de destinatários padrão e à variável `NOTIFICATION_EMAILS` no `.env`.
+- Integrados aos endpoints:
+  - `/api/send-budget-notification` (notificação de novo orçamento).
+  - `/api/send-gastos-fixos-alert` (alerta de contas a vencer em até 7 dias).
+
+
 
 
 

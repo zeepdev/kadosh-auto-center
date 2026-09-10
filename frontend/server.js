@@ -21,6 +21,45 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// ======================================================
+// CONFIGURAÇÃO DOS DESTINATÁRIOS DE NOTIFICAÇÕES (ORÇAMENTOS & GASTOS A VENCER)
+// ======================================================
+const DEFAULT_NOTIFICATION_EMAILS = [
+  'kadoshautocenter7@gmail.com',
+  'isaqueduarte07@gmail.com',
+  'thaiscb.engcivil@gmail.com',
+  'rafaedust@gmail.com'
+];
+
+async function getAdminNotificationEmails() {
+  try {
+    const envEmails = process.env.NOTIFICATION_EMAILS
+      ? process.env.NOTIFICATION_EMAILS.split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
+      : [];
+
+    const { data: admins, error } = await supabase
+      .from('clientes')
+      .select('email')
+      .eq('is_admin', true);
+
+    const dbEmails = (!error && Array.isArray(admins))
+      ? admins.map(a => a.email?.trim().toLowerCase()).filter(Boolean)
+      : [];
+
+    // Consolida e-mails padrão, variáveis de ambiente e admins cadastrados no banco sem duplicatas
+    const allEmails = new Set([
+      ...DEFAULT_NOTIFICATION_EMAILS.map(e => e.trim().toLowerCase()),
+      ...envEmails,
+      ...dbEmails
+    ]);
+
+    return Array.from(allEmails);
+  } catch (err) {
+    console.warn('⚠️ Erro ao consultar admins no Supabase para notificações:', err.message);
+    return DEFAULT_NOTIFICATION_EMAILS;
+  }
+}
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -365,22 +404,9 @@ app.post('/api/send-budget-notification', async (req, res) => {
   const { nome, email, telefone, whatsapp, placa, servicoDesejado, descricao, dataAgendamento } = req.body;
 
   try {
-    console.log('🔍 Buscando administradores para notificação...');
-    
-    // Resend no plano gratuito só permite envio para o dono da conta.
-    const { data: admins, error: adminError } = await supabase
-      .from('clientes')
-      .select('email, nome')
-      .eq('is_admin', true);
-    if (adminError) throw adminError;
-    let adminEmails = admins?.map(a => a.email).filter(e => !!e) || [];
-
-    // Fallback caso não encontre nenhum admin por algum motivo
-    if (adminEmails.length === 0) {
-      adminEmails = ['isaqueduarte07@gmail.com'];
-    }
-
-    console.log(`📧 Enviando notificação para: ${adminEmails.join(', ')}`);
+    console.log('🔍 Buscando destinatários para notificação de orçamento...');
+    const adminEmails = await getAdminNotificationEmails();
+    console.log(`📧 Enviando notificação de orçamento para: ${adminEmails.join(', ')}`);
 
     // 2. Enviar o e-mail via Resend
     const data = await resend.emails.send({
@@ -510,17 +536,8 @@ app.post('/api/send-gastos-fixos-alert', async (req, res) => {
       return res.json({ success: true, message: 'Nenhuma conta ou contrato a vencer nos próximos 7 dias.', count: 0 });
     }
 
-    // 2. Buscar administradores
-    const { data: admins } = await supabase
-      .from('clientes')
-      .select('email, nome')
-      .eq('is_admin', true);
-    
-    let adminEmails = admins?.map(a => a.email).filter(e => !!e) || [];
-    if (adminEmails.length === 0) {
-      adminEmails = ['isaqueduarte07@gmail.com'];
-    }
-
+    // 2. Obter destinatários para o alerta financeiro
+    const adminEmails = await getAdminNotificationEmails();
     console.log(`📧 Enviando alerta de ${alertas.length} gasto(s) a vencer para: ${adminEmails.join(', ')}`);
 
     // 3. Montar HTML do e-mail
