@@ -572,7 +572,25 @@ Botão fica `disabled` se o cliente não tem nenhum veículo cadastrado, com tex
    - Botões globais `Expandir Todas` / `Recolher Todas`.
 4. **Assistente de Diagnóstico e Sincronização**:
    - Detecção em tempo real se a tabela existe no Supabase.
-   - Banner de alerta caso a tabela ainda não tenha sido criada, com modal para copiar o código SQL em 1 clique e botão de migração automática dos dados salvos no cache local para o Supabase.
+   - Sincronização silenciosa e transparente de dados locais para o Supabase sem exibir banners técnicos na tela do usuário.
+
+### 2026-09-10 — Universalização da "Pasta Mãe" para Todas as Recorrências e Dados Legados
+
+**Contexto**: O cliente solicitou estender o conceito de **Pasta Mãe** para todas as despesas (semanais, quinzenais, mensais, trimestrais, anuais) e garantir que todas as contas já cadastradas anteriormente nos computadores da oficina também fossem convertidas automaticamente em Pastas Mãe.
+
+**Mudanças**:
+1. **Migração Automática Universal (`migrarTodosParaPastaMae`)**:
+   - Função executada no carregamento dos dados que examina todas as despesas legadas salvas no navegador ou banco.
+   - Identifica lançamentos com o mesmo nome e categoria criados manualmente e os unifica sob uma única Pasta Mãe mestre.
+   - Converte lançamentos únicos com recorrência (semanal, quinzenal, mensal, etc.) em Pastas Mãe com todas as suas ocorrências geradas para o ano inteiro, preservando o histórico de pagamentos já efetuados na 1ª parcela.
+   - Sincroniza o resultado automaticamente no Supabase e no `localStorage`.
+2. **Modal e Cadastro 100% Baseado em Pasta Mãe**:
+   - Eliminação de opções fragmentadas: todo e qualquer novo gasto é criado como uma Pasta Mãe com ocorrências filhas.
+   - Suporte completo a Semanais (Semanas 1..12), Quinzenais (Quinzenas 1..12), Mensais (Parcelas 1..12), Trimestrais, Semestrais e Anuais.
+   - Modos de término flexíveis: Contínuo (12 ocorrências/ano), Até Data Final ou Quantidade Exata.
+3. **Ações da Pasta**:
+   - Botão rápido `+ Próxima Parcela/Ocorrência` no rodapé da sanfona para estender prazos com 1 clique.
+
 
 
 

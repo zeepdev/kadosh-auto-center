@@ -18,15 +18,15 @@ const CATEGORIAS = [
 ];
 
 const RECORRENCIAS = [
-  { id: 'mensal', label: 'Mensal (Todo mês)' },
-  { id: 'semanal', label: 'Semanal (Toda semana)' },
-  { id: 'quinzenal', label: 'Quinzenal (A cada 15 dias)' },
-  { id: 'trimestral', label: 'Trimestral (A cada 3 meses)' },
-  { id: 'semestral', label: 'Semestral (A cada 6 meses)' },
-  { id: 'anual', label: 'Anual (1 vez por ano)' }
+  { id: 'mensal', label: 'Mensal (Todo mês)', singular: 'Mês', labelOcorrencia: 'Parcela' },
+  { id: 'quinzenal', label: 'Quinzenal (A cada 15 dias)', singular: 'Quinzena', labelOcorrencia: 'Quinzena' },
+  { id: 'semanal', label: 'Semanal (Toda semana)', singular: 'Semana', labelOcorrencia: 'Semana' },
+  { id: 'trimestral', label: 'Trimestral (A cada 3 meses)', singular: 'Trimestre', labelOcorrencia: 'Trimestre' },
+  { id: 'semestral', label: 'Semestral (A cada 6 meses)', singular: 'Semestre', labelOcorrencia: 'Semestre' },
+  { id: 'anual', label: 'Anual (1 vez por ano)', singular: 'Ano', labelOcorrencia: 'Ano' }
 ];
 
-// Funções de Cálculo de Datas e Parcelamento
+// Funções de Cálculo de Datas e Intervalos
 function addIntervalToDate(dateStr, recorrencia, step) {
   if (!dateStr) return '';
   const [ano, mes, dia] = dateStr.split('-').map(Number);
@@ -40,7 +40,7 @@ function addIntervalToDate(dateStr, recorrencia, step) {
     const origDay = dia;
     dt.setMonth(dt.getMonth() + step);
     if (dt.getDate() !== origDay) {
-      dt.setDate(0); // Último dia do mês correto caso o mês seguinte tenha menos dias
+      dt.setDate(0); // Último dia do mês correto
     }
   } else if (recorrencia === 'trimestral') {
     dt.setMonth(dt.getMonth() + 3 * step);
@@ -65,6 +65,12 @@ function gerarListaDatasParcelas(dataInicio, modo, dataFinal, qtdParcelas, recor
     for (let i = 0; i < total; i++) {
       datas.push(addIntervalToDate(dataInicio, recorrencia, i));
     }
+  } else if (modo === 'continuo') {
+    // Para gastos contínuos: gera 12 parcelas / ano para planejamento financeiro
+    const defaultQtd = recorrencia === 'semanal' ? 12 : (recorrencia === 'quinzenal' ? 12 : (recorrencia === 'mensal' ? 12 : (recorrencia === 'trimestral' ? 4 : 2)));
+    for (let i = 0; i < defaultQtd; i++) {
+      datas.push(addIntervalToDate(dataInicio, recorrencia, i));
+    }
   } else {
     // modo data_final
     if (!dataFinal) {
@@ -78,8 +84,151 @@ function gerarListaDatasParcelas(dataInicio, modo, dataFinal, qtdParcelas, recor
       datas.push(dt);
       step++;
     }
+    if (datas.length === 0) datas.push(dataInicio);
   }
   return datas;
+}
+
+// MIGRAÇÃO AUTOMÁTICA UNIVERSAL: TRANSFORMA TODOS OS GASTOS (INCLUSIVE LEGADOS) EM PASTAS MÃE
+function migrarTodosParaPastaMae(listaOriginal) {
+  if (!Array.isArray(listaOriginal) || listaOriginal.length === 0) return [];
+
+  const jaMigrados = [];
+  const legados = [];
+
+  listaOriginal.forEach(item => {
+    if (item.is_parent || item.parent_id) {
+      jaMigrados.push(item);
+    } else {
+      legados.push(item);
+    }
+  });
+
+  if (legados.length === 0) return listaOriginal;
+
+  // Agrupar itens legados por nome base limpo + categoria
+  const gruposLegados = {};
+  legados.forEach(item => {
+    const nomeLimpo = (item.descricao || 'Gasto')
+      .replace(/\s*-\s*parcela\s*\d+/i, '')
+      .replace(/\s*\(parcela\s*\d+\/\d+\)/i, '')
+      .replace(/\s*\(ocorrência\s*\d+\/\d+\)/i, '')
+      .trim();
+    const key = nomeLimpo.toLowerCase() + '::' + (item.categoria || '').trim().toLowerCase();
+    if (!gruposLegados[key]) gruposLegados[key] = { nome: nomeLimpo, categoria: item.categoria, items: [] };
+    gruposLegados[key].items.push(item);
+  });
+
+  const novosMigrados = [];
+
+  Object.values(gruposLegados).forEach(grupo => {
+    const items = grupo.items.sort((a, b) => (a.data_vencimento || '').localeCompare(b.data_vencimento || ''));
+    const primeiro = items[0];
+    const rec = primeiro.recorrencia || 'mensal';
+    const parentId = 'mae_' + primeiro.id;
+
+    if (items.length > 1) {
+      // Caso 1: Já existiam múltiplos lançamentos manuais do mesmo gasto
+      const parent = {
+        id: parentId,
+        parent_id: null,
+        is_parent: true,
+        total_parcelas: items.length,
+        descricao: grupo.nome,
+        categoria: grupo.categoria,
+        valor: primeiro.valor || 0,
+        data_vencimento: primeiro.data_vencimento,
+        data_final: items[items.length - 1].data_vencimento,
+        recorrencia: rec,
+        status: 'em_aberto',
+        observacoes: primeiro.observacoes || null,
+        created_at: primeiro.created_at || new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      novosMigrados.push(parent);
+
+      items.forEach((it, idx) => {
+        novosMigrados.push({
+          id: parentId + '_p' + (idx + 1),
+          parent_id: parentId,
+          is_parent: false,
+          parcela_numero: idx + 1,
+          total_parcelas: items.length,
+          descricao: `${grupo.nome} (Ocorrência ${idx + 1}/${items.length})`,
+          categoria: it.categoria,
+          valor: it.valor,
+          valor_pago_real: it.valor_pago_real !== undefined && it.valor_pago_real !== null ? it.valor_pago_real : (it.status === 'pago' ? it.valor : null),
+          data_vencimento: it.data_vencimento,
+          data_final: null,
+          recorrencia: rec,
+          status: it.status || 'em_aberto',
+          data_pagamento: it.data_pagamento || null,
+          metodo_pagamento: it.metodo_pagamento || null,
+          conta_destino: it.conta_destino || null,
+          observacoes: it.observacoes || null,
+          created_at: it.created_at || new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+      });
+    } else {
+      // Caso 2: Apenas 1 lançamento solto -> expande em Pasta Mãe com suas ocorrências
+      const defaultQtd = rec === 'semanal' ? 12 : (rec === 'quinzenal' ? 12 : (rec === 'mensal' ? 12 : (rec === 'trimestral' ? 4 : 2)));
+      const datas = gerarListaDatasParcelas(
+        primeiro.data_vencimento,
+        primeiro.data_final ? 'data_final' : 'continuo',
+        primeiro.data_final,
+        defaultQtd,
+        rec
+      );
+
+      const parent = {
+        id: parentId,
+        parent_id: null,
+        is_parent: true,
+        total_parcelas: datas.length,
+        descricao: grupo.nome,
+        categoria: grupo.categoria,
+        valor: primeiro.valor || 0,
+        data_vencimento: datas[0],
+        data_final: datas[datas.length - 1],
+        recorrencia: rec,
+        status: 'em_aberto',
+        observacoes: primeiro.observacoes || null,
+        created_at: primeiro.created_at || new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      novosMigrados.push(parent);
+
+      const labelOcorrencia = rec === 'semanal' ? 'Semana' : (rec === 'quinzenal' ? 'Quinzena' : 'Parcela');
+
+      datas.forEach((dt, idx) => {
+        const isFirst = idx === 0;
+        novosMigrados.push({
+          id: parentId + '_p' + (idx + 1),
+          parent_id: parentId,
+          is_parent: false,
+          parcela_numero: idx + 1,
+          total_parcelas: datas.length,
+          descricao: `${grupo.nome} (${labelOcorrencia} ${idx + 1}/${datas.length})`,
+          categoria: primeiro.categoria,
+          valor: primeiro.valor,
+          valor_pago_real: isFirst && primeiro.status === 'pago' ? (primeiro.valor_pago_real !== undefined && primeiro.valor_pago_real !== null ? primeiro.valor_pago_real : primeiro.valor) : null,
+          data_vencimento: dt,
+          data_final: null,
+          recorrencia: rec,
+          status: isFirst ? primeiro.status : 'em_aberto',
+          data_pagamento: isFirst ? primeiro.data_pagamento : null,
+          metodo_pagamento: isFirst ? primeiro.metodo_pagamento : null,
+          conta_destino: isFirst ? primeiro.conta_destino : null,
+          observacoes: primeiro.observacoes || null,
+          created_at: primeiro.created_at || new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+      });
+    }
+  });
+
+  return [...jaMigrados, ...novosMigrados];
 }
 
 export default function GastosFixos() {
@@ -96,17 +245,15 @@ export default function GastosFixos() {
   const [showModal, setShowModal] = useState(false);
   const [editingGasto, setEditingGasto] = useState(null);
 
-  // Form State
+  // Form State da Pasta Mãe
   const [descricao, setDescricao] = useState('');
   const [categoria, setCategoria] = useState(CATEGORIAS[0]);
   const [valor, setValor] = useState('');
-  const [tipoCadastro, setTipoCadastro] = useState('simples'); // 'simples' (mensal contínuo) ou 'parcelado' (agrupado em parcelas)
-  const [modoParcelas, setModoParcelas] = useState('data_final'); // 'data_final' ou 'qtd_parcelas'
+  const [recorrencia, setRecorrencia] = useState('mensal');
+  const [modoTermino, setModoTermino] = useState('continuo'); // 'continuo', 'data_final' ou 'qtd_parcelas'
   const [dataVencimento, setDataVencimento] = useState(new Date().toISOString().split('T')[0]);
   const [dataFinal, setDataFinal] = useState('');
-  const [qtdParcelas, setQtdParcelas] = useState('3');
-  const [recorrencia, setRecorrencia] = useState('mensal');
-  const [status, setStatus] = useState('em_aberto'); // 'pago' ou 'em_aberto'
+  const [qtdParcelas, setQtdParcelas] = useState('12');
   const [observacoes, setObservacoes] = useState('');
 
   // Modal de Baixa de Pagamento com Valor Editável
@@ -146,8 +293,7 @@ export default function GastosFixos() {
     return `${d}/${m}/${y}`;
   };
 
-  // Carregar Gastos Fixos (Supabase + localStorage fallback)
-  // Carregar Gastos Fixos (Supabase + localStorage fallback transparente)
+  // Carregar Gastos Fixos e Aplicar Conceito da Pasta Mãe Universal
   const fetchGastos = async () => {
     setLoading(true);
     try {
@@ -156,51 +302,44 @@ export default function GastosFixos() {
         .select('*')
         .order('data_vencimento', { ascending: true });
 
-      if (error) {
-        console.warn('Fallback local para gastos fixos:', error.message);
-        const local = localStorage.getItem(STORAGE_KEY);
-        if (local) {
-          const parsed = JSON.parse(local);
-          setGastos(parsed);
-          checkAndSendDailyAlert(parsed);
-        } else {
-          setGastos([]);
-        }
-      } else {
-        let list = Array.isArray(data) ? [...data] : [];
-        // Se houver dados locais naquele computador, preserva e sincroniza silenciosamente para o Supabase
-        try {
-          const localStr = localStorage.getItem(STORAGE_KEY);
-          if (localStr) {
-            const localList = JSON.parse(localStr);
-            if (Array.isArray(localList) && localList.length > 0) {
-              const pendentes = localList.filter(l => !list.some(d => d.id === l.id));
-              if (pendentes.length > 0) {
-                try {
-                  await supabase.from('gastos_fixos').upsert(pendentes, { onConflict: 'id' });
-                } catch (errUp) {
-                  console.warn('Tentativa de sincronização com Supabase pendente:', errUp);
-                }
-                // Mescla os pendentes para que NADA seja perdido na visualização ou no cache local
-                list = [...list, ...pendentes];
-              }
-            }
-          }
-        } catch (eSync) {
-          console.warn('Erro ao mesclar dados locais:', eSync);
-        }
+      let baseList = [];
+      if (!error && Array.isArray(data)) {
+        baseList = [...data];
+      }
 
-        setGastos(list);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-        checkAndSendDailyAlert(list);
+      // Mescla com dados locais daquele computador caso haja algo pendente
+      try {
+        const localStr = localStorage.getItem(STORAGE_KEY);
+        if (localStr) {
+          const localList = JSON.parse(localStr);
+          if (Array.isArray(localList) && localList.length > 0) {
+            const pendentes = localList.filter(l => !baseList.some(d => d.id === l.id));
+            baseList = [...baseList, ...pendentes];
+          }
+        }
+      } catch (eLocal) {}
+
+      // APLICA O CONCEITO DA PASTA MÃE PARA TODOS OS GASTOS (inclusive legados existentes)
+      const listMigrada = migrarTodosParaPastaMae(baseList);
+
+      setGastos(listMigrada);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(listMigrada));
+      checkAndSendDailyAlert(listMigrada);
+
+      // Sincroniza silenciosamente com o Supabase
+      if (!error && listMigrada.length > 0) {
+        try {
+          await supabase.from('gastos_fixos').upsert(listMigrada, { onConflict: 'id' });
+        } catch (eUp) {}
       }
     } catch (err) {
       console.warn('Usando armazenamento local para Gastos Fixos:', err);
       const local = localStorage.getItem(STORAGE_KEY);
       if (local) {
         const parsed = JSON.parse(local);
-        setGastos(parsed);
-        checkAndSendDailyAlert(parsed);
+        const migrado = migrarTodosParaPastaMae(parsed);
+        setGastos(migrado);
+        checkAndSendDailyAlert(migrado);
       }
     } finally {
       setLoading(false);
@@ -312,21 +451,19 @@ export default function GastosFixos() {
     setExpandedParents(new Set());
   };
 
-  // Abrir Modal para Criar ou Editar
-  const handleOpenModal = (item = null, parentContext = null) => {
+  // Abrir Modal para Criar Nova Pasta Mãe ou Editar Ocorrência
+  const handleOpenModal = (item = null) => {
     if (item) {
       setEditingGasto(item);
-      setDescricao(item.descricao ? item.descricao.replace(/\s*\(Parcela \d+\/\d+\)/, '') : '');
+      setDescricao(item.descricao ? item.descricao.replace(/\s*\((Semana|Quinzena|Parcela|Trimestre|Semestre|Ano|Ocorrência)\s*\d+.*\)/i, '') : '');
       setCategoria(item.categoria || CATEGORIAS[0]);
       setValor(item.valor !== undefined ? item.valor.toString() : '');
       setDataVencimento(item.data_vencimento || hojeStr);
       setDataFinal(item.data_final || '');
       setRecorrencia(item.recorrencia || 'mensal');
-      setStatus(item.status === 'pago' ? 'pago' : 'em_aberto');
       setObservacoes(item.observacoes || '');
-      setTipoCadastro(item.is_parent || item.parent_id ? 'parcelado' : 'simples');
-      setModoParcelas(item.data_final ? 'data_final' : 'qtd_parcelas');
-      setQtdParcelas(item.total_parcelas ? item.total_parcelas.toString() : '3');
+      setModoTermino(item.data_final ? 'data_final' : 'continuo');
+      setQtdParcelas(item.total_parcelas ? item.total_parcelas.toString() : '12');
     } else {
       setEditingGasto(null);
       setDescricao('');
@@ -334,23 +471,21 @@ export default function GastosFixos() {
       setValor('');
       setDataVencimento(hojeStr);
       setDataFinal('');
-      setQtdParcelas('3');
-      setModoParcelas('data_final');
+      setQtdParcelas('12');
+      setModoTermino('continuo');
       setRecorrencia('mensal');
-      setTipoCadastro('simples');
-      setStatus('em_aberto');
       setObservacoes('');
     }
     setShowModal(true);
   };
 
-  // Prévia das parcelas no modal
+  // Prévia das ocorrências/parcelas no modal
   const datasPrevia = useMemo(() => {
-    if (tipoCadastro !== 'parcelado') return [];
-    return gerarListaDatasParcelas(dataVencimento, modoParcelas, dataFinal, qtdParcelas, recorrencia);
-  }, [tipoCadastro, dataVencimento, modoParcelas, dataFinal, qtdParcelas, recorrencia]);
+    if (editingGasto && !editingGasto.is_parent) return [];
+    return gerarListaDatasParcelas(dataVencimento, modoTermino, dataFinal, qtdParcelas, recorrencia);
+  }, [editingGasto, dataVencimento, modoTermino, dataFinal, qtdParcelas, recorrencia]);
 
-  // Salvar Novo Gasto ou Alteração (Com geração automática de parcelas e agrupamento na Parcela Mãe)
+  // Salvar Novo Gasto: CRIA SEMPRE COMO PASTA MÃE + OCORRÊNCIAS
   const handleSaveGasto = async (e) => {
     e.preventDefault();
     if (!descricao.trim() || !dataVencimento) {
@@ -360,34 +495,29 @@ export default function GastosFixos() {
 
     const valNum = parseFloat(valor) || 0;
 
-    // CASO 1: Edição de um item existente (único ou parcela específica)
-    if (editingGasto) {
+    // CASO 1: Edição de uma ocorrência filha individual
+    if (editingGasto && !editingGasto.is_parent) {
       const payload = {
         ...editingGasto,
         descricao: descricao.trim(),
         categoria,
         valor: valNum,
         data_vencimento: dataVencimento,
-        data_final: dataFinal || null,
-        recorrencia,
-        status: status === 'pago' ? 'pago' : 'em_aberto',
-        data_pagamento: status === 'pago' ? (editingGasto?.data_pagamento || hojeStr) : null,
         observacoes: observacoes.trim(),
         updated_at: new Date().toISOString()
       };
 
       try {
-        const { error } = await supabase.from('gastos_fixos').update(payload).eq('id', editingGasto.id);
-        if (error) console.warn('Supabase update fallback:', error.message);
+        await supabase.from('gastos_fixos').update(payload).eq('id', editingGasto.id);
       } catch (err) {}
 
       const updatedList = gastos.map(g => g.id === editingGasto.id ? payload : g);
       saveLocalGastos(updatedList);
 
       registrarLog({
-        acao: 'EDICAO_GASTO_FIXO',
+        acao: 'EDICAO_PARCELA_GASTO',
         modulo: 'Gastos Fixos',
-        detalhes: `Gasto Fixo "${payload.descricao}" atualizado.`,
+        detalhes: `Ocorrência "${payload.descricao}" atualizada.`,
         metadata: payload
       });
 
@@ -395,100 +525,52 @@ export default function GastosFixos() {
       return;
     }
 
-    // CASO 2: Criação de Gasto Parcelado com Parcela Mãe + Parcelas Filhas
-    if (tipoCadastro === 'parcelado' && datasPrevia.length > 1) {
-      const parentId = 'mae_' + Date.now();
-      const totalP = datasPrevia.length;
-      const dataFimCalculada = datasPrevia[datasPrevia.length - 1];
-
-      // Registro da Parcela Mãe (Registro Mestre)
-      const parentRecord = {
-        id: parentId,
-        parent_id: null,
-        is_parent: true,
-        parcela_numero: null,
-        total_parcelas: totalP,
+    // CASO 2: Edição da Pasta Mãe existente
+    if (editingGasto && editingGasto.is_parent) {
+      const payloadParent = {
+        ...editingGasto,
         descricao: descricao.trim(),
         categoria,
         valor: valNum,
-        valor_pago_real: null,
-        data_vencimento: datasPrevia[0],
-        data_final: dataFimCalculada,
         recorrencia,
-        status: 'em_aberto',
-        data_pagamento: null,
-        metodo_pagamento: null,
-        conta_destino: null,
         observacoes: observacoes.trim(),
-        created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
 
-      // Registros das Parcelas Filhas
-      const childrenRecords = datasPrevia.map((dt, idx) => ({
-        id: `${parentId}_p${idx + 1}`,
-        parent_id: parentId,
-        is_parent: false,
-        parcela_numero: idx + 1,
-        total_parcelas: totalP,
-        descricao: `${descricao.trim()} (Parcela ${idx + 1}/${totalP})`,
-        categoria,
-        valor: valNum,
-        valor_pago_real: null,
-        data_vencimento: dt,
-        data_final: null,
-        recorrencia,
-        status: 'em_aberto',
-        data_pagamento: null,
-        metodo_pagamento: null,
-        conta_destino: null,
-        observacoes: observacoes.trim(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }));
-
-      const novosRegistros = [parentRecord, ...childrenRecords];
-
       try {
-        const { error } = await supabase.from('gastos_fixos').insert(novosRegistros);
-        if (error) console.warn('Supabase insert parcelas fallback:', error.message);
+        await supabase.from('gastos_fixos').update(payloadParent).eq('id', editingGasto.id);
       } catch (err) {}
 
-      const updatedList = [...novosRegistros, ...gastos];
+      const updatedList = gastos.map(g => g.id === editingGasto.id ? payloadParent : g);
       saveLocalGastos(updatedList);
-
-      // Expandir automaticamente a nova parcela mãe para o usuário visualizar
-      setExpandedParents(prev => new Set([...prev, parentId]));
-
-      registrarLog({
-        acao: 'CRIACAO_GASTO_PARCELADO',
-        modulo: 'Gastos Fixos',
-        detalhes: `Parcelamento "${descricao.trim()}": ${totalP} parcelas de R$ ${valNum.toFixed(2)} geradas até ${dataFimCalculada}.`,
-        metadata: { parentId, totalParcelas: totalP }
-      });
-
-      alert(`✅ Parcelamento "${descricao.trim()}" criado com sucesso!\n📁 Foram geradas ${totalP} parcelas agrupadas dentro da Parcela Mãe.`);
       setShowModal(false);
       return;
     }
 
-    // CASO 3: Gasto Fixo Simples / Mensal sem parcelas
-    const simpleId = 'gasto_' + Date.now();
-    const simpleRecord = {
-      id: simpleId,
+    // CASO 3: Criação de Nova Pasta Mãe para QUALQUER recorrência (Semanal, Quinzenal, Mensal, etc.)
+    const parentId = 'mae_' + Date.now();
+    const totalP = datasPrevia.length || 1;
+    const dataFimCalculada = datasPrevia[datasPrevia.length - 1] || dataVencimento;
+
+    const recInfo = RECORRENCIAS.find(r => r.id === recorrencia) || RECORRENCIAS[0];
+    const labelOcorrencia = recInfo.labelOcorrencia;
+
+    // Registro da Pasta Mãe
+    const parentRecord = {
+      id: parentId,
       parent_id: null,
-      is_parent: false,
+      is_parent: true,
       parcela_numero: null,
-      total_parcelas: null,
+      total_parcelas: totalP,
       descricao: descricao.trim(),
       categoria,
       valor: valNum,
       valor_pago_real: null,
-      data_vencimento: dataVencimento,
-      data_final: dataFinal || null,
+      data_vencimento: datasPrevia[0] || dataVencimento,
+      data_final: dataFimCalculada,
       recorrencia,
-      status: status === 'pago' ? 'pago' : 'em_aberto',
-      data_pagamento: status === 'pago' ? hojeStr : null,
+      status: 'em_aberto',
+      data_pagamento: null,
       metodo_pagamento: null,
       conta_destino: null,
       observacoes: observacoes.trim(),
@@ -496,28 +578,104 @@ export default function GastosFixos() {
       updated_at: new Date().toISOString()
     };
 
+    // Registros das Ocorrências / Parcelas Filhas
+    const childrenRecords = datasPrevia.map((dt, idx) => ({
+      id: `${parentId}_p${idx + 1}`,
+      parent_id: parentId,
+      is_parent: false,
+      parcela_numero: idx + 1,
+      total_parcelas: totalP,
+      descricao: `${descricao.trim()} (${labelOcorrencia} ${idx + 1}/${totalP})`,
+      categoria,
+      valor: valNum,
+      valor_pago_real: null,
+      data_vencimento: dt,
+      data_final: null,
+      recorrencia,
+      status: 'em_aberto',
+      data_pagamento: null,
+      metodo_pagamento: null,
+      conta_destino: null,
+      observacoes: observacoes.trim(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }));
+
+    const novosRegistros = [parentRecord, ...childrenRecords];
+
     try {
-      const { error } = await supabase.from('gastos_fixos').insert([simpleRecord]);
-      if (error) console.warn('Supabase insert simple fallback:', error.message);
+      await supabase.from('gastos_fixos').insert(novosRegistros);
     } catch (err) {}
 
-    const updatedList = [simpleRecord, ...gastos];
+    const updatedList = [...novosRegistros, ...gastos];
     saveLocalGastos(updatedList);
 
+    // Expandir automaticamente a nova pasta mãe
+    setExpandedParents(prev => new Set([...prev, parentId]));
+
     registrarLog({
-      acao: 'CRIACAO_GASTO_FIXO',
+      acao: 'CRIACAO_PASTA_MAE_GASTOS',
       modulo: 'Gastos Fixos',
-      detalhes: `Gasto Fixo "${simpleRecord.descricao}" (${simpleRecord.categoria}): R$ ${simpleRecord.valor.toFixed(2)} - Vencimento: ${simpleRecord.data_vencimento}.`,
-      metadata: simpleRecord
+      detalhes: `Pasta Mãe "${descricao.trim()}" criada com ${totalP} ocorrências (${recorrencia}).`,
+      metadata: { parentId, totalParcelas: totalP }
     });
 
+    alert(`✅ Pasta Mãe "${descricao.trim()}" criada com sucesso!\n📁 Foram geradas ${totalP} ocorrências (${recorrencia}) organizadas dentro desta pasta.`);
     setShowModal(false);
+  };
+
+  // Adicionar Próxima Ocorrência em uma Pasta Mãe Existente
+  const handleAddNextInstallment = async (parent, children) => {
+    const totalAtual = children.length;
+    const lastChild = children[children.length - 1];
+    const baseDate = lastChild?.data_vencimento || parent.data_vencimento;
+    const nextDate = addIntervalToDate(baseDate, parent.recorrencia || 'mensal', 1);
+    const nextNum = totalAtual + 1;
+    const recInfo = RECORRENCIAS.find(r => r.id === parent.recorrencia) || RECORRENCIAS[0];
+    const labelOcorrencia = recInfo.labelOcorrencia;
+
+    const newChild = {
+      id: `${parent.id}_p${Date.now()}`,
+      parent_id: parent.id,
+      is_parent: false,
+      parcela_numero: nextNum,
+      total_parcelas: nextNum,
+      descricao: `${parent.descricao} (${labelOcorrencia} ${nextNum})`,
+      categoria: parent.categoria,
+      valor: parent.valor,
+      valor_pago_real: null,
+      data_vencimento: nextDate,
+      data_final: null,
+      recorrencia: parent.recorrencia,
+      status: 'em_aberto',
+      data_pagamento: null,
+      metodo_pagamento: null,
+      conta_destino: null,
+      observacoes: '',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    const updatedParent = {
+      ...parent,
+      total_parcelas: nextNum,
+      data_final: nextDate,
+      updated_at: new Date().toISOString()
+    };
+
+    try {
+      await supabase.from('gastos_fixos').insert([newChild]);
+      await supabase.from('gastos_fixos').update(updatedParent).eq('id', parent.id);
+    } catch (e) {}
+
+    const newList = gastos.map(g => g.id === parent.id ? updatedParent : g).concat([newChild]);
+    saveLocalGastos(newList);
   };
 
   // Deletar Gasto Fixo ou Agrupamento Completo
   const handleDeleteGasto = async (item) => {
     if (item.is_parent) {
-      if (!window.confirm(`⚠️ Atenção: Deseja excluir a Parcela Mãe "${item.descricao}" e TODAS as suas parcelas vinculadas?`)) {
+      if (!window.confirm(`⚠️ Atenção: Deseja excluir a Pasta Mãe "${item.descricao}" e TODAS as suas ocorrências/parcelas vinculadas?`)) {
         return;
       }
       try {
@@ -529,15 +687,15 @@ export default function GastosFixos() {
       saveLocalGastos(newList);
 
       registrarLog({
-        acao: 'EXCLUSAO_GRUPO_GASTO_FIXO',
+        acao: 'EXCLUSAO_PASTA_MAE_GASTOS',
         modulo: 'Gastos Fixos',
-        detalhes: `Grupo de parcelas "${item.descricao}" e todas as suas parcelas foram excluídos.`,
+        detalhes: `Pasta Mãe "${item.descricao}" e suas parcelas foram excluídas.`,
         metadata: { id: item.id }
       });
       return;
     }
 
-    if (!window.confirm(`Tem certeza que deseja excluir "${item.descricao}"?`)) return;
+    if (!window.confirm(`Tem certeza que deseja excluir esta parcela (${item.descricao})?`)) return;
 
     try {
       await supabase.from('gastos_fixos').delete().eq('id', item.id);
@@ -547,9 +705,9 @@ export default function GastosFixos() {
     saveLocalGastos(newList);
 
     registrarLog({
-      acao: 'EXCLUSAO_GASTO_FIXO',
+      acao: 'EXCLUSAO_PARCELA_GASTO',
       modulo: 'Gastos Fixos',
-      detalhes: `Gasto Fixo "${item.descricao}" removido.`,
+      detalhes: `Ocorrência "${item.descricao}" removida.`,
       metadata: { id: item.id }
     });
   };
@@ -631,14 +789,14 @@ export default function GastosFixos() {
     }
   };
 
-  // Alternar Status Direto (Abrir modal de baixa com valor editável ou reabrir)
+  // Alternar Status Direto
   const handleToggleStatusQuick = async (gasto) => {
     if (gasto.status !== 'pago') {
       setPayingGasto(gasto);
       setPayingValorReal(gasto.valor ? gasto.valor.toString() : '0');
       setUpdateDefaultEstimate(false);
     } else {
-      if (!window.confirm(`Deseja reabrir a pendência do gasto "${gasto.descricao}"?`)) return;
+      if (!window.confirm(`Deseja reabrir a pendência de "${gasto.descricao}"?`)) return;
 
       const updated = { ...gasto, status: 'em_aberto', data_pagamento: null, valor_pago_real: null };
       try {
@@ -650,7 +808,7 @@ export default function GastosFixos() {
     }
   };
 
-  // CÁLCULO DE STATUS INDIVIDUAL DE UM ITEM
+  // Cálculo de Status Individual de uma Ocorrência
   const getComputedStatus = (item) => {
     if (item.status === 'pago') {
       return { 
@@ -696,13 +854,13 @@ export default function GastosFixos() {
     };
   };
 
-  // ESTRUTURAÇÃO DO AGRUPAMENTO: PARCELA MÃE + PARCELAS FILHAS
+  // ESTRUTURAÇÃO DO AGRUPAMENTO UNIVERSAL: TODAS SÃO PASTAS MÃE
   const { groupedList, allParentIds } = useMemo(() => {
     const parentMap = new Map();
     const standalone = [];
     const parentsFound = [];
 
-    // 1º Passo: Identificar e registrar todos os pais explícitos
+    // 1º Passo: Registrar todos os pais explícitos
     gastos.forEach(item => {
       if (item.is_parent) {
         parentMap.set(item.id, {
@@ -717,7 +875,7 @@ export default function GastosFixos() {
     gastos.forEach(item => {
       if (item.parent_id) {
         if (!parentMap.has(item.parent_id)) {
-          const baseName = item.descricao ? item.descricao.replace(/\s*\(Parcela \d+\/\d+\)/, '') : 'Gasto Parcelado';
+          const baseName = item.descricao ? item.descricao.replace(/\s*\((Semana|Quinzena|Parcela|Trimestre|Semestre|Ano|Ocorrência)\s*\d+.*\)/i, '') : 'Gasto Recorrente';
           const virtualParent = {
             id: item.parent_id,
             parent_id: null,
@@ -745,10 +903,9 @@ export default function GastosFixos() {
       }
     });
 
-    // 3º Passo: Montar lista agrupada com métricas consolidadas de cada grupo
+    // 3º Passo: Montar lista com métricas consolidadas de cada Pasta Mãe
     const groups = [];
     parentMap.forEach(({ parent, children }) => {
-      // Ordenar parcelas por data de vencimento
       children.sort((a, b) => (a.data_vencimento || '').localeCompare(b.data_vencimento || ''));
 
       const totalParcelas = children.length || parent.total_parcelas || 1;
@@ -761,10 +918,8 @@ export default function GastosFixos() {
       const valorPagoTotal = pagas.reduce((acc, c) => acc + (parseFloat(c.valor_pago_real !== undefined && c.valor_pago_real !== null ? c.valor_pago_real : c.valor) || 0), 0);
       const valorRestante = children.filter(c => c.status !== 'pago').reduce((acc, c) => acc + (parseFloat(c.valor) || 0), 0);
 
-      // Próxima parcela a vencer
       const proximaPendente = children.find(c => c.status !== 'pago');
 
-      // Status geral do grupo
       let statusGeral = {
         label: `⏳ Em Aberto (0/${totalParcelas})`,
         code: 'em_aberto',
@@ -816,7 +971,7 @@ export default function GastosFixos() {
       });
     });
 
-    // Combinar e ordenar a lista pela data mais próxima
+    // Ordenar pela data do próximo vencimento
     const combined = [...groups, ...standalone].sort((a, b) => {
       const dateA = a.isGroup ? (a.proximaPendente?.data_vencimento || a.parent.data_vencimento || '') : (a.item.data_vencimento || '');
       const dateB = b.isGroup ? (b.proximaPendente?.data_vencimento || b.parent.data_vencimento || '') : (b.item.data_vencimento || '');
@@ -829,22 +984,19 @@ export default function GastosFixos() {
     };
   }, [gastos, hojeStr]);
 
-  // Filtragem da Lista Agrupada
+  // Filtragem da Lista
   const filteredData = useMemo(() => {
     return groupedList.filter(entry => {
       if (entry.isGroup) {
-        const { parent, children, statusGeral, vencidasCount, alertasCount, pagasCount, totalParcelas } = entry;
+        const { parent, children, vencidasCount, alertasCount, pagasCount, totalParcelas } = entry;
 
-        // Filtro por Status
         if (statusFilter === 'vencido' && vencidasCount === 0) return false;
         if (statusFilter === 'alerta7dias' && alertasCount === 0) return false;
         if (statusFilter === 'pago' && pagasCount !== totalParcelas) return false;
         if (statusFilter === 'em_aberto' && (pagasCount === totalParcelas || (vencidasCount > 0 && pagasCount === 0))) return false;
 
-        // Filtro por Categoria
         if (categoriaFilter !== 'todas' && parent.categoria !== categoriaFilter) return false;
 
-        // Filtro por Busca
         if (search.trim()) {
           const q = search.toLowerCase();
           const matchParent = parent.descricao?.toLowerCase().includes(q) || parent.categoria?.toLowerCase().includes(q) || parent.observacoes?.toLowerCase().includes(q);
@@ -886,7 +1038,7 @@ export default function GastosFixos() {
     });
   }, [groupedList, statusFilter, categoriaFilter, search, hojeStr]);
 
-  // Métricas Globais (Calculadas sobre parcelas filhas + itens standalone para não haver duplicação)
+  // Métricas Globais
   const metricas = useMemo(() => {
     let totalGeral = 0;
     let totalPago = 0;
@@ -895,8 +1047,7 @@ export default function GastosFixos() {
     let totalAlertas = 0;
 
     gastos.forEach(g => {
-      // Se for a parcela mãe, não soma seu valor individual pois as filhas já representam as parcelas
-      if (g.is_parent) return;
+      if (g.is_parent) return; // evita duplicar soma do pai com os filhos
 
       const val = parseFloat(g.valor) || 0;
       const valReal = g.valor_pago_real !== undefined && g.valor_pago_real !== null ? parseFloat(g.valor_pago_real) : val;
@@ -924,8 +1075,6 @@ export default function GastosFixos() {
     return { totalGeral, totalPago, totalEmAberto, totalVencido, totalAlertas };
   }, [gastos, hojeStr]);
 
-
-
   return (
     <div style={{ padding: '20px 0' }}>
       
@@ -936,7 +1085,7 @@ export default function GastosFixos() {
             📌 Gestão de Gastos Fixos & Recorrentes
           </h2>
           <p style={{ color: '#aaa', margin: '4px 0 0 0', fontSize: '0.85rem' }}>
-            Organização de contas a pagar, parcelamentos e vencimentos com status automáticos.
+            Todas as contas e recorrências organizadas em <strong>Pastas Mãe</strong> expansíveis com status automáticos.
           </p>
         </div>
 
@@ -968,7 +1117,7 @@ export default function GastosFixos() {
             className="btn"
             style={{ background: '#f59e0b', color: '#000', fontWeight: 'bold', padding: '10px 18px', borderRadius: '8px', fontSize: '0.88rem', boxShadow: '0 4px 14px rgba(245, 158, 11, 0.3)' }}
           >
-            + Novo Gasto Fixo / Parcelamento
+            + Nova Pasta Mãe de Gastos
           </button>
         </div>
       </div>
@@ -1007,7 +1156,7 @@ export default function GastosFixos() {
         </div>
       )}
 
-      {/* Cards KPI de Resumo Sólido com Status Automáticos */}
+      {/* Cards KPI de Resumo Sólido */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '15px', marginBottom: '25px' }}>
         <div style={{ background: '#16161a', border: '1px solid #2a2a35', padding: '18px', borderRadius: '12px', borderLeft: '4px solid #3b82f6' }}>
           <span style={{ fontSize: '0.78rem', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total de Gastos (Geral)</span>
@@ -1070,14 +1219,14 @@ export default function GastosFixos() {
             <button
               onClick={() => expandAllGroups(allParentIds)}
               style={{ padding: '8px 12px', background: '#222', border: '1px solid #444', borderRadius: '6px', color: '#ddd', fontSize: '0.78rem', cursor: 'pointer' }}
-              title="Abre todas as sanfonas de parcelas"
+              title="Abre todas as pastas mãe"
             >
               ▼ Expandir Todas
             </button>
             <button
               onClick={collapseAllGroups}
               style={{ padding: '8px 12px', background: '#222', border: '1px solid #444', borderRadius: '6px', color: '#ddd', fontSize: '0.78rem', cursor: 'pointer' }}
-              title="Recolhe todas as sanfonas"
+              title="Recolhe todas as pastas"
             >
               ▲ Recolher Todas
             </button>
@@ -1085,43 +1234,41 @@ export default function GastosFixos() {
         )}
       </div>
 
-      {/* Tabela de Gastos Fixos com Accordion das Parcelas */}
+      {/* Tabela de Gastos Fixos: TODAS AS LINHAS SÃO PASTAS MÃE COM ACCORDION */}
       <div style={{ background: '#16161a', borderRadius: '12px', border: '1px solid #2a2a35', overflow: 'hidden' }}>
         {loading ? (
           <p style={{ color: '#aaa', textAlign: 'center', padding: '40px' }}>Carregando gastos fixos...</p>
         ) : filteredData.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '50px 20px' }}>
-            <p style={{ fontSize: '2.5rem', margin: '0 0 10px 0' }}>📌</p>
+            <p style={{ fontSize: '2.5rem', margin: '0 0 10px 0' }}>📁</p>
             <p style={{ color: '#fff', fontWeight: 'bold', fontSize: '1.1rem' }}>Nenhum gasto fixo localizado</p>
-            <p style={{ color: '#888', fontSize: '0.85rem' }}>Clique no botão "+ Novo Gasto Fixo / Parcelamento" acima para cadastrar contas.</p>
+            <p style={{ color: '#888', fontSize: '0.85rem' }}>Clique no botão "+ Nova Pasta Mãe de Gastos" acima para cadastrar contas.</p>
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
               <thead>
                 <tr style={{ background: '#0f0f13', borderBottom: '2px solid #2a2a35', color: '#aaa' }}>
-                  <th style={{ padding: '14px 12px' }}>Descrição / Estrutura</th>
-                  <th style={{ padding: '14px 12px' }}>Vencimento</th>
-                  <th style={{ padding: '14px 12px' }}>Término / Parcelas</th>
-                  <th style={{ padding: '14px 12px' }}>Recorrência</th>
-                  <th style={{ padding: '14px 12px' }}>Valor</th>
-                  <th style={{ padding: '14px 12px' }}>Status</th>
-                  <th style={{ padding: '14px 12px', textAlign: 'right' }}>Ações</th>
+                  <th style={{ padding: '14px 12px' }}>Pasta Mãe / Descrição</th>
+                  <th style={{ padding: '14px 12px' }}>Próximo Vencimento</th>
+                  <th style={{ padding: '14px 12px' }}>Período / Ocorrências</th>
+                  <th style={{ padding: '14px 12px' }}>Frequência</th>
+                  <th style={{ padding: '14px 12px' }}>Valor Total</th>
+                  <th style={{ padding: '14px 12px' }}>Status Geral</th>
+                  <th style={{ padding: '14px 12px', textAlign: 'right' }}>Ações da Pasta</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredData.map((entry) => {
-                  // =========================================================================
-                  // RENDERIZAÇÃO 1: PARCELA MÃE (AGRUPAMENTO COM SANFONA / ACCORDION)
-                  // =========================================================================
                   if (entry.isGroup) {
-                    const { parent, children, totalParcelas, pagasCount, vencidasCount, valorTotal, valorPagoTotal, valorRestante, proximaPendente, statusGeral } = entry;
+                    const { parent, children, totalParcelas, pagasCount, valorTotal, valorPagoTotal, proximaPendente, statusGeral } = entry;
                     const isExpanded = expandedParents.has(parent.id);
                     const percentualPago = totalParcelas > 0 ? Math.round((pagasCount / totalParcelas) * 100) : 0;
+                    const recInfo = RECORRENCIAS.find(r => r.id === parent.recorrencia) || RECORRENCIAS[0];
 
                     return (
                       <React.Fragment key={parent.id}>
-                        {/* Linha Mestre da Parcela Mãe */}
+                        {/* Linha Mestre da Pasta Mãe */}
                         <tr 
                           style={{ 
                             background: isExpanded ? 'rgba(245, 158, 11, 0.06)' : '#18181f',
@@ -1147,9 +1294,9 @@ export default function GastosFixos() {
                                   alignItems: 'center',
                                   gap: '4px'
                                 }}
-                                title="Clique para descer e ver todas as parcelas deste gasto"
+                                title="Clique para descer e ver todas as ocorrências desta pasta"
                               >
-                                {isExpanded ? '▲ Recolher' : `▼ Ver ${children.length} Parcelas`}
+                                {isExpanded ? '▲ Recolher' : `▼ Ver ${children.length} ${recInfo.labelOcorrencia}s`}
                               </button>
                               
                               <div>
@@ -1161,7 +1308,7 @@ export default function GastosFixos() {
                                     {parent.categoria}
                                   </span>
                                   <span style={{ fontSize: '0.72rem', color: '#60a5fa', background: '#3b82f615', padding: '1px 6px', borderRadius: '4px', border: '1px solid #3b82f633' }}>
-                                    {pagasCount} de {totalParcelas} pagas ({percentualPago}%)
+                                    {pagasCount} de {totalParcelas} quitadas ({percentualPago}%)
                                   </span>
                                 </div>
                               </div>
@@ -1181,7 +1328,7 @@ export default function GastosFixos() {
                                   📅 {formatDate(proximaPendente.data_vencimento)}
                                 </span>
                                 <span style={{ display: 'block', fontSize: '0.72rem', color: '#888' }}>
-                                  Próx: Parcela {proximaPendente.parcela_numero || '—'}/{totalParcelas}
+                                  Próx: {recInfo.labelOcorrencia} {proximaPendente.parcela_numero || '—'}/{totalParcelas}
                                 </span>
                               </div>
                             ) : (
@@ -1195,14 +1342,14 @@ export default function GastosFixos() {
                             <div>
                               <span>{formatDate(parent.data_final || children[children.length - 1]?.data_vencimento)}</span>
                               <span style={{ display: 'block', fontSize: '0.72rem', color: '#aaa' }}>
-                                Total: {totalParcelas} parcelas
+                                {totalParcelas} {recInfo.labelOcorrencia.toLowerCase()}(s)
                               </span>
                             </div>
                           </td>
 
                           <td style={{ padding: '14px 12px' }}>
                             <span style={{ background: '#3b82f615', color: '#60a5fa', border: '1px solid #3b82f633', padding: '3px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold' }}>
-                              🔄 {RECORRENCIAS.find(r => r.id === parent.recorrencia)?.label || parent.recorrencia}
+                              🔄 {recInfo.label}
                             </span>
                           </td>
 
@@ -1211,7 +1358,7 @@ export default function GastosFixos() {
                               {formatCurrency(valorTotal)}
                             </strong>
                             <span style={{ display: 'block', fontSize: '0.72rem', color: '#888' }}>
-                              {formatCurrency(parent.valor)}/mês
+                              {formatCurrency(parent.valor)}/{recInfo.singular.toLowerCase()}
                             </span>
                           </td>
 
@@ -1253,7 +1400,7 @@ export default function GastosFixos() {
                               <button
                                 onClick={() => handleOpenModal(parent)}
                                 style={{ padding: '6px 10px', background: '#f59e0b', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#000', fontWeight: 'bold', fontSize: '0.78rem' }}
-                                title="Editar Grupo de Parcelas"
+                                title="Editar Pasta Mãe"
                               >
                                 ✏️
                               </button>
@@ -1261,7 +1408,7 @@ export default function GastosFixos() {
                               <button
                                 onClick={() => handleDeleteGasto(parent)}
                                 style={{ padding: '6px 10px', background: '#ef444420', border: '1px solid #ef4444', borderRadius: '6px', cursor: 'pointer', color: '#ef4444', fontWeight: 'bold', fontSize: '0.78rem' }}
-                                title="Excluir Parcela Mãe e todas as parcelas vinculadas"
+                                title="Excluir Pasta Mãe e todas as parcelas vinculadas"
                               >
                                 🗑️
                               </button>
@@ -1269,7 +1416,7 @@ export default function GastosFixos() {
                           </td>
                         </tr>
 
-                        {/* DESDOBRAMENTO EM SANFONA: SUB-TABELA COM TODAS AS PARCELAS FILHAS */}
+                        {/* DESDOBRAMENTO EM SANFONA: SUB-TABELA COM TODAS AS OCORRÊNCIAS */}
                         {isExpanded && (
                           <tr style={{ background: '#0e0e13', borderBottom: '2px solid #2a2a35' }}>
                             <td colSpan={7} style={{ padding: '0 0 16px 0' }}>
@@ -1294,10 +1441,10 @@ export default function GastosFixos() {
                                 }}>
                                   <div>
                                     <span style={{ color: '#f59e0b', fontWeight: 'bold', fontSize: '0.9rem' }}>
-                                      📂 Parcelas Individuais de "{parent.descricao}"
+                                      📂 Ocorrências / Parcelas de "{parent.descricao}"
                                     </span>
                                     <span style={{ color: '#888', fontSize: '0.75rem', display: 'block', marginTop: '2px' }}>
-                                      {children.length} parcela(s) programada(s) • Quitado: {formatCurrency(valorPagoTotal)} de {formatCurrency(valorTotal)}
+                                      {children.length} programada(s) • Quitado: {formatCurrency(valorPagoTotal)} de {formatCurrency(valorTotal)}
                                     </span>
                                   </div>
 
@@ -1306,6 +1453,23 @@ export default function GastosFixos() {
                                       <div style={{ width: `${percentualPago}%`, background: '#10b981', height: '100%', transition: 'width 0.3s' }} />
                                     </div>
                                     <span style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: 'bold' }}>{percentualPago}% pago</span>
+
+                                    <button
+                                      onClick={() => handleAddNextInstallment(parent, children)}
+                                      style={{
+                                        background: '#222',
+                                        color: '#60a5fa',
+                                        border: '1px dashed #3b82f688',
+                                        padding: '4px 10px',
+                                        borderRadius: '6px',
+                                        cursor: 'pointer',
+                                        fontSize: '0.75rem',
+                                        fontWeight: 'bold'
+                                      }}
+                                      title="Adicionar a próxima ocorrência nesta pasta mãe"
+                                    >
+                                      + Próxima {recInfo.labelOcorrencia}
+                                    </button>
                                   </div>
                                 </div>
 
@@ -1313,12 +1477,12 @@ export default function GastosFixos() {
                                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                                   <thead>
                                     <tr style={{ background: '#0a0a0d', borderBottom: '1px solid #222', color: '#888' }}>
-                                      <th style={{ padding: '10px 14px' }}>Nº Parcela</th>
+                                      <th style={{ padding: '10px 14px' }}>Nº Ocorrência</th>
                                       <th style={{ padding: '10px 14px' }}>Vencimento</th>
                                       <th style={{ padding: '10px 14px' }}>Valor</th>
-                                      <th style={{ padding: '10px 14px' }}>Status da Parcela</th>
+                                      <th style={{ padding: '10px 14px' }}>Status</th>
                                       <th style={{ padding: '10px 14px' }}>Pagamento / Destino</th>
-                                      <th style={{ padding: '10px 14px', textAlign: 'right' }}>Ações da Parcela</th>
+                                      <th style={{ padding: '10px 14px', textAlign: 'right' }}>Ações</th>
                                     </tr>
                                   </thead>
                                   <tbody>
@@ -1331,7 +1495,7 @@ export default function GastosFixos() {
                                         <tr key={child.id} style={{ borderBottom: idx === children.length - 1 ? 'none' : '1px solid #1a1a22', background: isPago ? '#10b98108' : 'transparent' }}>
                                           <td style={{ padding: '10px 14px', color: '#fff' }}>
                                             <strong style={{ color: '#f59e0b' }}>
-                                              Parcela {child.parcela_numero || (idx + 1)} de {totalParcelas}
+                                              {recInfo.labelOcorrencia} {child.parcela_numero || (idx + 1)} de {totalParcelas}
                                             </strong>
                                             {child.observacoes && (
                                               <span style={{ display: 'block', fontSize: '0.72rem', color: '#777', fontStyle: 'italic' }}>
@@ -1427,115 +1591,26 @@ export default function GastosFixos() {
                     );
                   }
 
-                  // =========================================================================
-                  // RENDERIZAÇÃO 2: GASTO FIXO SIMPLES / STANDALONE (SEM PARCELAMENTO)
-                  // =========================================================================
+                  // Caso legado isolado (fallback de segurança)
                   const item = entry.item;
                   const compStatus = getComputedStatus(item);
-                  const valorExibicao = item.status === 'pago' && item.valor_pago_real !== undefined && item.valor_pago_real !== null ? item.valor_pago_real : item.valor;
-                  const diffFinal = item.data_final ? getDaysDiff(item.data_final) : null;
-                  const isFinalAlerta = diffFinal !== null && diffFinal >= 0 && diffFinal <= 7;
-
                   return (
                     <tr key={item.id} style={{ borderBottom: '1px solid #22222a' }}>
                       <td style={{ padding: '14px 12px' }}>
-                        <strong style={{ color: '#fff', fontSize: '0.95rem', display: 'block' }}>{item.descricao}</strong>
-                        <span style={{ fontSize: '0.75rem', color: '#f59e0b', background: '#f59e0b10', padding: '2px 6px', borderRadius: '4px', border: '1px solid #f59e0b33', marginTop: '3px', display: 'inline-block' }}>
-                          {item.categoria}
-                        </span>
-                        {item.observacoes && (
-                          <span style={{ display: 'block', fontSize: '0.75rem', color: '#777', marginTop: '3px', fontStyle: 'italic' }}>
-                            📝 {item.observacoes}
-                          </span>
-                        )}
+                        <strong style={{ color: '#fff' }}>📁 {item.descricao}</strong>
+                        <span style={{ fontSize: '0.75rem', color: '#f59e0b', display: 'block' }}>{item.categoria}</span>
                       </td>
-
-                      <td style={{ padding: '14px 12px', color: '#ccc', fontWeight: '500' }}>
-                        📅 {formatDate(item.data_vencimento)}
-                      </td>
-
-                      <td style={{ padding: '14px 12px', color: '#888' }}>
-                        {item.data_final ? (
-                          <div>
-                            <span>{formatDate(item.data_final)}</span>
-                            {isFinalAlerta && (
-                              <span style={{ display: 'block', fontSize: '0.72rem', color: '#8b5cf6', fontWeight: 'bold' }}>
-                                ⚠️ Encerra em {diffFinal === 0 ? 'HOJE' : `${diffFinal}d`}
-                              </span>
-                            )}
-                          </div>
-                        ) : '∞ Contínuo'}
-                      </td>
-
+                      <td style={{ padding: '14px 12px', color: '#ccc' }}>📅 {formatDate(item.data_vencimento)}</td>
+                      <td style={{ padding: '14px 12px', color: '#888' }}>—</td>
+                      <td style={{ padding: '14px 12px' }}>{item.recorrencia}</td>
+                      <td style={{ padding: '14px 12px', fontWeight: 'bold', color: '#10b981' }}>{formatCurrency(item.valor)}</td>
                       <td style={{ padding: '14px 12px' }}>
-                        <span style={{ background: '#3b82f615', color: '#60a5fa', border: '1px solid #3b82f633', padding: '3px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold' }}>
-                          🔄 {RECORRENCIAS.find(r => r.id === item.recorrencia)?.label || item.recorrencia}
-                        </span>
-                      </td>
-
-                      <td style={{ padding: '14px 12px', fontWeight: 'bold', color: item.status === 'pago' ? '#10b981' : '#f59e0b', fontSize: '1rem' }}>
-                        {formatCurrency(valorExibicao)}
-                        {item.status === 'pago' && item.valor_pago_real !== undefined && item.valor_pago_real !== item.valor && (
-                          <span style={{ display: 'block', fontSize: '0.7rem', color: '#888', fontWeight: 'normal' }}>
-                            Estimado era: {formatCurrency(item.valor)}
-                          </span>
-                        )}
-                      </td>
-
-                      <td style={{ padding: '14px 12px' }}>
-                        <span 
-                          title={compStatus.title}
-                          style={{ 
-                            background: compStatus.bg, 
-                            color: compStatus.color, 
-                            border: `1px solid ${compStatus.border}`, 
-                            padding: '4px 10px', 
-                            borderRadius: '6px', 
-                            fontSize: '0.78rem', 
-                            fontWeight: 'bold', 
-                            display: 'inline-block' 
-                          }}
-                        >
+                        <span style={{ background: compStatus.bg, color: compStatus.color, padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 'bold' }}>
                           {compStatus.label}
                         </span>
-                        {item.status === 'pago' && item.data_pagamento && (
-                          <span style={{ display: 'block', fontSize: '0.72rem', color: '#888', marginTop: '3px' }}>
-                            Pago em: {formatDate(item.data_pagamento)}
-                          </span>
-                        )}
                       </td>
-
                       <td style={{ padding: '14px 12px', textAlign: 'right' }}>
-                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
-                          <button
-                            onClick={() => handleToggleStatusQuick(item)}
-                            style={{
-                              padding: '6px 12px',
-                              background: item.status === 'pago' ? '#333' : '#10b981',
-                              color: item.status === 'pago' ? '#aaa' : '#000',
-                              border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.78rem'
-                            }}
-                            title={item.status === 'pago' ? 'Reabrir pendência (Em Aberto)' : 'Marcar como Pago e confirmar valor real'}
-                          >
-                            {item.status === 'pago' ? '↩️ Reabrir' : '✅ Pagar'}
-                          </button>
-
-                          <button
-                            onClick={() => handleOpenModal(item)}
-                            style={{ padding: '6px 10px', background: '#f59e0b', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#000', fontWeight: 'bold', fontSize: '0.78rem' }}
-                            title="Editar Gasto Fixo"
-                          >
-                            ✏️
-                          </button>
-
-                          <button
-                            onClick={() => handleDeleteGasto(item)}
-                            style={{ padding: '6px 10px', background: '#ef444420', border: '1px solid #ef4444', borderRadius: '6px', cursor: 'pointer', color: '#ef4444', fontWeight: 'bold', fontSize: '0.78rem' }}
-                            title="Excluir Gasto Fixo"
-                          >
-                            🗑️
-                          </button>
-                        </div>
+                        <button onClick={() => handleOpenModal(item)} style={{ padding: '6px 10px', background: '#f59e0b', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>✏️</button>
                       </td>
                     </tr>
                   );
@@ -1546,7 +1621,7 @@ export default function GastosFixos() {
         )}
       </div>
 
-      {/* Modal de Cadastro / Edição de Gasto Fixo / Parcelamento */}
+      {/* Modal de Cadastro / Edição de Pasta Mãe de Gastos */}
       {showModal && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -1560,8 +1635,8 @@ export default function GastosFixos() {
             maxHeight: '90vh', overflowY: 'auto'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #222', paddingBottom: '12px' }}>
-              <h3 style={{ margin: 0, color: '#f59e0b', fontSize: '1.2rem' }}>
-                {editingGasto ? '✏️ Editar Gasto' : '📌 Cadastrar Novo Gasto / Parcelamento'}
+              <h3 style={{ margin: 0, color: '#f59e0b', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                📁 {editingGasto ? (editingGasto.is_parent ? '✏️ Editar Pasta Mãe' : '✏️ Editar Parcela Específica') : '📌 Cadastrar Nova Pasta Mãe de Gastos'}
               </h3>
               <button onClick={() => setShowModal(false)} style={{ background: 'transparent', color: '#ef4444', border: 'none', fontSize: '1.3rem', cursor: 'pointer' }}>
                 ✕
@@ -1569,61 +1644,11 @@ export default function GastosFixos() {
             </div>
 
             <form onSubmit={handleSaveGasto}>
-              {/* Seletor de Tipo de Gasto: Simples vs Parcelado */}
-              {!editingGasto && (
-                <div style={{ marginBottom: '18px', background: '#1c1c24', padding: '12px', borderRadius: '10px', border: '1px solid #333' }}>
-                  <label style={{ fontSize: '0.82rem', color: '#aaa', display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
-                    Tipo de Lançamento:
-                  </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                    <button
-                      type="button"
-                      onClick={() => setTipoCadastro('simples')}
-                      style={{
-                        padding: '10px',
-                        borderRadius: '8px',
-                        border: tipoCadastro === 'simples' ? '2px solid #3b82f6' : '1px solid #444',
-                        background: tipoCadastro === 'simples' ? '#3b82f620' : '#141418',
-                        color: tipoCadastro === 'simples' ? '#60a5fa' : '#aaa',
-                        fontWeight: 'bold',
-                        cursor: 'pointer',
-                        fontSize: '0.82rem'
-                      }}
-                    >
-                      🔄 Gasto Recorrente Contínuo
-                      <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 'normal', marginTop: '2px', color: '#888' }}>
-                        (Ex: Aluguel, Energia, Internet)
-                      </span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setTipoCadastro('parcelado')}
-                      style={{
-                        padding: '10px',
-                        borderRadius: '8px',
-                        border: tipoCadastro === 'parcelado' ? '2px solid #f59e0b' : '1px solid #444',
-                        background: tipoCadastro === 'parcelado' ? '#f59e0b20' : '#141418',
-                        color: tipoCadastro === 'parcelado' ? '#f59e0b' : '#aaa',
-                        fontWeight: 'bold',
-                        cursor: 'pointer',
-                        fontSize: '0.82rem'
-                      }}
-                    >
-                      📁 Parcelamento / Parcela Mãe
-                      <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 'normal', marginTop: '2px', color: '#888' }}>
-                        (Ex: Equipamento em 3x ou até Mês 12)
-                      </span>
-                    </button>
-                  </div>
-                </div>
-              )}
-
               <div style={{ marginBottom: '15px' }}>
-                <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Descrição da Despesa / Nome da Conta *</label>
+                <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Descrição do Gasto / Nome da Conta *</label>
                 <input 
                   type="text" 
-                  placeholder="Ex: Financiamento Elevador, Aluguel do Galpão, Seguro Oficina" 
+                  placeholder="Ex: Aluguel do Galpão, Conta de Energia, Limpeza Semanal, Financiamento Elevador" 
                   value={descricao} 
                   onChange={e => setDescricao(e.target.value)} 
                   style={inputStyle} 
@@ -1643,7 +1668,7 @@ export default function GastosFixos() {
 
                 <div>
                   <label style={{ fontSize: '0.8rem', color: '#aaa' }}>
-                    {tipoCadastro === 'parcelado' ? 'Valor de Cada Parcela (R$) *' : 'Valor Estimado ou Fixo (R$) *'}
+                    {editingGasto && !editingGasto.is_parent ? 'Valor desta Parcela (R$) *' : 'Valor por Ocorrência / Parcela (R$) *'}
                   </label>
                   <input 
                     type="number" step="0.01" 
@@ -1656,83 +1681,111 @@ export default function GastosFixos() {
                 </div>
               </div>
 
-              {/* Se for Parcelamento: opções de definição de término (Data Final ou Qtd Parcelas) */}
-              {tipoCadastro === 'parcelado' && !editingGasto && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
+                <div>
+                  <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Frequência / Recorrência</label>
+                  <select 
+                    value={recorrencia} 
+                    onChange={e => setRecorrencia(e.target.value)} 
+                    style={inputStyle}
+                    disabled={editingGasto && !editingGasto.is_parent}
+                  >
+                    {RECORRENCIAS.map(r => (
+                      <option key={r.id} value={r.id}>{r.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.8rem', color: '#aaa' }}>
+                    {editingGasto && !editingGasto.is_parent ? 'Data de Vencimento *' : 'Data do 1º Vencimento (Início) *'}
+                  </label>
+                  <input 
+                    type="date" 
+                    value={dataVencimento} 
+                    onChange={e => setDataVencimento(e.target.value)} 
+                    style={inputStyle} 
+                    required 
+                  />
+                </div>
+              </div>
+
+              {/* Opções de Duração / Término da Pasta Mãe */}
+              {!editingGasto && (
                 <div style={{ background: '#17171e', padding: '14px', borderRadius: '10px', border: '1px solid #f59e0b44', marginBottom: '15px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                    <label style={{ fontSize: '0.82rem', color: '#f59e0b', fontWeight: 'bold' }}>
-                      Definição do Parcelamento:
+                  <label style={{ fontSize: '0.82rem', color: '#f59e0b', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>
+                    Duração e Geração de Ocorrências nesta Pasta:
+                  </label>
+                  
+                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                    <label style={{ fontSize: '0.78rem', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <input
+                        type="radio"
+                        name="modoTermino"
+                        checked={modoTermino === 'continuo'}
+                        onChange={() => setModoTermino('continuo')}
+                      />
+                      🔄 Recorrente Contínuo (12 ocorrências / ano)
                     </label>
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                      <label style={{ fontSize: '0.78rem', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <input
-                          type="radio"
-                          name="modoParcelas"
-                          checked={modoParcelas === 'data_final'}
-                          onChange={() => setModoParcelas('data_final')}
-                        />
-                        Até Data Final (Ex: Mês 12)
-                      </label>
-                      <label style={{ fontSize: '0.78rem', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <input
-                          type="radio"
-                          name="modoParcelas"
-                          checked={modoParcelas === 'qtd_parcelas'}
-                          onChange={() => setModoParcelas('qtd_parcelas')}
-                        />
-                        Por Quantidade de Parcelas (Ex: 12x)
-                      </label>
-                    </div>
+
+                    <label style={{ fontSize: '0.78rem', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <input
+                        type="radio"
+                        name="modoTermino"
+                        checked={modoTermino === 'data_final'}
+                        onChange={() => setModoTermino('data_final')}
+                      />
+                      📅 Até Data Final (ex: até Dezembro)
+                    </label>
+
+                    <label style={{ fontSize: '0.78rem', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <input
+                        type="radio"
+                        name="modoTermino"
+                        checked={modoTermino === 'qtd_parcelas'}
+                        onChange={() => setModoTermino('qtd_parcelas')}
+                      />
+                      🔢 Quantidade Exata (ex: 3x, 6x, 12x)
+                    </label>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-                    <div>
-                      <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Data da 1ª Parcela (Início) *</label>
+                  {modoTermino === 'data_final' && (
+                    <div style={{ marginBottom: '10px' }}>
+                      <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Data Final Limite (Última Parcela) *</label>
                       <input 
                         type="date" 
-                        value={dataVencimento} 
-                        onChange={e => setDataVencimento(e.target.value)} 
+                        value={dataFinal} 
+                        onChange={e => setDataFinal(e.target.value)} 
                         style={inputStyle} 
                         required 
                       />
                     </div>
+                  )}
 
-                    {modoParcelas === 'data_final' ? (
-                      <div>
-                        <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Data Final Limite (Última Parcela) *</label>
-                        <input 
-                          type="date" 
-                          value={dataFinal} 
-                          onChange={e => setDataFinal(e.target.value)} 
-                          style={inputStyle} 
-                          required 
-                        />
-                      </div>
-                    ) : (
-                      <div>
-                        <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Quantidade de Parcelas *</label>
-                        <input 
-                          type="number" 
-                          min="2" max="120"
-                          value={qtdParcelas} 
-                          onChange={e => setQtdParcelas(e.target.value)} 
-                          style={inputStyle} 
-                          required 
-                        />
-                      </div>
-                    )}
-                  </div>
+                  {modoTermino === 'qtd_parcelas' && (
+                    <div style={{ marginBottom: '10px' }}>
+                      <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Quantidade de Parcelas / Ocorrências *</label>
+                      <input 
+                        type="number" 
+                        min="2" max="120"
+                        value={qtdParcelas} 
+                        onChange={e => setQtdParcelas(e.target.value)} 
+                        style={inputStyle} 
+                        required 
+                      />
+                    </div>
+                  )}
 
                   {/* Prévia dinâmica das parcelas */}
                   {datasPrevia.length > 0 && (
-                    <div style={{ marginTop: '12px', background: '#0a0a0d', padding: '10px', borderRadius: '8px', border: '1px solid #333' }}>
+                    <div style={{ marginTop: '10px', background: '#0a0a0d', padding: '10px', borderRadius: '8px', border: '1px solid #333' }}>
                       <span style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>
-                        📁 Prévia: Serão criadas {datasPrevia.length} parcelas sob a Parcela Mãe (Total: {formatCurrency((parseFloat(valor) || 0) * datasPrevia.length)}):
+                        📁 Prévia da Pasta Mãe: Serão geradas {datasPrevia.length} ocorrências ({RECORRENCIAS.find(r => r.id === recorrencia)?.label || recorrencia}) • Total: {formatCurrency((parseFloat(valor) || 0) * datasPrevia.length)}
                       </span>
-                      <div style={{ maxHeight: '100px', overflowY: 'auto', fontSize: '0.75rem', color: '#ccc', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                      <div style={{ maxHeight: '110px', overflowY: 'auto', fontSize: '0.75rem', color: '#ccc', display: 'flex', flexDirection: 'column', gap: '3px' }}>
                         {datasPrevia.map((dt, i) => (
                           <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 4px', borderBottom: '1px dashed #222' }}>
-                            <span>• Parcela {i + 1} de {datasPrevia.length}:</span>
+                            <span>• {RECORRENCIAS.find(r => r.id === recorrencia)?.labelOcorrencia || 'Parcela'} {i + 1} de {datasPrevia.length}:</span>
                             <span style={{ color: '#f59e0b' }}>{formatDate(dt)}</span>
                             <span style={{ color: '#10b981' }}>{formatCurrency(parseFloat(valor) || 0)}</span>
                           </div>
@@ -1743,56 +1796,11 @@ export default function GastosFixos() {
                 </div>
               )}
 
-              {/* Se for Gasto Simples: campos normais */}
-              {(tipoCadastro === 'simples' || editingGasto) && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
-                  <div>
-                    <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Data de Vencimento *</label>
-                    <input 
-                      type="date" 
-                      value={dataVencimento} 
-                      onChange={e => setDataVencimento(e.target.value)} 
-                      style={inputStyle} 
-                      required 
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Data Final de Término (Opcional)</label>
-                    <input 
-                      type="date" 
-                      value={dataFinal} 
-                      onChange={e => setDataFinal(e.target.value)} 
-                      style={inputStyle} 
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
-                <div>
-                  <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Recorrência</label>
-                  <select value={recorrencia} onChange={e => setRecorrencia(e.target.value)} style={inputStyle}>
-                    {RECORRENCIAS.map(r => (
-                      <option key={r.id} value={r.id}>{r.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Status Inicial</label>
-                  <select value={status} onChange={e => setStatus(e.target.value)} style={inputStyle}>
-                    <option value="em_aberto">⏳ Em Aberto (Automático)</option>
-                    <option value="pago">🟢 Já Pago</option>
-                  </select>
-                </div>
-              </div>
-
               <div style={{ marginBottom: '20px' }}>
-                <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Observações / Detalhes Adicionais</label>
+                <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Observações / Instruções de Pagamento</label>
                 <textarea 
                   rows={3} 
-                  placeholder="Instruções de pagamento, código de barras ou detalhes..." 
+                  placeholder="Código de barras, chave PIX, conta bancária ou detalhes..." 
                   value={observacoes} 
                   onChange={e => setObservacoes(e.target.value)} 
                   style={{ ...inputStyle, resize: 'vertical' }} 
@@ -1804,7 +1812,7 @@ export default function GastosFixos() {
                   Cancelar
                 </button>
                 <button type="submit" className="btn" style={{ background: '#f59e0b', color: '#000', fontWeight: 'bold' }}>
-                  💾 {editingGasto ? 'Salvar Alterações' : (tipoCadastro === 'parcelado' ? `Gerar ${datasPrevia.length} Parcelas Agrupadas` : 'Salvar Gasto Fixo')}
+                  💾 {editingGasto ? 'Salvar Alterações' : `Criar Pasta Mãe (${datasPrevia.length} Ocorrências)`}
                 </button>
               </div>
             </form>
@@ -1839,8 +1847,6 @@ export default function GastosFixos() {
             </div>
 
             <form onSubmit={handleConfirmPayGasto}>
-              
-              {/* CAMPO DE VALOR REAL EDITÁVEL AO PAGAR */}
               <div style={{ marginBottom: '18px', background: '#10b98115', border: '1px solid #10b981', padding: '14px', borderRadius: '10px' }}>
                 <label style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>
                   💵 Valor Realmente Pago nesta Conta (R$) *
