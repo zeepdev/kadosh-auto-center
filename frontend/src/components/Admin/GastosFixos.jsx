@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { registrarLog } from '../../services/logService';
 
@@ -26,6 +26,62 @@ const RECORRENCIAS = [
   { id: 'anual', label: 'Anual (1 vez por ano)' }
 ];
 
+// Funções de Cálculo de Datas e Parcelamento
+function addIntervalToDate(dateStr, recorrencia, step) {
+  if (!dateStr) return '';
+  const [ano, mes, dia] = dateStr.split('-').map(Number);
+  const dt = new Date(ano, mes - 1, dia);
+
+  if (recorrencia === 'semanal') {
+    dt.setDate(dt.getDate() + 7 * step);
+  } else if (recorrencia === 'quinzenal') {
+    dt.setDate(dt.getDate() + 15 * step);
+  } else if (recorrencia === 'mensal') {
+    const origDay = dia;
+    dt.setMonth(dt.getMonth() + step);
+    if (dt.getDate() !== origDay) {
+      dt.setDate(0); // Último dia do mês correto caso o mês seguinte tenha menos dias
+    }
+  } else if (recorrencia === 'trimestral') {
+    dt.setMonth(dt.getMonth() + 3 * step);
+  } else if (recorrencia === 'semestral') {
+    dt.setMonth(dt.getMonth() + 6 * step);
+  } else if (recorrencia === 'anual') {
+    dt.setFullYear(dt.getFullYear() + step);
+  }
+
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const d = String(dt.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function gerarListaDatasParcelas(dataInicio, modo, dataFinal, qtdParcelas, recorrencia) {
+  if (!dataInicio) return [];
+  const datas = [];
+
+  if (modo === 'qtd_parcelas') {
+    const total = Math.max(1, Math.min(120, parseInt(qtdParcelas, 10) || 1));
+    for (let i = 0; i < total; i++) {
+      datas.push(addIntervalToDate(dataInicio, recorrencia, i));
+    }
+  } else {
+    // modo data_final
+    if (!dataFinal) {
+      datas.push(dataInicio);
+      return datas;
+    }
+    let step = 0;
+    while (step < 120) {
+      const dt = addIntervalToDate(dataInicio, recorrencia, step);
+      if (dt > dataFinal) break;
+      datas.push(dt);
+      step++;
+    }
+  }
+  return datas;
+}
+
 export default function GastosFixos() {
   const [gastos, setGastos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -33,6 +89,16 @@ export default function GastosFixos() {
   const [statusFilter, setStatusFilter] = useState('todos'); // 'todos', 'em_aberto', 'vencido', 'pago', 'alerta7dias'
   const [categoriaFilter, setCategoriaFilter] = useState('todas');
   
+  // Status de conexão e sincronização com o Supabase
+  const [supabaseOnline, setSupabaseOnline] = useState(null); // null = checando, true = sincronizado, false = erro/tabela ausente
+  const [showSqlModal, setShowSqlModal] = useState(false);
+  const [copiedSql, setCopiedSql] = useState(false);
+  const [migratingLocal, setMigratingLocal] = useState(false);
+
+  // Controle de sanfonas (accordions) abertas
+  const [expandedParents, setExpandedParents] = useState(new Set());
+
+  // Modal Principal de Cadastro / Edição
   const [showModal, setShowModal] = useState(false);
   const [editingGasto, setEditingGasto] = useState(null);
 
@@ -40,8 +106,11 @@ export default function GastosFixos() {
   const [descricao, setDescricao] = useState('');
   const [categoria, setCategoria] = useState(CATEGORIAS[0]);
   const [valor, setValor] = useState('');
+  const [tipoCadastro, setTipoCadastro] = useState('simples'); // 'simples' (mensal contínuo) ou 'parcelado' (agrupado em parcelas)
+  const [modoParcelas, setModoParcelas] = useState('data_final'); // 'data_final' ou 'qtd_parcelas'
   const [dataVencimento, setDataVencimento] = useState(new Date().toISOString().split('T')[0]);
   const [dataFinal, setDataFinal] = useState('');
+  const [qtdParcelas, setQtdParcelas] = useState('3');
   const [recorrencia, setRecorrencia] = useState('mensal');
   const [status, setStatus] = useState('em_aberto'); // 'pago' ou 'em_aberto'
   const [observacoes, setObservacoes] = useState('');
@@ -57,6 +126,32 @@ export default function GastosFixos() {
   const [sendingAlert, setSendingAlert] = useState(false);
   const [alertStatusMessage, setAlertStatusMessage] = useState(null);
 
+  // Auxiliares de Datas
+  const hojeStr = new Date().toISOString().split('T')[0];
+
+  const getDaysDiff = (dateStr) => {
+    if (!dateStr) return null;
+    const [ano, mes, dia] = dateStr.split('-').map(Number);
+    const dt = new Date(ano, mes - 1, dia);
+    dt.setHours(0, 0, 0, 0);
+
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+
+    const diffTempo = dt.getTime() - hoje.getTime();
+    return Math.ceil(diffTempo / (1000 * 60 * 60 * 24));
+  };
+
+  const formatCurrency = (val) => {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
+  };
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '—';
+    const [y, m, d] = dateStr.split('-');
+    return `${d}/${m}/${y}`;
+  };
+
   // Carregar Gastos Fixos (Supabase + localStorage fallback)
   const fetchGastos = async () => {
     setLoading(true);
@@ -66,20 +161,27 @@ export default function GastosFixos() {
         .select('*')
         .order('data_vencimento', { ascending: true });
 
-      if (!error && data) {
-        setGastos(data);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-        checkAndSendDailyAlert(data);
-      } else {
+      if (error) {
+        console.warn('Supabase gastos_fixos query error:', error.message);
+        setSupabaseOnline(false);
         const local = localStorage.getItem(STORAGE_KEY);
         if (local) {
           const parsed = JSON.parse(local);
           setGastos(parsed);
           checkAndSendDailyAlert(parsed);
+        } else {
+          setGastos([]);
         }
+      } else {
+        setSupabaseOnline(true);
+        const list = data || [];
+        setGastos(list);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+        checkAndSendDailyAlert(list);
       }
     } catch (err) {
       console.warn('Usando armazenamento local para Gastos Fixos:', err);
+      setSupabaseOnline(false);
       const local = localStorage.getItem(STORAGE_KEY);
       if (local) {
         const parsed = JSON.parse(local);
@@ -93,9 +195,7 @@ export default function GastosFixos() {
 
   // Checagem automática 1x por dia ao abrir
   const checkAndSendDailyAlert = async (lista) => {
-    const hojeStr = new Date().toISOString().split('T')[0];
     const lastSent = localStorage.getItem(ALERT_STORAGE_KEY);
-
     if (lastSent === hojeStr) return;
 
     const hasAlerts = lista.some(g => {
@@ -107,7 +207,6 @@ export default function GastosFixos() {
     });
 
     if (hasAlerts) {
-      console.log('🔔 Disparando verificação diária de e-mail (7 dias antes)...');
       try {
         await fetch('/api/send-gastos-fixos-alert', {
           method: 'POST',
@@ -144,7 +243,7 @@ export default function GastosFixos() {
           setAlertStatusMessage({ type: 'info', text: msg });
           alert(msg);
         }
-        localStorage.setItem(ALERT_STORAGE_KEY, new Date().toISOString().split('T')[0]);
+        localStorage.setItem(ALERT_STORAGE_KEY, hojeStr);
       } else {
         throw new Error(json.error || 'Erro ao disparar alertas.');
       }
@@ -157,6 +256,7 @@ export default function GastosFixos() {
     }
   };
 
+  // Inscrição Realtime no Supabase
   useEffect(() => {
     fetchGastos();
 
@@ -177,33 +277,94 @@ export default function GastosFixos() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(newList));
   };
 
+  // Migrar dados salvos em LocalStorage para o Supabase (após o usuário rodar o SQL)
+  const handleMigrateLocalToSupabase = async () => {
+    setMigratingLocal(true);
+    try {
+      const localStr = localStorage.getItem(STORAGE_KEY);
+      if (!localStr) {
+        alert('Nenhum dado local para migrar.');
+        return;
+      }
+      const localList = JSON.parse(localStr);
+      if (!localList || localList.length === 0) {
+        alert('Nenhum dado local para migrar.');
+        return;
+      }
+
+      const { error } = await supabase.from('gastos_fixos').upsert(localList, { onConflict: 'id' });
+      if (error) {
+        throw error;
+      }
+      alert(`✅ Sucesso! ${localList.length} registro(s) sincronizados com o Supabase.`);
+      await fetchGastos();
+    } catch (err) {
+      alert('Erro ao sincronizar com o Supabase: ' + err.message);
+    } finally {
+      setMigratingLocal(false);
+    }
+  };
+
+  // Alternar visualização da sanfona (accordion)
+  const toggleAccordion = (parentId) => {
+    setExpandedParents(prev => {
+      const next = new Set(prev);
+      if (next.has(parentId)) {
+        next.delete(parentId);
+      } else {
+        next.add(parentId);
+      }
+      return next;
+    });
+  };
+
+  const expandAllGroups = (allParentIds) => {
+    setExpandedParents(new Set(allParentIds));
+  };
+
+  const collapseAllGroups = () => {
+    setExpandedParents(new Set());
+  };
+
   // Abrir Modal para Criar ou Editar
-  const handleOpenModal = (item = null) => {
+  const handleOpenModal = (item = null, parentContext = null) => {
     if (item) {
       setEditingGasto(item);
-      setDescricao(item.descricao || '');
+      setDescricao(item.descricao ? item.descricao.replace(/\s*\(Parcela \d+\/\d+\)/, '') : '');
       setCategoria(item.categoria || CATEGORIAS[0]);
       setValor(item.valor !== undefined ? item.valor.toString() : '');
-      setDataVencimento(item.data_vencimento || new Date().toISOString().split('T')[0]);
+      setDataVencimento(item.data_vencimento || hojeStr);
       setDataFinal(item.data_final || '');
       setRecorrencia(item.recorrencia || 'mensal');
       setStatus(item.status === 'pago' ? 'pago' : 'em_aberto');
       setObservacoes(item.observacoes || '');
+      setTipoCadastro(item.is_parent || item.parent_id ? 'parcelado' : 'simples');
+      setModoParcelas(item.data_final ? 'data_final' : 'qtd_parcelas');
+      setQtdParcelas(item.total_parcelas ? item.total_parcelas.toString() : '3');
     } else {
       setEditingGasto(null);
       setDescricao('');
       setCategoria(CATEGORIAS[0]);
       setValor('');
-      setDataVencimento(new Date().toISOString().split('T')[0]);
+      setDataVencimento(hojeStr);
       setDataFinal('');
+      setQtdParcelas('3');
+      setModoParcelas('data_final');
       setRecorrencia('mensal');
+      setTipoCadastro('simples');
       setStatus('em_aberto');
       setObservacoes('');
     }
     setShowModal(true);
   };
 
-  // Salvar Novo Gasto ou Alteração
+  // Prévia das parcelas no modal
+  const datasPrevia = useMemo(() => {
+    if (tipoCadastro !== 'parcelado') return [];
+    return gerarListaDatasParcelas(dataVencimento, modoParcelas, dataFinal, qtdParcelas, recorrencia);
+  }, [tipoCadastro, dataVencimento, modoParcelas, dataFinal, qtdParcelas, recorrencia]);
+
+  // Salvar Novo Gasto ou Alteração (Com geração automática de parcelas e agrupamento na Parcela Mãe)
   const handleSaveGasto = async (e) => {
     e.preventDefault();
     if (!descricao.trim() || !dataVencimento) {
@@ -213,66 +374,197 @@ export default function GastosFixos() {
 
     const valNum = parseFloat(valor) || 0;
 
-    const payload = {
-      id: editingGasto ? editingGasto.id : Date.now().toString(),
-      descricao: descricao.trim(),
-      categoria,
-      valor: valNum,
-      data_vencimento: dataVencimento,
-      data_final: dataFinal || null,
-      recorrencia,
-      status: status === 'pago' ? 'pago' : 'em_aberto',
-      data_pagamento: status === 'pago' ? (editingGasto?.data_pagamento || new Date().toISOString().split('T')[0]) : null,
-      observacoes: observacoes.trim(),
-      updated_at: new Date().toISOString()
-    };
+    // CASO 1: Edição de um item existente (único ou parcela específica)
+    if (editingGasto) {
+      const payload = {
+        ...editingGasto,
+        descricao: descricao.trim(),
+        categoria,
+        valor: valNum,
+        data_vencimento: dataVencimento,
+        data_final: dataFinal || null,
+        recorrencia,
+        status: status === 'pago' ? 'pago' : 'em_aberto',
+        data_pagamento: status === 'pago' ? (editingGasto?.data_pagamento || hojeStr) : null,
+        observacoes: observacoes.trim(),
+        updated_at: new Date().toISOString()
+      };
 
-    try {
-      const { error } = editingGasto
-        ? await supabase.from('gastos_fixos').update(payload).eq('id', editingGasto.id)
-        : await supabase.from('gastos_fixos').insert([payload]);
+      try {
+        const { error } = await supabase.from('gastos_fixos').update(payload).eq('id', editingGasto.id);
+        if (error) console.warn('Supabase update fallback:', error.message);
+      } catch (err) {}
 
-      if (error) {
-        console.warn('Fallback Supabase save:', error.message);
-      }
-
-      let updatedList = [];
-      if (editingGasto) {
-        updatedList = gastos.map(g => g.id === editingGasto.id ? { ...g, ...payload } : g);
-      } else {
-        updatedList = [payload, ...gastos];
-      }
+      const updatedList = gastos.map(g => g.id === editingGasto.id ? payload : g);
       saveLocalGastos(updatedList);
 
       registrarLog({
-        acao: editingGasto ? 'EDICAO_GASTO_FIXO' : 'CRIACAO_GASTO_FIXO',
+        acao: 'EDICAO_GASTO_FIXO',
         modulo: 'Gastos Fixos',
-        detalhes: `Gasto Fixo "${payload.descricao}" (${payload.categoria}): R$ ${payload.valor.toFixed(2)} - Vencimento: ${payload.data_vencimento}.`,
+        detalhes: `Gasto Fixo "${payload.descricao}" atualizado.`,
         metadata: payload
       });
 
       setShowModal(false);
-    } catch (err) {
-      console.error('Erro ao salvar gasto fixo:', err);
+      return;
     }
-  };
 
-  // Deletar Gasto Fixo
-  const handleDeleteGasto = async (id, name) => {
-    if (!window.confirm(`Tem certeza que deseja excluir o gasto fixo "${name}"?`)) return;
+    // CASO 2: Criação de Gasto Parcelado com Parcela Mãe + Parcelas Filhas
+    if (tipoCadastro === 'parcelado' && datasPrevia.length > 1) {
+      const parentId = 'mae_' + Date.now();
+      const totalP = datasPrevia.length;
+      const dataFimCalculada = datasPrevia[datasPrevia.length - 1];
+
+      // Registro da Parcela Mãe (Registro Mestre)
+      const parentRecord = {
+        id: parentId,
+        parent_id: null,
+        is_parent: true,
+        parcela_numero: null,
+        total_parcelas: totalP,
+        descricao: descricao.trim(),
+        categoria,
+        valor: valNum,
+        valor_pago_real: null,
+        data_vencimento: datasPrevia[0],
+        data_final: dataFimCalculada,
+        recorrencia,
+        status: 'em_aberto',
+        data_pagamento: null,
+        metodo_pagamento: null,
+        conta_destino: null,
+        observacoes: observacoes.trim(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      // Registros das Parcelas Filhas
+      const childrenRecords = datasPrevia.map((dt, idx) => ({
+        id: `${parentId}_p${idx + 1}`,
+        parent_id: parentId,
+        is_parent: false,
+        parcela_numero: idx + 1,
+        total_parcelas: totalP,
+        descricao: `${descricao.trim()} (Parcela ${idx + 1}/${totalP})`,
+        categoria,
+        valor: valNum,
+        valor_pago_real: null,
+        data_vencimento: dt,
+        data_final: null,
+        recorrencia,
+        status: 'em_aberto',
+        data_pagamento: null,
+        metodo_pagamento: null,
+        conta_destino: null,
+        observacoes: observacoes.trim(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }));
+
+      const novosRegistros = [parentRecord, ...childrenRecords];
+
+      try {
+        const { error } = await supabase.from('gastos_fixos').insert(novosRegistros);
+        if (error) console.warn('Supabase insert parcelas fallback:', error.message);
+      } catch (err) {}
+
+      const updatedList = [...novosRegistros, ...gastos];
+      saveLocalGastos(updatedList);
+
+      // Expandir automaticamente a nova parcela mãe para o usuário visualizar
+      setExpandedParents(prev => new Set([...prev, parentId]));
+
+      registrarLog({
+        acao: 'CRIACAO_GASTO_PARCELADO',
+        modulo: 'Gastos Fixos',
+        detalhes: `Parcelamento "${descricao.trim()}": ${totalP} parcelas de R$ ${valNum.toFixed(2)} geradas até ${dataFimCalculada}.`,
+        metadata: { parentId, totalParcelas: totalP }
+      });
+
+      alert(`✅ Parcelamento "${descricao.trim()}" criado com sucesso!\n📁 Foram geradas ${totalP} parcelas agrupadas dentro da Parcela Mãe.`);
+      setShowModal(false);
+      return;
+    }
+
+    // CASO 3: Gasto Fixo Simples / Mensal sem parcelas
+    const simpleId = 'gasto_' + Date.now();
+    const simpleRecord = {
+      id: simpleId,
+      parent_id: null,
+      is_parent: false,
+      parcela_numero: null,
+      total_parcelas: null,
+      descricao: descricao.trim(),
+      categoria,
+      valor: valNum,
+      valor_pago_real: null,
+      data_vencimento: dataVencimento,
+      data_final: dataFinal || null,
+      recorrencia,
+      status: status === 'pago' ? 'pago' : 'em_aberto',
+      data_pagamento: status === 'pago' ? hojeStr : null,
+      metodo_pagamento: null,
+      conta_destino: null,
+      observacoes: observacoes.trim(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
 
     try {
-      await supabase.from('gastos_fixos').delete().eq('id', id);
+      const { error } = await supabase.from('gastos_fixos').insert([simpleRecord]);
+      if (error) console.warn('Supabase insert simple fallback:', error.message);
+    } catch (err) {}
+
+    const updatedList = [simpleRecord, ...gastos];
+    saveLocalGastos(updatedList);
+
+    registrarLog({
+      acao: 'CRIACAO_GASTO_FIXO',
+      modulo: 'Gastos Fixos',
+      detalhes: `Gasto Fixo "${simpleRecord.descricao}" (${simpleRecord.categoria}): R$ ${simpleRecord.valor.toFixed(2)} - Vencimento: ${simpleRecord.data_vencimento}.`,
+      metadata: simpleRecord
+    });
+
+    setShowModal(false);
+  };
+
+  // Deletar Gasto Fixo ou Agrupamento Completo
+  const handleDeleteGasto = async (item) => {
+    if (item.is_parent) {
+      if (!window.confirm(`⚠️ Atenção: Deseja excluir a Parcela Mãe "${item.descricao}" e TODAS as suas parcelas vinculadas?`)) {
+        return;
+      }
+      try {
+        await supabase.from('gastos_fixos').delete().eq('parent_id', item.id);
+        await supabase.from('gastos_fixos').delete().eq('id', item.id);
+      } catch (e) {}
+
+      const newList = gastos.filter(g => g.id !== item.id && g.parent_id !== item.id);
+      saveLocalGastos(newList);
+
+      registrarLog({
+        acao: 'EXCLUSAO_GRUPO_GASTO_FIXO',
+        modulo: 'Gastos Fixos',
+        detalhes: `Grupo de parcelas "${item.descricao}" e todas as suas parcelas foram excluídos.`,
+        metadata: { id: item.id }
+      });
+      return;
+    }
+
+    if (!window.confirm(`Tem certeza que deseja excluir "${item.descricao}"?`)) return;
+
+    try {
+      await supabase.from('gastos_fixos').delete().eq('id', item.id);
     } catch (e) {}
 
-    const newList = gastos.filter(g => g.id !== id);
+    const newList = gastos.filter(g => g.id !== item.id);
     saveLocalGastos(newList);
 
     registrarLog({
       acao: 'EXCLUSAO_GASTO_FIXO',
       modulo: 'Gastos Fixos',
-      detalhes: `Gasto Fixo "${name}" removido.`,
-      metadata: { id, name }
+      detalhes: `Gasto Fixo "${item.descricao}" removido.`,
+      metadata: { id: item.id }
     });
   };
 
@@ -282,14 +574,13 @@ export default function GastosFixos() {
     if (!payingGasto) return;
 
     const valPagoNum = parseFloat(payingValorReal) || parseFloat(payingGasto.valor) || 0;
-    const hoje = new Date().toISOString().split('T')[0];
 
     const updatedPayload = {
       ...payingGasto,
       valor: updateDefaultEstimate ? valPagoNum : (payingGasto.valor || valPagoNum),
       valor_pago_real: valPagoNum,
       status: 'pago',
-      data_pagamento: hoje,
+      data_pagamento: hojeStr,
       metodo_pagamento: metodoPagamento,
       conta_destino: contaDestino
     };
@@ -305,7 +596,7 @@ export default function GastosFixos() {
 
       // 2. Lançar Saída Automática no Fluxo de Caixa de Hoje com o Valor REAL Confirmado
       const novaSaida = {
-        descricao: `Gasto Fixo: ${payingGasto.descricao} (${payingGasto.categoria})`,
+        descricao: `Gasto: ${payingGasto.descricao} (${payingGasto.categoria})`,
         valor: valPagoNum.toString(),
         metodo: metodoPagamento,
         conta: contaDestino
@@ -327,7 +618,7 @@ export default function GastosFixos() {
         try {
           await supabase.from('fluxo_caixa_draft').upsert([{
             id: 'current_draft',
-            data_caixa: hoje,
+            data_caixa: hojeStr,
             saidas: draft.saidas,
             updated_at: new Date().toISOString()
           }]);
@@ -341,11 +632,11 @@ export default function GastosFixos() {
       registrarLog({
         acao: 'PAGAMENTO_GASTO_FIXO',
         modulo: 'Gastos Fixos',
-        detalhes: `Baixa no Gasto Fixo "${payingGasto.descricao}": R$ ${valPagoNum.toFixed(2)} lançado como Saída no Fluxo de Caixa.`,
+        detalhes: `Baixa no Gasto "${payingGasto.descricao}": R$ ${valPagoNum.toFixed(2)} lançado como Saída no Fluxo de Caixa.`,
         metadata: updatedPayload
       });
 
-      alert(`✅ Gasto Fixo "${payingGasto.descricao}" baixado como PAGO!\n💵 Saída de R$ ${valPagoNum.toFixed(2)} lançada no Fluxo de Caixa.`);
+      alert(`✅ Gasto "${payingGasto.descricao}" baixado como PAGO!\n💵 Saída de R$ ${valPagoNum.toFixed(2)} lançada no Fluxo de Caixa.`);
       setPayingGasto(null);
 
     } catch (err) {
@@ -363,7 +654,7 @@ export default function GastosFixos() {
     } else {
       if (!window.confirm(`Deseja reabrir a pendência do gasto "${gasto.descricao}"?`)) return;
 
-      const updated = { ...gasto, status: 'em_aberto', data_pagamento: null };
+      const updated = { ...gasto, status: 'em_aberto', data_pagamento: null, valor_pago_real: null };
       try {
         await supabase.from('gastos_fixos').update(updated).eq('id', gasto.id);
       } catch (e) {}
@@ -373,27 +664,7 @@ export default function GastosFixos() {
     }
   };
 
-  // Auxiliares de Datas e Status Automáticos
-  const hojeStr = new Date().toISOString().split('T')[0];
-
-  const getDaysDiff = (dateStr) => {
-    if (!dateStr) return null;
-    const [ano, mes, dia] = dateStr.split('-').map(Number);
-    const dt = new Date(ano, mes - 1, dia);
-    dt.setHours(0, 0, 0, 0);
-
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-
-    const diffTempo = dt.getTime() - hoje.getTime();
-    return Math.ceil(diffTempo / (1000 * 60 * 60 * 24));
-  };
-
-  // CÁLCULO AUTOMÁTICO DE STATUS EM TEMPO REAL:
-  // 1. Pago: se marcado como pago
-  // 2. Vencido: se data_vencimento < hoje e não foi pago
-  // 3. Vence em até 7d: se faltam de 0 a 7 dias
-  // 4. Em Aberto: se data_vencimento >= hoje
+  // CÁLCULO DE STATUS INDIVIDUAL DE UM ITEM
   const getComputedStatus = (item) => {
     if (item.status === 'pago') {
       return { 
@@ -439,61 +710,383 @@ export default function GastosFixos() {
     };
   };
 
-  // Filtragem
-  const filteredGastos = gastos.filter(item => {
-    const comp = getComputedStatus(item);
+  // ESTRUTURAÇÃO DO AGRUPAMENTO: PARCELA MÃE + PARCELAS FILHAS
+  const { groupedList, allParentIds } = useMemo(() => {
+    const parentMap = new Map();
+    const standalone = [];
+    const parentsFound = [];
 
-    if (statusFilter === 'alerta7dias') {
-      const dv = getDaysDiff(item.data_vencimento);
-      const df = item.data_final ? getDaysDiff(item.data_final) : null;
-      const isVenc7 = item.status !== 'pago' && dv !== null && dv >= 0 && dv <= 7;
-      const isFinal7 = df !== null && df >= 0 && df <= 7;
-      if (!isVenc7 && !isFinal7) return false;
-    } else if (statusFilter === 'em_aberto') {
-      if (item.status === 'pago' || (item.data_vencimento && item.data_vencimento < hojeStr)) return false;
-    } else if (statusFilter === 'vencido') {
-      if (comp.code !== 'vencido') return false;
-    } else if (statusFilter === 'pago') {
-      if (comp.code !== 'pago') return false;
-    }
+    // 1º Passo: Identificar e registrar todos os pais explícitos
+    gastos.forEach(item => {
+      if (item.is_parent) {
+        parentMap.set(item.id, {
+          parent: item,
+          children: []
+        });
+        parentsFound.push(item.id);
+      }
+    });
 
-    if (categoriaFilter !== 'todas' && item.categoria !== categoriaFilter) return false;
+    // 2º Passo: Vincular os filhos ao pai ou criar pai virtual se necessário
+    gastos.forEach(item => {
+      if (item.parent_id) {
+        if (!parentMap.has(item.parent_id)) {
+          const baseName = item.descricao ? item.descricao.replace(/\s*\(Parcela \d+\/\d+\)/, '') : 'Gasto Parcelado';
+          const virtualParent = {
+            id: item.parent_id,
+            parent_id: null,
+            is_parent: true,
+            is_virtual: true,
+            descricao: baseName,
+            categoria: item.categoria || CATEGORIAS[0],
+            valor: item.valor || 0,
+            recorrencia: item.recorrencia || 'mensal',
+            status: 'em_aberto',
+            total_parcelas: item.total_parcelas || 1
+          };
+          parentMap.set(item.parent_id, {
+            parent: virtualParent,
+            children: []
+          });
+          parentsFound.push(item.parent_id);
+        }
+        parentMap.get(item.parent_id).children.push(item);
+      } else if (!item.is_parent) {
+        standalone.push({
+          isGroup: false,
+          item
+        });
+      }
+    });
 
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      const matchDesc = item.descricao?.toLowerCase().includes(q);
-      const matchCat = item.categoria?.toLowerCase().includes(q);
-      const matchObs = item.observacoes?.toLowerCase().includes(q);
-      return matchDesc || matchCat || matchObs;
-    }
-    return true;
-  });
+    // 3º Passo: Montar lista agrupada com métricas consolidadas de cada grupo
+    const groups = [];
+    parentMap.forEach(({ parent, children }) => {
+      // Ordenar parcelas por data de vencimento
+      children.sort((a, b) => (a.data_vencimento || '').localeCompare(b.data_vencimento || ''));
 
-  // Métricas Automáticas
-  const totalGeral = filteredGastos.reduce((acc, g) => acc + (parseFloat(g.valor_pago_real !== undefined ? g.valor_pago_real : g.valor) || 0), 0);
-  const totalPago = filteredGastos.filter(g => g.status === 'pago').reduce((acc, g) => acc + (parseFloat(g.valor_pago_real !== undefined ? g.valor_pago_real : g.valor) || 0), 0);
-  const totalEmAberto = filteredGastos.filter(g => g.status !== 'pago' && (!g.data_vencimento || g.data_vencimento >= hojeStr)).reduce((acc, g) => acc + (parseFloat(g.valor) || 0), 0);
-  const totalVencido = filteredGastos.filter(g => getComputedStatus(g).code === 'vencido').reduce((acc, g) => acc + (parseFloat(g.valor) || 0), 0);
-  
-  const totalAlertas7d = gastos.filter(g => {
-    const dv = getDaysDiff(g.data_vencimento);
-    const df = g.data_final ? getDaysDiff(g.data_final) : null;
-    return (g.status !== 'pago' && dv !== null && dv >= 0 && dv <= 7) || (df !== null && df >= 0 && df <= 7);
-  }).length;
+      const totalParcelas = children.length || parent.total_parcelas || 1;
+      const pagas = children.filter(c => c.status === 'pago');
+      const vencidas = children.filter(c => getComputedStatus(c).code === 'vencido');
+      const emAberto = children.filter(c => c.status !== 'pago' && getComputedStatus(c).code !== 'vencido');
+      const alertas7d = children.filter(c => getComputedStatus(c).code === 'alerta7dias');
 
-  const formatCurrency = (val) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
-  };
+      const valorTotal = children.reduce((acc, c) => acc + (parseFloat(c.valor) || 0), 0) || (parseFloat(parent.valor) * totalParcelas) || 0;
+      const valorPagoTotal = pagas.reduce((acc, c) => acc + (parseFloat(c.valor_pago_real !== undefined && c.valor_pago_real !== null ? c.valor_pago_real : c.valor) || 0), 0);
+      const valorRestante = children.filter(c => c.status !== 'pago').reduce((acc, c) => acc + (parseFloat(c.valor) || 0), 0);
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '—';
-    const [y, m, d] = dateStr.split('-');
-    return `${d}/${m}/${y}`;
+      // Próxima parcela a vencer
+      const proximaPendente = children.find(c => c.status !== 'pago');
+
+      // Status geral do grupo
+      let statusGeral = {
+        label: `⏳ Em Aberto (0/${totalParcelas})`,
+        code: 'em_aberto',
+        color: '#3b82f6',
+        bg: '#3b82f615',
+        border: '#3b82f6'
+      };
+
+      if (vencidas.length > 0) {
+        statusGeral = {
+          label: `🔴 ${vencidas.length} Vencida(s)`,
+          code: 'vencido',
+          color: '#ef4444',
+          bg: '#ef444415',
+          border: '#ef4444'
+        };
+      } else if (pagas.length === totalParcelas && totalParcelas > 0) {
+        statusGeral = {
+          label: `🟢 100% Quitado (${pagas.length}/${totalParcelas})`,
+          code: 'pago',
+          color: '#10b981',
+          bg: '#10b98115',
+          border: '#10b981'
+        };
+      } else if (pagas.length > 0) {
+        statusGeral = {
+          label: `⏳ Em Andamento (${pagas.length}/${totalParcelas} pagas)`,
+          code: 'em_aberto',
+          color: '#f59e0b',
+          bg: '#f59e0b15',
+          border: '#f59e0b'
+        };
+      }
+
+      groups.push({
+        isGroup: true,
+        parent,
+        children,
+        totalParcelas,
+        pagasCount: pagas.length,
+        vencidasCount: vencidas.length,
+        alertasCount: alertas7d.length,
+        emAbertoCount: emAberto.length,
+        valorTotal,
+        valorPagoTotal,
+        valorRestante,
+        proximaPendente,
+        statusGeral
+      });
+    });
+
+    // Combinar e ordenar a lista pela data mais próxima
+    const combined = [...groups, ...standalone].sort((a, b) => {
+      const dateA = a.isGroup ? (a.proximaPendente?.data_vencimento || a.parent.data_vencimento || '') : (a.item.data_vencimento || '');
+      const dateB = b.isGroup ? (b.proximaPendente?.data_vencimento || b.parent.data_vencimento || '') : (b.item.data_vencimento || '');
+      return dateA.localeCompare(dateB);
+    });
+
+    return {
+      groupedList: combined,
+      allParentIds: parentsFound
+    };
+  }, [gastos, hojeStr]);
+
+  // Filtragem da Lista Agrupada
+  const filteredData = useMemo(() => {
+    return groupedList.filter(entry => {
+      if (entry.isGroup) {
+        const { parent, children, statusGeral, vencidasCount, alertasCount, pagasCount, totalParcelas } = entry;
+
+        // Filtro por Status
+        if (statusFilter === 'vencido' && vencidasCount === 0) return false;
+        if (statusFilter === 'alerta7dias' && alertasCount === 0) return false;
+        if (statusFilter === 'pago' && pagasCount !== totalParcelas) return false;
+        if (statusFilter === 'em_aberto' && (pagasCount === totalParcelas || (vencidasCount > 0 && pagasCount === 0))) return false;
+
+        // Filtro por Categoria
+        if (categoriaFilter !== 'todas' && parent.categoria !== categoriaFilter) return false;
+
+        // Filtro por Busca
+        if (search.trim()) {
+          const q = search.toLowerCase();
+          const matchParent = parent.descricao?.toLowerCase().includes(q) || parent.categoria?.toLowerCase().includes(q) || parent.observacoes?.toLowerCase().includes(q);
+          const matchChildren = children.some(c => c.descricao?.toLowerCase().includes(q) || c.observacoes?.toLowerCase().includes(q));
+          if (!matchParent && !matchChildren) return false;
+        }
+
+        return true;
+      } else {
+        const item = entry.item;
+        const comp = getComputedStatus(item);
+
+        if (statusFilter === 'alerta7dias') {
+          const dv = getDaysDiff(item.data_vencimento);
+          const df = item.data_final ? getDaysDiff(item.data_final) : null;
+          const isVenc7 = item.status !== 'pago' && dv !== null && dv >= 0 && dv <= 7;
+          const isFinal7 = df !== null && df >= 0 && df <= 7;
+          if (!isVenc7 && !isFinal7) return false;
+        } else if (statusFilter === 'em_aberto') {
+          if (item.status === 'pago' || (item.data_vencimento && item.data_vencimento < hojeStr)) return false;
+        } else if (statusFilter === 'vencido') {
+          if (comp.code !== 'vencido') return false;
+        } else if (statusFilter === 'pago') {
+          if (comp.code !== 'pago') return false;
+        }
+
+        if (categoriaFilter !== 'todas' && item.categoria !== categoriaFilter) return false;
+
+        if (search.trim()) {
+          const q = search.toLowerCase();
+          const matchDesc = item.descricao?.toLowerCase().includes(q);
+          const matchCat = item.categoria?.toLowerCase().includes(q);
+          const matchObs = item.observacoes?.toLowerCase().includes(q);
+          if (!matchDesc && !matchCat && !matchObs) return false;
+        }
+
+        return true;
+      }
+    });
+  }, [groupedList, statusFilter, categoriaFilter, search, hojeStr]);
+
+  // Métricas Globais (Calculadas sobre parcelas filhas + itens standalone para não haver duplicação)
+  const metricas = useMemo(() => {
+    let totalGeral = 0;
+    let totalPago = 0;
+    let totalEmAberto = 0;
+    let totalVencido = 0;
+    let totalAlertas = 0;
+
+    gastos.forEach(g => {
+      // Se for a parcela mãe, não soma seu valor individual pois as filhas já representam as parcelas
+      if (g.is_parent) return;
+
+      const val = parseFloat(g.valor) || 0;
+      const valReal = g.valor_pago_real !== undefined && g.valor_pago_real !== null ? parseFloat(g.valor_pago_real) : val;
+
+      totalGeral += valReal;
+
+      if (g.status === 'pago') {
+        totalPago += valReal;
+      } else {
+        const comp = getComputedStatus(g);
+        if (comp.code === 'vencido') {
+          totalVencido += val;
+        } else {
+          totalEmAberto += val;
+        }
+
+        const dv = getDaysDiff(g.data_vencimento);
+        const df = g.data_final ? getDaysDiff(g.data_final) : null;
+        if ((dv !== null && dv >= 0 && dv <= 7) || (df !== null && df >= 0 && df <= 7)) {
+          totalAlertas++;
+        }
+      }
+    });
+
+    return { totalGeral, totalPago, totalEmAberto, totalVencido, totalAlertas };
+  }, [gastos, hojeStr]);
+
+  // SQL Script para o Modal
+  const SQL_SCRIPT = `-- ==============================================================================
+-- SCRIPT DE CRIAÇÃO E CONFIGURAÇÃO DA TABELA: gastos_fixos
+-- Execute no Supabase SQL Editor (https://supabase.com/dashboard)
+-- ==============================================================================
+
+CREATE TABLE IF NOT EXISTS public.gastos_fixos (
+  id TEXT PRIMARY KEY,
+  parent_id TEXT REFERENCES public.gastos_fixos(id) ON DELETE CASCADE,
+  is_parent BOOLEAN DEFAULT false,
+  parcela_numero INTEGER,
+  total_parcelas INTEGER,
+  descricao TEXT NOT NULL,
+  categoria TEXT NOT NULL,
+  valor NUMERIC NOT NULL DEFAULT 0,
+  valor_pago_real NUMERIC,
+  data_vencimento DATE NOT NULL,
+  data_final DATE,
+  recorrencia TEXT DEFAULT 'mensal',
+  status TEXT DEFAULT 'em_aberto',
+  data_pagamento DATE,
+  metodo_pagamento TEXT,
+  conta_destino TEXT,
+  observacoes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_gastos_fixos_parent_id ON public.gastos_fixos(parent_id);
+CREATE INDEX IF NOT EXISTS idx_gastos_fixos_data_vencimento ON public.gastos_fixos(data_vencimento);
+CREATE INDEX IF NOT EXISTS idx_gastos_fixos_status ON public.gastos_fixos(status);
+
+ALTER TABLE public.gastos_fixos ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Permitir tudo em gastos_fixos" ON public.gastos_fixos;
+CREATE POLICY "Permitir tudo em gastos_fixos" ON public.gastos_fixos
+  FOR ALL USING (true) WITH CHECK (true);
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.gastos_fixos;
+  END IF;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;`;
+
+  const copySqlToClipboard = () => {
+    navigator.clipboard.writeText(SQL_SCRIPT);
+    setCopiedSql(true);
+    setTimeout(() => setCopiedSql(false), 3000);
   };
 
   return (
     <div style={{ padding: '20px 0' }}>
       
+      {/* Banner de Sincronização do Supabase */}
+      {supabaseOnline === false && (
+        <div style={{
+          background: 'rgba(239, 68, 68, 0.12)',
+          border: '1px solid #ef444488',
+          borderRadius: '12px',
+          padding: '14px 18px',
+          marginBottom: '20px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '1.4rem' }}>⚠️</span>
+            <div>
+              <strong style={{ color: '#ef4444', fontSize: '0.95rem' }}>
+                Supabase: Tabela 'gastos_fixos' pendente de criação no banco
+              </strong>
+              <span style={{ display: 'block', fontSize: '0.8rem', color: '#ccc', marginTop: '2px' }}>
+                Os dados estão sendo salvos apenas localmente neste dispositivo (LocalStorage). Para que os gastos apareçam sincronizados entre todos os computadores e celulares em tempo real, execute o script SQL no Supabase.
+              </span>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              onClick={() => setShowSqlModal(true)}
+              style={{
+                background: '#ef4444',
+                color: '#fff',
+                border: 'none',
+                padding: '8px 14px',
+                borderRadius: '8px',
+                fontWeight: 'bold',
+                fontSize: '0.82rem',
+                cursor: 'pointer'
+              }}
+            >
+              📋 Ver Script SQL & Instruções
+            </button>
+            <button
+              onClick={fetchGastos}
+              style={{
+                background: '#222',
+                color: '#aaa',
+                border: '1px solid #444',
+                padding: '8px 12px',
+                borderRadius: '8px',
+                fontSize: '0.82rem',
+                cursor: 'pointer'
+              }}
+            >
+              🔄 Testar Novamente
+            </button>
+          </div>
+        </div>
+      )}
+
+      {supabaseOnline === true && (
+        <div style={{
+          background: 'rgba(16, 185, 129, 0.08)',
+          border: '1px solid #10b98144',
+          borderRadius: '10px',
+          padding: '8px 14px',
+          marginBottom: '15px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          fontSize: '0.82rem'
+        }}>
+          <span style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            🟢 <strong>Supabase Online:</strong> Dados sincronizados em tempo real entre todos os computadores e celulares dos administradores.
+          </span>
+          <button
+            onClick={handleMigrateLocalToSupabase}
+            disabled={migratingLocal}
+            style={{
+              background: 'transparent',
+              color: '#10b981',
+              border: '1px dashed #10b98188',
+              padding: '4px 10px',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '0.75rem'
+            }}
+            title="Sincroniza os gastos salvos em cache deste navegador para o Supabase"
+          >
+            {migratingLocal ? 'Sincronizando...' : '🔄 Sincronizar Cache Local para a Nuvem'}
+          </button>
+        </div>
+      )}
+
       {/* Header com Ações e Alerta de E-mail */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px', flexWrap: 'wrap', gap: '15px' }}>
         <div>
@@ -501,7 +1094,7 @@ export default function GastosFixos() {
             📌 Gestão de Gastos Fixos & Recorrentes
           </h2>
           <p style={{ color: '#aaa', margin: '4px 0 0 0', fontSize: '0.85rem' }}>
-            Status 100% automáticos (<strong>Em Aberto</strong>, <strong>Vencido</strong> e <strong>Pago</strong>) com cálculo diário em tempo real.
+            Organização com <strong>Parcela Mãe</strong> expansível (sanfona) e sincronização na nuvem para múltiplos administradores.
           </p>
         </div>
 
@@ -515,9 +1108,9 @@ export default function GastosFixos() {
               color: '#f59e0b', 
               border: '1px solid #f59e0b66', 
               fontWeight: 'bold', 
-              padding: '12px 18px', 
+              padding: '10px 16px', 
               borderRadius: '8px', 
-              fontSize: '0.88rem',
+              fontSize: '0.85rem',
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
@@ -525,21 +1118,30 @@ export default function GastosFixos() {
             }}
             title="Checa e envia e-mail com as contas que vencem ou encerram em até 7 dias"
           >
-            {sendingAlert ? '📧 Enviando Alerta...' : `🔔 Notificar Vencimentos por E-mail (${totalAlertas7d})`}
+            {sendingAlert ? '📧 Enviando Alerta...' : `🔔 Notificar Vencimentos (${metricas.totalAlertas})`}
+          </button>
+
+          <button 
+            onClick={() => setShowSqlModal(true)}
+            className="btn"
+            style={{ background: '#1c1c24', color: '#93c5fd', border: '1px solid #3b82f655', padding: '10px 14px', borderRadius: '8px', fontSize: '0.85rem' }}
+            title="Ver e copiar código SQL para criação das tabelas no Supabase"
+          >
+            📋 SQL Supabase
           </button>
 
           <button 
             onClick={() => handleOpenModal(null)}
             className="btn"
-            style={{ background: '#f59e0b', color: '#000', fontWeight: 'bold', padding: '12px 20px', borderRadius: '8px', fontSize: '0.9rem', boxShadow: '0 4px 14px rgba(245, 158, 11, 0.3)' }}
+            style={{ background: '#f59e0b', color: '#000', fontWeight: 'bold', padding: '10px 18px', borderRadius: '8px', fontSize: '0.88rem', boxShadow: '0 4px 14px rgba(245, 158, 11, 0.3)' }}
           >
-            + Novo Gasto Fixo
+            + Novo Gasto Fixo / Parcelamento
           </button>
         </div>
       </div>
 
       {/* Alerta de 7 Dias em Destaque */}
-      {totalAlertas7d > 0 && (
+      {metricas.totalAlertas > 0 && (
         <div style={{ 
           background: 'linear-gradient(90deg, rgba(245, 158, 11, 0.15) 0%, rgba(220, 39, 67, 0.15) 100%)', 
           border: '1px solid #f59e0b88', 
@@ -556,10 +1158,10 @@ export default function GastosFixos() {
             <span style={{ fontSize: '1.4rem' }}>🔔</span>
             <div>
               <strong style={{ color: '#f59e0b', fontSize: '0.95rem' }}>
-                Atenção: {totalAlertas7d} conta(s) ou contrato(s) vencem nos próximos 7 dias!
+                Atenção: {metricas.totalAlertas} conta(s) ou parcela(s) vencem nos próximos 7 dias!
               </strong>
               <span style={{ display: 'block', fontSize: '0.8rem', color: '#ccc' }}>
-                O sistema notifica automaticamente os e-mails dos administradores para garantir o pagamento em dia.
+                O sistema notifica os e-mails dos administradores para garantir o pagamento em dia.
               </span>
             </div>
           </div>
@@ -575,33 +1177,31 @@ export default function GastosFixos() {
       {/* Cards KPI de Resumo Sólido com Status Automáticos */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '15px', marginBottom: '25px' }}>
         <div style={{ background: '#16161a', border: '1px solid #2a2a35', padding: '18px', borderRadius: '12px', borderLeft: '4px solid #3b82f6' }}>
-          <span style={{ fontSize: '0.78rem', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total de Gastos Fixos</span>
-          <h3 style={{ margin: '6px 0 0 0', fontSize: '1.7rem', color: '#3b82f6' }}>{formatCurrency(totalGeral)}</h3>
-          <span style={{ fontSize: '0.72rem', color: '#888' }}>{filteredGastos.length} item(ns) listado(s)</span>
+          <span style={{ fontSize: '0.78rem', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total de Gastos (Geral)</span>
+          <h3 style={{ margin: '6px 0 0 0', fontSize: '1.7rem', color: '#3b82f6' }}>{formatCurrency(metricas.totalGeral)}</h3>
+          <span style={{ fontSize: '0.72rem', color: '#888' }}>{gastos.filter(g => !g.is_parent).length} ocorrência(s) programada(s)</span>
         </div>
 
         <div style={{ background: '#16161a', border: '1px solid #2a2a35', padding: '18px', borderRadius: '12px', borderLeft: '4px solid #10b981' }}>
-          <span style={{ fontSize: '0.78rem', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🟢 Total Pago</span>
-          <h3 style={{ margin: '6px 0 0 0', fontSize: '1.7rem', color: '#10b981' }}>{formatCurrency(totalPago)}</h3>
-          <span style={{ fontSize: '0.72rem', color: '#888' }}>Contas quitadas</span>
+          <span style={{ fontSize: '0.78rem', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Quitado / Pago</span>
+          <h3 style={{ margin: '6px 0 0 0', fontSize: '1.7rem', color: '#10b981' }}>{formatCurrency(metricas.totalPago)}</h3>
+          <span style={{ fontSize: '0.72rem', color: '#888' }}>Contas quitadas e baixadas</span>
         </div>
 
-        <div style={{ background: '#16161a', border: '1px solid #2a2a35', padding: '18px', borderRadius: '12px', borderLeft: '4px solid #3b82f6' }}>
-          <span style={{ fontSize: '0.78rem', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.5px' }}>⏳ Em Aberto</span>
-          <h3 style={{ margin: '6px 0 0 0', fontSize: '1.7rem', color: '#3b82f6' }}>{formatCurrency(totalEmAberto)}</h3>
-          <span style={{ fontSize: '0.72rem', color: '#888' }}>A vencer dentro do prazo</span>
+        <div style={{ background: '#16161a', border: '1px solid #2a2a35', padding: '18px', borderRadius: '12px', borderLeft: '4px solid #f59e0b' }}>
+          <span style={{ fontSize: '0.78rem', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Em Aberto (No Prazo)</span>
+          <h3 style={{ margin: '6px 0 0 0', fontSize: '1.7rem', color: '#f59e0b' }}>{formatCurrency(metricas.totalEmAberto)}</h3>
+          <span style={{ fontSize: '0.72rem', color: '#888' }}>A vencer futuramente</span>
         </div>
 
         <div style={{ background: '#16161a', border: '1px solid #2a2a35', padding: '18px', borderRadius: '12px', borderLeft: '4px solid #ef4444' }}>
-          <span style={{ fontSize: '0.78rem', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🔴 Vencido (Automático)</span>
-          <h3 style={{ margin: '6px 0 0 0', fontSize: '1.7rem', color: '#ef4444' }}>{formatCurrency(totalVencido)}</h3>
-          <span style={{ fontSize: '0.72rem', color: totalVencido > 0 ? '#ef4444' : '#888', fontWeight: totalVencido > 0 ? 'bold' : 'normal' }}>
-            {totalVencido > 0 ? '⚠️ Atenção: Contas vencidas!' : 'Nenhuma conta vencida'}
-          </span>
+          <span style={{ fontSize: '0.78rem', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Vencido</span>
+          <h3 style={{ margin: '6px 0 0 0', fontSize: '1.7rem', color: '#ef4444' }}>{formatCurrency(metricas.totalVencido)}</h3>
+          <span style={{ fontSize: '0.72rem', color: '#888' }}>Vencimento ultrapassado</span>
         </div>
       </div>
 
-      {/* Barra de Filtros e Busca */}
+      {/* Barra de Filtros, Busca e Controles da Sanfona */}
       <div style={{ background: '#16161a', padding: '15px 20px', borderRadius: '12px', border: '1px solid #2a2a35', marginBottom: '20px', display: 'flex', gap: '15px', flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ flex: 1, minWidth: '220px' }}>
           <input 
@@ -631,36 +1231,375 @@ export default function GastosFixos() {
             ))}
           </select>
         </div>
+
+        {allParentIds.length > 0 && (
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              onClick={() => expandAllGroups(allParentIds)}
+              style={{ padding: '8px 12px', background: '#222', border: '1px solid #444', borderRadius: '6px', color: '#ddd', fontSize: '0.78rem', cursor: 'pointer' }}
+              title="Abre todas as sanfonas de parcelas"
+            >
+              ▼ Expandir Todas
+            </button>
+            <button
+              onClick={collapseAllGroups}
+              style={{ padding: '8px 12px', background: '#222', border: '1px solid #444', borderRadius: '6px', color: '#ddd', fontSize: '0.78rem', cursor: 'pointer' }}
+              title="Recolhe todas as sanfonas"
+            >
+              ▲ Recolher Todas
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Tabela de Gastos Fixos */}
+      {/* Tabela de Gastos Fixos com Accordion das Parcelas */}
       <div style={{ background: '#16161a', borderRadius: '12px', border: '1px solid #2a2a35', overflow: 'hidden' }}>
         {loading ? (
           <p style={{ color: '#aaa', textAlign: 'center', padding: '40px' }}>Carregando gastos fixos...</p>
-        ) : filteredGastos.length === 0 ? (
+        ) : filteredData.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '50px 20px' }}>
             <p style={{ fontSize: '2.5rem', margin: '0 0 10px 0' }}>📌</p>
             <p style={{ color: '#fff', fontWeight: 'bold', fontSize: '1.1rem' }}>Nenhum gasto fixo localizado</p>
-            <p style={{ color: '#888', fontSize: '0.85rem' }}>Clique no botão "+ Novo Gasto Fixo" acima para cadastrar contas recorrentes.</p>
+            <p style={{ color: '#888', fontSize: '0.85rem' }}>Clique no botão "+ Novo Gasto Fixo / Parcelamento" acima para cadastrar contas.</p>
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
               <thead>
                 <tr style={{ background: '#0f0f13', borderBottom: '2px solid #2a2a35', color: '#aaa' }}>
-                  <th style={{ padding: '14px 12px' }}>Descrição / Categoria</th>
+                  <th style={{ padding: '14px 12px' }}>Descrição / Estrutura</th>
                   <th style={{ padding: '14px 12px' }}>Vencimento</th>
-                  <th style={{ padding: '14px 12px' }}>Data Final</th>
+                  <th style={{ padding: '14px 12px' }}>Término / Parcelas</th>
                   <th style={{ padding: '14px 12px' }}>Recorrência</th>
-                  <th style={{ padding: '14px 12px' }}>Valor (Estimado / Pago)</th>
-                  <th style={{ padding: '14px 12px' }}>Status Automático</th>
+                  <th style={{ padding: '14px 12px' }}>Valor</th>
+                  <th style={{ padding: '14px 12px' }}>Status</th>
                   <th style={{ padding: '14px 12px', textAlign: 'right' }}>Ações</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredGastos.map((item) => {
+                {filteredData.map((entry) => {
+                  // =========================================================================
+                  // RENDERIZAÇÃO 1: PARCELA MÃE (AGRUPAMENTO COM SANFONA / ACCORDION)
+                  // =========================================================================
+                  if (entry.isGroup) {
+                    const { parent, children, totalParcelas, pagasCount, vencidasCount, valorTotal, valorPagoTotal, valorRestante, proximaPendente, statusGeral } = entry;
+                    const isExpanded = expandedParents.has(parent.id);
+                    const percentualPago = totalParcelas > 0 ? Math.round((pagasCount / totalParcelas) * 100) : 0;
+
+                    return (
+                      <React.Fragment key={parent.id}>
+                        {/* Linha Mestre da Parcela Mãe */}
+                        <tr 
+                          style={{ 
+                            background: isExpanded ? 'rgba(245, 158, 11, 0.06)' : '#18181f',
+                            borderBottom: isExpanded ? 'none' : '1px solid #262633',
+                            borderLeft: '4px solid #f59e0b',
+                            transition: 'background 0.2s'
+                          }}
+                        >
+                          <td style={{ padding: '14px 12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <button
+                                onClick={() => toggleAccordion(parent.id)}
+                                style={{
+                                  background: isExpanded ? '#f59e0b' : '#272730',
+                                  color: isExpanded ? '#000' : '#f59e0b',
+                                  border: '1px solid #f59e0b66',
+                                  borderRadius: '6px',
+                                  padding: '4px 8px',
+                                  cursor: 'pointer',
+                                  fontSize: '0.8rem',
+                                  fontWeight: 'bold',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                                title="Clique para descer e ver todas as parcelas deste gasto"
+                              >
+                                {isExpanded ? '▲ Recolher' : `▼ Ver ${children.length} Parcelas`}
+                              </button>
+                              
+                              <div>
+                                <strong style={{ color: '#fff', fontSize: '0.98rem' }}>
+                                  📁 {parent.descricao}
+                                </strong>
+                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '3px', flexWrap: 'wrap' }}>
+                                  <span style={{ fontSize: '0.72rem', color: '#f59e0b', background: '#f59e0b15', padding: '1px 6px', borderRadius: '4px', border: '1px solid #f59e0b33' }}>
+                                    {parent.categoria}
+                                  </span>
+                                  <span style={{ fontSize: '0.72rem', color: '#60a5fa', background: '#3b82f615', padding: '1px 6px', borderRadius: '4px', border: '1px solid #3b82f633' }}>
+                                    {pagasCount} de {totalParcelas} pagas ({percentualPago}%)
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {parent.observacoes && (
+                              <span style={{ display: 'block', fontSize: '0.75rem', color: '#777', marginTop: '4px', fontStyle: 'italic', paddingLeft: '32px' }}>
+                                📝 {parent.observacoes}
+                              </span>
+                            )}
+                          </td>
+
+                          <td style={{ padding: '14px 12px', color: '#ccc' }}>
+                            {proximaPendente ? (
+                              <div>
+                                <span style={{ fontWeight: 'bold', color: '#f59e0b' }}>
+                                  📅 {formatDate(proximaPendente.data_vencimento)}
+                                </span>
+                                <span style={{ display: 'block', fontSize: '0.72rem', color: '#888' }}>
+                                  Próx: Parcela {proximaPendente.parcela_numero || '—'}/{totalParcelas}
+                                </span>
+                              </div>
+                            ) : (
+                              <span style={{ color: '#10b981', fontWeight: 'bold' }}>
+                                ✅ Todas Quitadas
+                              </span>
+                            )}
+                          </td>
+
+                          <td style={{ padding: '14px 12px', color: '#888' }}>
+                            <div>
+                              <span>{formatDate(parent.data_final || children[children.length - 1]?.data_vencimento)}</span>
+                              <span style={{ display: 'block', fontSize: '0.72rem', color: '#aaa' }}>
+                                Total: {totalParcelas} parcelas
+                              </span>
+                            </div>
+                          </td>
+
+                          <td style={{ padding: '14px 12px' }}>
+                            <span style={{ background: '#3b82f615', color: '#60a5fa', border: '1px solid #3b82f633', padding: '3px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold' }}>
+                              🔄 {RECORRENCIAS.find(r => r.id === parent.recorrencia)?.label || parent.recorrencia}
+                            </span>
+                          </td>
+
+                          <td style={{ padding: '14px 12px' }}>
+                            <strong style={{ color: '#fff', fontSize: '1rem', display: 'block' }}>
+                              {formatCurrency(valorTotal)}
+                            </strong>
+                            <span style={{ display: 'block', fontSize: '0.72rem', color: '#888' }}>
+                              {formatCurrency(parent.valor)}/mês
+                            </span>
+                          </td>
+
+                          <td style={{ padding: '14px 12px' }}>
+                            <span 
+                              style={{ 
+                                background: statusGeral.bg, 
+                                color: statusGeral.color, 
+                                border: `1px solid ${statusGeral.border}`, 
+                                padding: '4px 10px', 
+                                borderRadius: '6px', 
+                                fontSize: '0.78rem', 
+                                fontWeight: 'bold', 
+                                display: 'inline-block' 
+                              }}
+                            >
+                              {statusGeral.label}
+                            </span>
+                          </td>
+
+                          <td style={{ padding: '14px 12px', textAlign: 'right' }}>
+                            <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                              <button
+                                onClick={() => toggleAccordion(parent.id)}
+                                style={{
+                                  padding: '6px 10px',
+                                  background: '#222',
+                                  border: '1px solid #444',
+                                  borderRadius: '6px',
+                                  color: '#fff',
+                                  fontSize: '0.78rem',
+                                  cursor: 'pointer'
+                                }}
+                                title="Abrir / fechar lista de parcelas"
+                              >
+                                {isExpanded ? '▲' : '▼'}
+                              </button>
+
+                              <button
+                                onClick={() => handleOpenModal(parent)}
+                                style={{ padding: '6px 10px', background: '#f59e0b', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#000', fontWeight: 'bold', fontSize: '0.78rem' }}
+                                title="Editar Grupo de Parcelas"
+                              >
+                                ✏️
+                              </button>
+
+                              <button
+                                onClick={() => handleDeleteGasto(parent)}
+                                style={{ padding: '6px 10px', background: '#ef444420', border: '1px solid #ef4444', borderRadius: '6px', cursor: 'pointer', color: '#ef4444', fontWeight: 'bold', fontSize: '0.78rem' }}
+                                title="Excluir Parcela Mãe e todas as parcelas vinculadas"
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+
+                        {/* DESDOBRAMENTO EM SANFONA: SUB-TABELA COM TODAS AS PARCELAS FILHAS */}
+                        {isExpanded && (
+                          <tr style={{ background: '#0e0e13', borderBottom: '2px solid #2a2a35' }}>
+                            <td colSpan={7} style={{ padding: '0 0 16px 0' }}>
+                              <div style={{
+                                margin: '0 12px 0 24px',
+                                background: '#121217',
+                                border: '1px solid #2a2a35',
+                                borderRadius: '10px',
+                                overflow: 'hidden',
+                                boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.5)'
+                              }}>
+                                {/* Header do Accordion com Barra de Progresso */}
+                                <div style={{
+                                  padding: '12px 16px',
+                                  background: '#16161e',
+                                  borderBottom: '1px solid #262633',
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                  flexWrap: 'wrap',
+                                  gap: '10px'
+                                }}>
+                                  <div>
+                                    <span style={{ color: '#f59e0b', fontWeight: 'bold', fontSize: '0.9rem' }}>
+                                      📂 Parcelas Individuais de "{parent.descricao}"
+                                    </span>
+                                    <span style={{ color: '#888', fontSize: '0.75rem', display: 'block', marginTop: '2px' }}>
+                                      {children.length} parcela(s) programada(s) • Quitado: {formatCurrency(valorPagoTotal)} de {formatCurrency(valorTotal)}
+                                    </span>
+                                  </div>
+
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                    <div style={{ width: '150px', background: '#222', borderRadius: '10px', height: '8px', overflow: 'hidden' }}>
+                                      <div style={{ width: `${percentualPago}%`, background: '#10b981', height: '100%', transition: 'width 0.3s' }} />
+                                    </div>
+                                    <span style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: 'bold' }}>{percentualPago}% pago</span>
+                                  </div>
+                                </div>
+
+                                {/* Listagem das Parcelas Filhas */}
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                                  <thead>
+                                    <tr style={{ background: '#0a0a0d', borderBottom: '1px solid #222', color: '#888' }}>
+                                      <th style={{ padding: '10px 14px' }}>Nº Parcela</th>
+                                      <th style={{ padding: '10px 14px' }}>Vencimento</th>
+                                      <th style={{ padding: '10px 14px' }}>Valor</th>
+                                      <th style={{ padding: '10px 14px' }}>Status da Parcela</th>
+                                      <th style={{ padding: '10px 14px' }}>Pagamento / Destino</th>
+                                      <th style={{ padding: '10px 14px', textAlign: 'right' }}>Ações da Parcela</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {children.map((child, idx) => {
+                                      const compChild = getComputedStatus(child);
+                                      const isPago = child.status === 'pago';
+                                      const valExib = isPago && child.valor_pago_real !== undefined && child.valor_pago_real !== null ? child.valor_pago_real : child.valor;
+
+                                      return (
+                                        <tr key={child.id} style={{ borderBottom: idx === children.length - 1 ? 'none' : '1px solid #1a1a22', background: isPago ? '#10b98108' : 'transparent' }}>
+                                          <td style={{ padding: '10px 14px', color: '#fff' }}>
+                                            <strong style={{ color: '#f59e0b' }}>
+                                              Parcela {child.parcela_numero || (idx + 1)} de {totalParcelas}
+                                            </strong>
+                                            {child.observacoes && (
+                                              <span style={{ display: 'block', fontSize: '0.72rem', color: '#777', fontStyle: 'italic' }}>
+                                                {child.observacoes}
+                                              </span>
+                                            )}
+                                          </td>
+
+                                          <td style={{ padding: '10px 14px', color: '#ccc' }}>
+                                            📅 {formatDate(child.data_vencimento)}
+                                          </td>
+
+                                          <td style={{ padding: '10px 14px', fontWeight: 'bold', color: isPago ? '#10b981' : '#f59e0b' }}>
+                                            {formatCurrency(valExib)}
+                                          </td>
+
+                                          <td style={{ padding: '10px 14px' }}>
+                                            <span style={{
+                                              background: compChild.bg,
+                                              color: compChild.color,
+                                              border: `1px solid ${compChild.border}`,
+                                              padding: '3px 8px',
+                                              borderRadius: '5px',
+                                              fontSize: '0.75rem',
+                                              fontWeight: 'bold',
+                                              display: 'inline-block'
+                                            }}>
+                                              {compChild.label}
+                                            </span>
+                                          </td>
+
+                                          <td style={{ padding: '10px 14px', color: '#aaa', fontSize: '0.75rem' }}>
+                                            {isPago ? (
+                                              <div>
+                                                <span style={{ color: '#10b981', display: 'block' }}>
+                                                  Pago em: {formatDate(child.data_pagamento || hojeStr)}
+                                                </span>
+                                                <span>
+                                                  {child.metodo_pagamento || 'PIX'} • {child.conta_destino || 'KADOSH'}
+                                                </span>
+                                              </div>
+                                            ) : (
+                                              <span style={{ color: '#666' }}>Aguardando baixa</span>
+                                            )}
+                                          </td>
+
+                                          <td style={{ padding: '10px 14px', textAlign: 'right' }}>
+                                            <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                                              <button
+                                                onClick={() => handleToggleStatusQuick(child)}
+                                                style={{
+                                                  padding: '5px 10px',
+                                                  background: isPago ? '#262626' : '#10b981',
+                                                  color: isPago ? '#aaa' : '#000',
+                                                  border: 'none',
+                                                  borderRadius: '5px',
+                                                  cursor: 'pointer',
+                                                  fontWeight: 'bold',
+                                                  fontSize: '0.75rem'
+                                                }}
+                                                title={isPago ? 'Reabrir pendência desta parcela' : 'Dar baixa nesta parcela (lança saída no Caixa)'}
+                                              >
+                                                {isPago ? '↩️ Reabrir' : '✅ Pagar'}
+                                              </button>
+
+                                              <button
+                                                onClick={() => handleOpenModal(child)}
+                                                style={{ padding: '5px 8px', background: '#333', border: 'none', borderRadius: '5px', color: '#fff', cursor: 'pointer', fontSize: '0.75rem' }}
+                                                title="Editar data ou valor desta parcela específica"
+                                              >
+                                                ✏️
+                                              </button>
+
+                                              <button
+                                                onClick={() => handleDeleteGasto(child)}
+                                                style={{ padding: '5px 8px', background: '#ef444415', border: '1px solid #ef444444', borderRadius: '5px', color: '#ef4444', cursor: 'pointer', fontSize: '0.75rem' }}
+                                                title="Excluir apenas esta parcela"
+                                              >
+                                                🗑️
+                                              </button>
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  }
+
+                  // =========================================================================
+                  // RENDERIZAÇÃO 2: GASTO FIXO SIMPLES / STANDALONE (SEM PARCELAMENTO)
+                  // =========================================================================
+                  const item = entry.item;
                   const compStatus = getComputedStatus(item);
-                  const valorExibicao = item.status === 'pago' && item.valor_pago_real !== undefined ? item.valor_pago_real : item.valor;
+                  const valorExibicao = item.status === 'pago' && item.valor_pago_real !== undefined && item.valor_pago_real !== null ? item.valor_pago_real : item.valor;
                   const diffFinal = item.data_final ? getDaysDiff(item.data_final) : null;
                   const isFinalAlerta = diffFinal !== null && diffFinal >= 0 && diffFinal <= 7;
 
@@ -757,7 +1696,7 @@ export default function GastosFixos() {
                           </button>
 
                           <button
-                            onClick={() => handleDeleteGasto(item.id, item.descricao)}
+                            onClick={() => handleDeleteGasto(item)}
                             style={{ padding: '6px 10px', background: '#ef444420', border: '1px solid #ef4444', borderRadius: '6px', cursor: 'pointer', color: '#ef4444', fontWeight: 'bold', fontSize: '0.78rem' }}
                             title="Excluir Gasto Fixo"
                           >
@@ -774,7 +1713,7 @@ export default function GastosFixos() {
         )}
       </div>
 
-      {/* Modal de Cadastro / Edição de Gasto Fixo */}
+      {/* Modal de Cadastro / Edição de Gasto Fixo / Parcelamento */}
       {showModal && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -783,13 +1722,13 @@ export default function GastosFixos() {
           zIndex: 9999, padding: '20px'
         }}>
           <div style={{
-            maxWidth: '650px', width: '100%', background: '#121216',
+            maxWidth: '680px', width: '100%', background: '#121216',
             border: '1px solid #333', borderRadius: '16px', padding: '25px', color: '#fff',
             maxHeight: '90vh', overflowY: 'auto'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #222', paddingBottom: '12px' }}>
               <h3 style={{ margin: 0, color: '#f59e0b', fontSize: '1.2rem' }}>
-                {editingGasto ? '✏️ Editar Gasto Fixo' : '📌 Cadastrar Novo Gasto Fixo'}
+                {editingGasto ? '✏️ Editar Gasto' : '📌 Cadastrar Novo Gasto / Parcelamento'}
               </h3>
               <button onClick={() => setShowModal(false)} style={{ background: 'transparent', color: '#ef4444', border: 'none', fontSize: '1.3rem', cursor: 'pointer' }}>
                 ✕
@@ -797,11 +1736,61 @@ export default function GastosFixos() {
             </div>
 
             <form onSubmit={handleSaveGasto}>
+              {/* Seletor de Tipo de Gasto: Simples vs Parcelado */}
+              {!editingGasto && (
+                <div style={{ marginBottom: '18px', background: '#1c1c24', padding: '12px', borderRadius: '10px', border: '1px solid #333' }}>
+                  <label style={{ fontSize: '0.82rem', color: '#aaa', display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+                    Tipo de Lançamento:
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setTipoCadastro('simples')}
+                      style={{
+                        padding: '10px',
+                        borderRadius: '8px',
+                        border: tipoCadastro === 'simples' ? '2px solid #3b82f6' : '1px solid #444',
+                        background: tipoCadastro === 'simples' ? '#3b82f620' : '#141418',
+                        color: tipoCadastro === 'simples' ? '#60a5fa' : '#aaa',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        fontSize: '0.82rem'
+                      }}
+                    >
+                      🔄 Gasto Recorrente Contínuo
+                      <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 'normal', marginTop: '2px', color: '#888' }}>
+                        (Ex: Aluguel, Energia, Internet)
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setTipoCadastro('parcelado')}
+                      style={{
+                        padding: '10px',
+                        borderRadius: '8px',
+                        border: tipoCadastro === 'parcelado' ? '2px solid #f59e0b' : '1px solid #444',
+                        background: tipoCadastro === 'parcelado' ? '#f59e0b20' : '#141418',
+                        color: tipoCadastro === 'parcelado' ? '#f59e0b' : '#aaa',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        fontSize: '0.82rem'
+                      }}
+                    >
+                      📁 Parcelamento / Parcela Mãe
+                      <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 'normal', marginTop: '2px', color: '#888' }}>
+                        (Ex: Equipamento em 3x ou até Mês 12)
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div style={{ marginBottom: '15px' }}>
                 <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Descrição da Despesa / Nome da Conta *</label>
                 <input 
                   type="text" 
-                  placeholder="Ex: Aluguel do Galpão, Conta de Energia (Enel), Sistema Kadosh" 
+                  placeholder="Ex: Financiamento Elevador, Aluguel do Galpão, Seguro Oficina" 
                   value={descricao} 
                   onChange={e => setDescricao(e.target.value)} 
                   style={inputStyle} 
@@ -820,45 +1809,136 @@ export default function GastosFixos() {
                 </div>
 
                 <div>
-                  <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Valor Estimado ou Fixo (R$)</label>
+                  <label style={{ fontSize: '0.8rem', color: '#aaa' }}>
+                    {tipoCadastro === 'parcelado' ? 'Valor de Cada Parcela (R$) *' : 'Valor Estimado ou Fixo (R$) *'}
+                  </label>
                   <input 
                     type="number" step="0.01" 
-                    placeholder="0.00 (Ex: Se for variável como energia, coloque uma estimativa ou 0)" 
+                    placeholder="0.00" 
                     value={valor} 
                     onChange={e => setValor(e.target.value)} 
                     style={{ ...inputStyle, color: '#10b981', fontWeight: 'bold' }} 
+                    required
                   />
-                  <span style={{ fontSize: '0.7rem', color: '#777' }}>Para Energia/Água, você poderá digitar o valor exato no momento de pagar!</span>
                 </div>
               </div>
 
+              {/* Se for Parcelamento: opções de definição de término (Data Final ou Qtd Parcelas) */}
+              {tipoCadastro === 'parcelado' && !editingGasto && (
+                <div style={{ background: '#17171e', padding: '14px', borderRadius: '10px', border: '1px solid #f59e0b44', marginBottom: '15px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <label style={{ fontSize: '0.82rem', color: '#f59e0b', fontWeight: 'bold' }}>
+                      Definição do Parcelamento:
+                    </label>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <label style={{ fontSize: '0.78rem', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <input
+                          type="radio"
+                          name="modoParcelas"
+                          checked={modoParcelas === 'data_final'}
+                          onChange={() => setModoParcelas('data_final')}
+                        />
+                        Até Data Final (Ex: Mês 12)
+                      </label>
+                      <label style={{ fontSize: '0.78rem', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <input
+                          type="radio"
+                          name="modoParcelas"
+                          checked={modoParcelas === 'qtd_parcelas'}
+                          onChange={() => setModoParcelas('qtd_parcelas')}
+                        />
+                        Por Quantidade de Parcelas (Ex: 12x)
+                      </label>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                    <div>
+                      <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Data da 1ª Parcela (Início) *</label>
+                      <input 
+                        type="date" 
+                        value={dataVencimento} 
+                        onChange={e => setDataVencimento(e.target.value)} 
+                        style={inputStyle} 
+                        required 
+                      />
+                    </div>
+
+                    {modoParcelas === 'data_final' ? (
+                      <div>
+                        <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Data Final Limite (Última Parcela) *</label>
+                        <input 
+                          type="date" 
+                          value={dataFinal} 
+                          onChange={e => setDataFinal(e.target.value)} 
+                          style={inputStyle} 
+                          required 
+                        />
+                      </div>
+                    ) : (
+                      <div>
+                        <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Quantidade de Parcelas *</label>
+                        <input 
+                          type="number" 
+                          min="2" max="120"
+                          value={qtdParcelas} 
+                          onChange={e => setQtdParcelas(e.target.value)} 
+                          style={inputStyle} 
+                          required 
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Prévia dinâmica das parcelas */}
+                  {datasPrevia.length > 0 && (
+                    <div style={{ marginTop: '12px', background: '#0a0a0d', padding: '10px', borderRadius: '8px', border: '1px solid #333' }}>
+                      <span style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>
+                        📁 Prévia: Serão criadas {datasPrevia.length} parcelas sob a Parcela Mãe (Total: {formatCurrency((parseFloat(valor) || 0) * datasPrevia.length)}):
+                      </span>
+                      <div style={{ maxHeight: '100px', overflowY: 'auto', fontSize: '0.75rem', color: '#ccc', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                        {datasPrevia.map((dt, i) => (
+                          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 4px', borderBottom: '1px dashed #222' }}>
+                            <span>• Parcela {i + 1} de {datasPrevia.length}:</span>
+                            <span style={{ color: '#f59e0b' }}>{formatDate(dt)}</span>
+                            <span style={{ color: '#10b981' }}>{formatCurrency(parseFloat(valor) || 0)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Se for Gasto Simples: campos normais */}
+              {(tipoCadastro === 'simples' || editingGasto) && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
+                  <div>
+                    <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Data de Vencimento *</label>
+                    <input 
+                      type="date" 
+                      value={dataVencimento} 
+                      onChange={e => setDataVencimento(e.target.value)} 
+                      style={inputStyle} 
+                      required 
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Data Final de Término (Opcional)</label>
+                    <input 
+                      type="date" 
+                      value={dataFinal} 
+                      onChange={e => setDataFinal(e.target.value)} 
+                      style={inputStyle} 
+                    />
+                  </div>
+                </div>
+              )}
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
                 <div>
-                  <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Data de Vencimento / Pagamento *</label>
-                  <input 
-                    type="date" 
-                    value={dataVencimento} 
-                    onChange={e => setDataVencimento(e.target.value)} 
-                    style={inputStyle} 
-                    required 
-                  />
-                </div>
-
-                <div>
-                  <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Data Final de Término (Opcional)</label>
-                  <input 
-                    type="date" 
-                    value={dataFinal} 
-                    onChange={e => setDataFinal(e.target.value)} 
-                    style={inputStyle} 
-                  />
-                  <span style={{ fontSize: '0.7rem', color: '#777' }}>Avisa no e-mail 7 dias antes do término.</span>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
-                <div>
-                  <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Recorrência Personalizada</label>
+                  <label style={{ fontSize: '0.8rem', color: '#aaa' }}>Recorrência</label>
                   <select value={recorrencia} onChange={e => setRecorrencia(e.target.value)} style={inputStyle}>
                     {RECORRENCIAS.map(r => (
                       <option key={r.id} value={r.id}>{r.label}</option>
@@ -891,7 +1971,7 @@ export default function GastosFixos() {
                   Cancelar
                 </button>
                 <button type="submit" className="btn" style={{ background: '#f59e0b', color: '#000', fontWeight: 'bold' }}>
-                  💾 Salvar Gasto Fixo
+                  💾 {editingGasto ? 'Salvar Alterações' : (tipoCadastro === 'parcelado' ? `Gerar ${datasPrevia.length} Parcelas Agrupadas` : 'Salvar Gasto Fixo')}
                 </button>
               </div>
             </form>
@@ -913,7 +1993,7 @@ export default function GastosFixos() {
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '1px solid #222', paddingBottom: '10px' }}>
               <h3 style={{ margin: 0, color: '#10b981', fontSize: '1.15rem' }}>
-                ✅ Confirmar Pagamento do Gasto Fixo
+                ✅ Confirmar Pagamento do Gasto
               </h3>
               <button onClick={() => setPayingGasto(null)} style={{ background: 'transparent', color: '#aaa', border: 'none', fontSize: '1.3rem', cursor: 'pointer' }}>
                 ✕
@@ -940,7 +2020,7 @@ export default function GastosFixos() {
                   required 
                 />
                 <span style={{ fontSize: '0.75rem', color: '#aaa', marginTop: '6px', display: 'block' }}>
-                  💡 Para contas variáveis (Energia, Água, Telefone), altere o valor exato cobrado na fatura deste mês!
+                  💡 Para contas com variações (Energia, Água, etc.), digite o valor exato cobrado na fatura!
                 </span>
 
                 <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px', borderTop: '1px dashed #10b98144', paddingTop: '8px' }}>
@@ -988,6 +2068,96 @@ export default function GastosFixos() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Informativo e Copiador do Script SQL do Supabase */}
+      {showSqlModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)',
+          display: 'flex', justifyContent: 'center', alignItems: 'center',
+          zIndex: 9999, padding: '20px'
+        }}>
+          <div style={{
+            maxWidth: '720px', width: '100%', background: '#121216',
+            border: '1px solid #333', borderRadius: '16px', padding: '25px', color: '#fff',
+            maxHeight: '90vh', overflowY: 'auto'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '1px solid #222', paddingBottom: '10px' }}>
+              <h3 style={{ margin: 0, color: '#3b82f6', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                ⚡ Configurar Sincronização no Supabase
+              </h3>
+              <button onClick={() => setShowSqlModal(false)} style={{ background: 'transparent', color: '#ef4444', border: 'none', fontSize: '1.3rem', cursor: 'pointer' }}>
+                ✕
+              </button>
+            </div>
+
+            <p style={{ color: '#ccc', fontSize: '0.88rem', lineHeight: '1.5', margin: '0 0 15px 0' }}>
+              Para que os <strong>Gastos Fixos e Parcelas</strong> sejam sincronizados automaticamente entre todos os administradores (seja no computador ou celular) e atualizados em tempo real sem precisar de F5, execute o script abaixo no Supabase:
+            </p>
+
+            <ol style={{ color: '#aaa', fontSize: '0.84rem', lineHeight: '1.6', margin: '0 0 15px 0', paddingLeft: '20px' }}>
+              <li>Acesse o painel do seu projeto no Supabase (<a href="https://supabase.com/dashboard" target="_blank" rel="noopener noreferrer" style={{ color: '#60a5fa' }}>supabase.com/dashboard</a>).</li>
+              <li>No menu lateral esquerdo, clique em <strong>SQL Editor</strong>.</li>
+              <li>Cole o código SQL abaixo e clique no botão verde <strong>RUN</strong>.</li>
+              <li>Pronto! O sistema passará a sincronizar todos os dispositivos instantaneamente.</li>
+            </ol>
+
+            <div style={{ position: 'relative', marginBottom: '15px' }}>
+              <pre style={{
+                background: '#09090c',
+                border: '1px solid #2a2a35',
+                borderRadius: '8px',
+                padding: '14px',
+                fontSize: '0.78rem',
+                color: '#a5f3fc',
+                maxHeight: '260px',
+                overflowY: 'auto',
+                whiteSpace: 'pre-wrap'
+              }}>
+                {SQL_SCRIPT}
+              </pre>
+              <button
+                onClick={copySqlToClipboard}
+                style={{
+                  position: 'absolute',
+                  top: '10px',
+                  right: '10px',
+                  background: copiedSql ? '#10b981' : '#3b82f6',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '6px 14px',
+                  borderRadius: '6px',
+                  fontWeight: 'bold',
+                  fontSize: '0.78rem',
+                  cursor: 'pointer'
+                }}
+              >
+                {copiedSql ? '✅ Copiado!' : '📋 Copiar Código SQL'}
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                onClick={() => {
+                  fetchGastos();
+                  setShowSqlModal(false);
+                }}
+                className="btn"
+                style={{ background: '#10b981', color: '#000', fontWeight: 'bold' }}
+              >
+                🔄 Já Executei no Supabase (Atualizar Conexão)
+              </button>
+              <button
+                onClick={() => setShowSqlModal(false)}
+                className="btn"
+                style={{ background: '#333', color: '#fff' }}
+              >
+                Fechar
+              </button>
+            </div>
           </div>
         </div>
       )}

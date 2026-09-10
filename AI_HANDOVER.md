@@ -421,3 +421,6 @@ npm run dev
 4. **Regra "OU" no histórico do cliente**: Mostra orçamentos com `cliente_id = meu_id` OU (`cliente_id IS NULL` AND placa é minha). Permite reivindicar orçamentos feitos como anônimo antes do cadastro.
 5. **E-mail de notificação fire-and-forget**: O `BudgetForm` dispara o `fetch` para `/api/send-budget-notification` sem `await` — o sucesso do insert não depende do e-mail ser enviado.
 6. **CPF validado localmente**: Não consulta Receita Federal (precisaria API paga). Só valida algoritmicamente os dígitos verificadores — suficiente para evitar erros de digitação.
+7. **Gastos Fixos & Parcela Mãe (Parent-Child)**: Gastos parcelados ou contínuos com data final geram um registro pai (`is_parent: true`) e N registros filhos (`parent_id: pai.id`). Na UI, a lista é compactada exibindo apenas a Parcela Mãe, com sanfona expansível (accordion) que desce e mostra todas as parcelas filhas ao clicar.
+8. **Sincronização Multi-Dispositivos**: O componente `GastosFixos.jsx` opera conectado diretamente ao Supabase com fallback gracioso para `localStorage`, incluindo canal `supabase_realtime` e script dedicado `frontend/setup_gastos_fixos.sql`.
+

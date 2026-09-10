@@ -548,4 +548,31 @@ Botão fica `disabled` se o cliente não tem nenhum veículo cadastrado, com tex
 2. **Inputs Flexíveis (`type="text" inputMode="decimal"`)**: Substituição do `type="number"` nos campos de valor em `DirectBudgetModal.jsx` e `EditBudgetModal.jsx`.
 3. **Imutabilidade e Reatividade**: Atualização das tabelas de peças e serviços com `prev.map` garantindo recálculo automático instantâneo dos subtotais, comissões de mecânicos e total geral.
 
+### 2026-09-10 — Sincronização de Gastos Fixos no Supabase & Agrupamento em Parcela Mãe (Accordion)
+
+**Contexto**: O cliente questionou se os gastos fixos estavam sendo sincronizados no Supabase para visualização entre diferentes computadores e celulares, e solicitou que despesas contínuas/parceladas até determinada data (ex: mês 10 a 12) sejam agrupadas dentro da "Parcela Mãe", abrindo uma sanfona (accordion) ao clicar para mostrar todas as parcelas filhas com seus respectivos vencimentos.
+
+**Diagnóstico & Causa**:
+- A tabela `public.gastos_fixos` não existia no banco de dados do Supabase. Como resultado, o componente `GastosFixos.jsx` acionava o fallback silencioso e salvava os dados apenas no `localStorage` do navegador local, impossibilitando que outros computadores ou celulares dos administradores visualizassem os mesmos gastos.
+
+**Implementação**:
+1. **Script SQL do Banco de Dados (`frontend/setup_gastos_fixos.sql`)**:
+   - Criação da tabela `public.gastos_fixos` com suporte nativo a parentesco (`parent_id REFERENCES public.gastos_fixos(id) ON DELETE CASCADE`, `is_parent BOOLEAN`, `parcela_numero`, `total_parcelas`, etc.).
+   - Índices de performance para busca por `parent_id`, `data_vencimento`, `status` e `categoria`.
+   - Políticas RLS completas e inclusão na publicação `supabase_realtime` para atualização automática sem F5 em todos os aparelhos.
+2. **Geração Automática de Parcelas & Parcela Mãe (`GastosFixos.jsx`)**:
+   - Seletor de Tipo no modal: Gasto Fixo Contínuo Simples vs. Parcelamento / Parcela Mãe.
+   - Cálculo automático por Data Final ou Quantidade de Parcelas para todas as recorrências (`mensal`, `semanal`, `quinzenal`, `trimestral`, `semestral`, `anual`), com tratamento preciso para virada de mês/ano e meses com 28/30/31 dias.
+   - Prévia dinâmica com lista de datas e valores antes de salvar.
+   - Criação simultânea do registro pai (`is_parent: true`) e de todos os registros filhos vinculados (`parent_id: pai.id`).
+3. **Visualização em Sanfona (Accordion) na Tabela**:
+   - A tabela principal exibe apenas a linha limpa da **Parcela Mãe** com badges consolidados (`X de Y parcelas pagas`, progresso percentual, próximo vencimento pendente e valor total).
+   - Ao clicar na linha ou no botão **`▼ Ver X Parcelas`**, a linha desce em formato de sanfona exibindo a sub-tabela com todas as parcelas filhas.
+   - Cada parcela filha possui suas próprias ações individuais (`✅ Pagar` com valor real lançado no Caixa, `✏️ Editar` e `🗑️ Excluir`).
+   - Botões globais `Expandir Todas` / `Recolher Todas`.
+4. **Assistente de Diagnóstico e Sincronização**:
+   - Detecção em tempo real se a tabela existe no Supabase.
+   - Banner de alerta caso a tabela ainda não tenha sido criada, com modal para copiar o código SQL em 1 clique e botão de migração automática dos dados salvos no cache local para o Supabase.
+
+
 
