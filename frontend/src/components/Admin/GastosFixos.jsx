@@ -167,19 +167,28 @@ export default function GastosFixos() {
           setGastos([]);
         }
       } else {
-        const list = data || [];
-        // Se houver dados locais não salvos no Supabase, sincroniza silenciosamente
+        let list = Array.isArray(data) ? [...data] : [];
+        // Se houver dados locais naquele computador, preserva e sincroniza silenciosamente para o Supabase
         try {
           const localStr = localStorage.getItem(STORAGE_KEY);
           if (localStr) {
             const localList = JSON.parse(localStr);
-            const pendentes = localList.filter(l => !list.some(d => d.id === l.id));
-            if (pendentes.length > 0) {
-              await supabase.from('gastos_fixos').upsert(pendentes, { onConflict: 'id' });
-              list.push(...pendentes);
+            if (Array.isArray(localList) && localList.length > 0) {
+              const pendentes = localList.filter(l => !list.some(d => d.id === l.id));
+              if (pendentes.length > 0) {
+                try {
+                  await supabase.from('gastos_fixos').upsert(pendentes, { onConflict: 'id' });
+                } catch (errUp) {
+                  console.warn('Tentativa de sincronização com Supabase pendente:', errUp);
+                }
+                // Mescla os pendentes para que NADA seja perdido na visualização ou no cache local
+                list = [...list, ...pendentes];
+              }
             }
           }
-        } catch (eSync) {}
+        } catch (eSync) {
+          console.warn('Erro ao mesclar dados locais:', eSync);
+        }
 
         setGastos(list);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
