@@ -612,6 +612,22 @@ Botão fica `disabled` se o cliente não tem nenhum veículo cadastrado, com tex
    - `fetchGastos` executa `deduplicarGastos` e remove imediatamente IDs obsoletos do banco e do `localStorage`.
    - `useMemo(groupedList)` possui trava defensiva por data e ID para blindar 100% a renderização na tela contra duplicatas em qualquer cenário.
 
+### 2026-09-10 — Eliminação do Loop Infinito de Recarregamento (Realtime Echo)
+
+**Contexto**: O cliente relatou que o sistema estava "meio bugado, atualizando e tentando recarregar sem parar".
+
+**Causa Raiz**:
+- Dentro da função de leitura `fetchGastos()`, havia uma chamada de `upsert(listFinal)` de volta ao Supabase.
+- Como o canal Realtime escutava qualquer alteração (`postgres_changes`) na tabela `gastos_fixos`, o próprio `upsert` gerado pelo `fetchGastos()` disparava um evento de alteração, que chamava `fetchGastos()` novamente, criando um **loop infinito de rede e renderização com piscar de tela (`setLoading(true)`)**.
+
+**Correções Implementadas**:
+1. **Remoção do Upsert Recursivo**:
+   - `fetchGastos` agora é estritamente uma operação de leitura, enviando para o banco apenas itens locais genuinamente pendentes (`pendentesParaSubir`), sem nunca reescrever a lista inteira.
+2. **Debounce e Atualização Silenciosa no Realtime**:
+   - Adicionado `debounceTimer` de 800ms para unificar eventos concorrentes de rede.
+   - Chamadas subsequentes vindas do Realtime passam `showSpinner = false`, atualizando a tabela de forma suave e silenciosa sem piscar a tela ou exibir loading.
+
+
 
 
 

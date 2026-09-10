@@ -449,8 +449,8 @@ export default function GastosFixos() {
   };
 
   // Carregar Gastos Fixos e Aplicar Conceito da Pasta Mãe Universal
-  const fetchGastos = async () => {
-    setLoading(true);
+  const fetchGastos = async (showSpinner = true) => {
+    if (showSpinner) setLoading(true);
     try {
       const { data, error } = await supabase
         .from('gastos_fixos')
@@ -462,14 +462,18 @@ export default function GastosFixos() {
         baseList = [...data];
       }
 
-      // Mescla com dados locais daquele computador caso haja algo pendente
+      // Mescla com dados locais daquele computador apenas se houver algo pendente não existente no banco
+      let pendentesParaSubir = [];
       try {
         const localStr = localStorage.getItem(STORAGE_KEY);
         if (localStr) {
           const localList = JSON.parse(localStr);
           if (Array.isArray(localList) && localList.length > 0) {
             const pendentes = localList.filter(l => l && l.id && !baseList.some(d => d.id === l.id));
-            baseList = [...baseList, ...pendentes];
+            if (pendentes.length > 0) {
+              baseList = [...baseList, ...pendentes];
+              pendentesParaSubir = pendentes;
+            }
           }
         }
       } catch (eLocal) {}
@@ -482,17 +486,18 @@ export default function GastosFixos() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(listFinal));
       checkAndSendDailyAlert(listFinal);
 
-      // Deletar do Supabase IDs legados obsoletos/duplicados
+      // Deletar do Supabase IDs legados obsoletos/duplicados se houver
       if (!error && idsParaRemover.length > 0) {
         try {
           await supabase.from('gastos_fixos').delete().in('id', idsParaRemover);
         } catch (eDel) {}
       }
 
-      // Sincroniza silenciosamente com o Supabase
-      if (!error && listFinal.length > 0) {
+      // APENAS insere no Supabase se houver itens locais pendentes que não existiam no banco.
+      // NUNCA fazer upsert da lista inteira dentro do fetch, para evitar loop de Realtime!
+      if (!error && pendentesParaSubir.length > 0) {
         try {
-          await supabase.from('gastos_fixos').upsert(listFinal, { onConflict: 'id' });
+          await supabase.from('gastos_fixos').upsert(pendentesParaSubir, { onConflict: 'id' });
         } catch (eUp) {}
       }
     } catch (err) {
@@ -509,7 +514,7 @@ export default function GastosFixos() {
         } catch (eLocalParse) {}
       }
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
     }
   };
 
@@ -576,18 +581,23 @@ export default function GastosFixos() {
     }
   };
 
-  // Inscrição Realtime no Supabase
+  // Inscrição Realtime no Supabase (com debounce de 800ms e atualização silenciosa sem piscar a tela)
   useEffect(() => {
-    fetchGastos();
+    fetchGastos(true);
 
+    let debounceTimer = null;
     const channel = supabase
       .channel('gastos_fixos_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'gastos_fixos' }, () => {
-        fetchGastos();
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          fetchGastos(false);
+        }, 800);
       })
       .subscribe();
 
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       supabase.removeChannel(channel);
     };
   }, []);
