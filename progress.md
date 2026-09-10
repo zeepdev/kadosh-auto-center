@@ -591,6 +591,28 @@ Botão fica `disabled` se o cliente não tem nenhum veículo cadastrado, com tex
 3. **Ações da Pasta**:
    - Botão rápido `+ Próxima Parcela/Ocorrência` no rodapé da sanfona para estender prazos com 1 clique.
 
+### 2026-09-10 — Eliminação Definitiva de Duplicatas e Higienização de Pastas Mãe
+
+**Contexto**: O cliente identificou que ocorrências de uma mesma despesa (ex: `SEMANA RAFAEL`) apareciam duplicadas na visualização expandida (`Semana 1 de 38`, `Semana 1 de 38`, etc.).
+
+**Causa Raiz**:
+- Registros legados antigos avulsos (`gasto_1789052753708` e `gasto_1789052858123`) continuavam persistidos no banco após a primeira migração.
+- Ao carregar a página, a rotina de migração identificava esses itens avulsos como "não migrados" e gerava novamente um conjunto idêntico de ocorrências filhas, somando 19 + 19 = 38 ocorrências no `localStorage` e na memória.
+
+**Correções Implementadas**:
+1. **Higienização e Limpeza do Banco (Supabase)**:
+   - Deletados do banco de dados os 2 registros avulsos legados que já possuíam Pastas Mãe ativas.
+   - O Supabase agora possui exatamente 56 registros (6 Pastas Mãe e 50 parcelas filhas) com 0 duplicatas.
+2. **Motor de Desduplicação Rigorosa (`deduplicarGastos`)**:
+   - Desduplica qualquer item com mesmo ID (mantendo o que tem status de pagamento ou atualização mais recente).
+   - Descarta lançamentos avulsos soltos caso já exista uma Pasta Mãe oficial cadastrada com o mesmo nome e categoria.
+   - Impede e elimina ocorrências filhas duplicadas com mesma data de vencimento sob o mesmo pai, preservando histórico de pagamentos.
+   - Recalcula e renumera todas as ocorrências de forma estritamente sequencial (`1..total`).
+3. **Proteção no Carregamento e Renderização**:
+   - `fetchGastos` executa `deduplicarGastos` e remove imediatamente IDs obsoletos do banco e do `localStorage`.
+   - `useMemo(groupedList)` possui trava defensiva por data e ID para blindar 100% a renderização na tela contra duplicatas em qualquer cenário.
+
+
 
 
 

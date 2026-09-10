@@ -89,14 +89,155 @@ function gerarListaDatasParcelas(dataInicio, modo, dataFinal, qtdParcelas, recor
   return datas;
 }
 
-// MIGRAÇÃO AUTOMÁTICA UNIVERSAL: TRANSFORMA TODOS OS GASTOS (INCLUSIVE LEGADOS) EM PASTAS MÃE
+// LIMPA SUFIXOS DE PARCELAS / OCORRÊNCIAS
+function limparNomeGasto(nome) {
+  if (!nome) return '';
+  return nome
+    .replace(/\s*-\s*parcela\s*\d+/gi, '')
+    .replace(/\s*\((semana|quinzena|parcela|trimestre|semestre|ano|ocorrência)\s*\d+.*\)/gi, '')
+    .trim();
+}
+
+// DESDUPLICAÇÃO RIGOROSA DE GASTOS: REMOVE QUALQUER DUPLICATA POR ID, VENCIMENTO OU NOME
+function deduplicarGastos(lista) {
+  if (!Array.isArray(lista) || lista.length === 0) return [];
+
+  // 1. Desduplicação estrita por ID único
+  const porId = new Map();
+  lista.forEach(item => {
+    if (!item || !item.id) return;
+    if (!porId.has(item.id)) {
+      porId.set(item.id, item);
+    } else {
+      const existente = porId.get(item.id);
+      if (item.status === 'pago' && existente.status !== 'pago') {
+        porId.set(item.id, item);
+      } else if (item.valor_pago_real !== undefined && item.valor_pago_real !== null && (existente.valor_pago_real === undefined || existente.valor_pago_real === null)) {
+        porId.set(item.id, item);
+      } else if ((item.updated_at || '') > (existente.updated_at || '')) {
+        porId.set(item.id, item);
+      }
+    }
+  });
+
+  const itensUnicos = Array.from(porId.values());
+
+  // 2. Identificar Pastas Mãe existentes
+  const paisMap = new Map();
+  itensUnicos.forEach(item => {
+    if (item.is_parent) {
+      if (!paisMap.has(item.id)) {
+        paisMap.set(item.id, item);
+      }
+    }
+  });
+
+  // Mapear pais por chave única (nome limpo + categoria)
+  const paisPorNomeCat = new Map();
+  paisMap.forEach(pai => {
+    const k = `${limparNomeGasto(pai.descricao).toLowerCase()}::${(pai.categoria || '').toLowerCase()}`;
+    if (!paisPorNomeCat.has(k)) {
+      paisPorNomeCat.set(k, pai);
+    }
+  });
+
+  // 3. Descartar itens soltos que são duplicatas de Pastas Mãe já criadas
+  const itensValidos = itensUnicos.filter(item => {
+    if (!item.is_parent && !item.parent_id) {
+      const k = `${limparNomeGasto(item.descricao).toLowerCase()}::${(item.categoria || '').toLowerCase()}`;
+      if (paisPorNomeCat.has(k)) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  // 4. Desduplicar filhos por (parent_id + data_vencimento)
+  const filhosPorPai = new Map();
+  const outrosItens = [];
+
+  itensValidos.forEach(item => {
+    if (item.parent_id) {
+      if (!filhosPorPai.has(item.parent_id)) {
+        filhosPorPai.set(item.parent_id, new Map());
+      }
+      const dataMap = filhosPorPai.get(item.parent_id);
+      const dataKey = item.data_vencimento || `venc_${item.parcela_numero || Math.random()}`;
+
+      if (!dataMap.has(dataKey)) {
+        dataMap.set(dataKey, item);
+      } else {
+        const anterior = dataMap.get(dataKey);
+        if (item.status === 'pago' && anterior.status !== 'pago') {
+          dataMap.set(dataKey, item);
+        } else if (item.valor_pago_real !== undefined && item.valor_pago_real !== null && (anterior.valor_pago_real === undefined || anterior.valor_pago_real === null)) {
+          dataMap.set(dataKey, item);
+        }
+      }
+    } else {
+      outrosItens.push(item);
+    }
+  });
+
+  // 5. Reorganizar e renumerar os filhos de cada pai corretamente
+  const filhosCorrigidos = [];
+  const paisAtualizados = new Map();
+
+  filhosPorPai.forEach((dataMap, parentId) => {
+    const listaFilhos = Array.from(dataMap.values()).sort((a, b) => 
+      (a.data_vencimento || '').localeCompare(b.data_vencimento || '')
+    );
+    const total = listaFilhos.length;
+
+    const pai = paisMap.get(parentId);
+    const rec = (pai?.recorrencia) || (listaFilhos[0]?.recorrencia) || 'mensal';
+    const recObj = RECORRENCIAS.find(r => r.id === rec) || RECORRENCIAS[0];
+    const labelOcorrencia = recObj.labelOcorrencia;
+    const nomeBase = pai?.descricao ? limparNomeGasto(pai.descricao) : (listaFilhos[0]?.descricao ? limparNomeGasto(listaFilhos[0].descricao) : 'Gasto');
+
+    listaFilhos.forEach((filho, idx) => {
+      const num = idx + 1;
+      filhosCorrigidos.push({
+        ...filho,
+        parcela_numero: num,
+        total_parcelas: total,
+        descricao: `${nomeBase} (${labelOcorrencia} ${num}/${total})`
+      });
+    });
+
+    if (pai) {
+      paisAtualizados.set(parentId, {
+        ...pai,
+        total_parcelas: total,
+        data_final: listaFilhos[total - 1]?.data_vencimento || pai.data_final
+      });
+    }
+  });
+
+  const resultado = outrosItens.map(item => {
+    if (item.is_parent && paisAtualizados.has(item.id)) {
+      return paisAtualizados.get(item.id);
+    }
+    return item;
+  }).concat(filhosCorrigidos);
+
+  return resultado;
+}
+
+// MIGRAÇÃO AUTOMÁTICA UNIVERSAL: TRANSFORMA TODOS OS GASTOS LEGADOS EM PASTAS MÃE
 function migrarTodosParaPastaMae(listaOriginal) {
-  if (!Array.isArray(listaOriginal) || listaOriginal.length === 0) return [];
+  if (!Array.isArray(listaOriginal) || listaOriginal.length === 0) {
+    return { lista: [], idsParaRemover: [] };
+  }
+
+  // Desduplicação inicial para garantir lista sã
+  const baseDeduplicada = deduplicarGastos(listaOriginal);
 
   const jaMigrados = [];
   const legados = [];
+  const idsParaRemover = [];
 
-  listaOriginal.forEach(item => {
+  baseDeduplicada.forEach(item => {
     if (item.is_parent || item.parent_id) {
       jaMigrados.push(item);
     } else {
@@ -104,19 +245,34 @@ function migrarTodosParaPastaMae(listaOriginal) {
     }
   });
 
-  if (legados.length === 0) return listaOriginal;
+  if (legados.length === 0) {
+    return { lista: baseDeduplicada, idsParaRemover: [] };
+  }
+
+  // Mapear pais já existentes para nunca duplicar
+  const paisExistentesPorChave = new Set(
+    jaMigrados
+      .filter(it => it.is_parent)
+      .map(it => `${limparNomeGasto(it.descricao).toLowerCase()}::${(it.categoria || '').toLowerCase()}`)
+  );
 
   // Agrupar itens legados por nome base limpo + categoria
   const gruposLegados = {};
   legados.forEach(item => {
-    const nomeLimpo = (item.descricao || 'Gasto')
-      .replace(/\s*-\s*parcela\s*\d+/i, '')
-      .replace(/\s*\(parcela\s*\d+\/\d+\)/i, '')
-      .replace(/\s*\(ocorrência\s*\d+\/\d+\)/i, '')
-      .trim();
+    const nomeLimpo = limparNomeGasto(item.descricao || 'Gasto');
     const key = nomeLimpo.toLowerCase() + '::' + (item.categoria || '').trim().toLowerCase();
-    if (!gruposLegados[key]) gruposLegados[key] = { nome: nomeLimpo, categoria: item.categoria, items: [] };
+
+    // Se já existe uma Pasta Mãe com este nome e categoria, o legado é obsoleto!
+    if (paisExistentesPorChave.has(key)) {
+      idsParaRemover.push(item.id);
+      return;
+    }
+
+    if (!gruposLegados[key]) {
+      gruposLegados[key] = { nome: nomeLimpo, categoria: item.categoria, items: [] };
+    }
     gruposLegados[key].items.push(item);
+    idsParaRemover.push(item.id);
   });
 
   const novosMigrados = [];
@@ -125,10 +281,11 @@ function migrarTodosParaPastaMae(listaOriginal) {
     const items = grupo.items.sort((a, b) => (a.data_vencimento || '').localeCompare(b.data_vencimento || ''));
     const primeiro = items[0];
     const rec = primeiro.recorrencia || 'mensal';
+    const recObj = RECORRENCIAS.find(r => r.id === rec) || RECORRENCIAS[0];
+    const labelOcorrencia = recObj.labelOcorrencia;
     const parentId = 'mae_' + primeiro.id;
 
     if (items.length > 1) {
-      // Caso 1: Já existiam múltiplos lançamentos manuais do mesmo gasto
       const parent = {
         id: parentId,
         parent_id: null,
@@ -154,7 +311,7 @@ function migrarTodosParaPastaMae(listaOriginal) {
           is_parent: false,
           parcela_numero: idx + 1,
           total_parcelas: items.length,
-          descricao: `${grupo.nome} (Ocorrência ${idx + 1}/${items.length})`,
+          descricao: `${grupo.nome} (${labelOcorrencia} ${idx + 1}/${items.length})`,
           categoria: it.categoria,
           valor: it.valor,
           valor_pago_real: it.valor_pago_real !== undefined && it.valor_pago_real !== null ? it.valor_pago_real : (it.status === 'pago' ? it.valor : null),
@@ -171,7 +328,6 @@ function migrarTodosParaPastaMae(listaOriginal) {
         });
       });
     } else {
-      // Caso 2: Apenas 1 lançamento solto -> expande em Pasta Mãe com suas ocorrências
       const defaultQtd = rec === 'semanal' ? 12 : (rec === 'quinzenal' ? 12 : (rec === 'mensal' ? 12 : (rec === 'trimestral' ? 4 : 2)));
       const datas = gerarListaDatasParcelas(
         primeiro.data_vencimento,
@@ -198,8 +354,6 @@ function migrarTodosParaPastaMae(listaOriginal) {
         updated_at: new Date().toISOString()
       };
       novosMigrados.push(parent);
-
-      const labelOcorrencia = rec === 'semanal' ? 'Semana' : (rec === 'quinzenal' ? 'Quinzena' : 'Parcela');
 
       datas.forEach((dt, idx) => {
         const isFirst = idx === 0;
@@ -228,7 +382,8 @@ function migrarTodosParaPastaMae(listaOriginal) {
     }
   });
 
-  return [...jaMigrados, ...novosMigrados];
+  const finalJunto = deduplicarGastos([...jaMigrados, ...novosMigrados]);
+  return { lista: finalJunto, idsParaRemover };
 }
 
 export default function GastosFixos() {
@@ -313,33 +468,45 @@ export default function GastosFixos() {
         if (localStr) {
           const localList = JSON.parse(localStr);
           if (Array.isArray(localList) && localList.length > 0) {
-            const pendentes = localList.filter(l => !baseList.some(d => d.id === l.id));
+            const pendentes = localList.filter(l => l && l.id && !baseList.some(d => d.id === l.id));
             baseList = [...baseList, ...pendentes];
           }
         }
       } catch (eLocal) {}
 
-      // APLICA O CONCEITO DA PASTA MÃE PARA TODOS OS GASTOS (inclusive legados existentes)
-      const listMigrada = migrarTodosParaPastaMae(baseList);
+      // APLICA O CONCEITO DA PASTA MÃE PARA TODOS OS GASTOS (com desduplicação rigorosa)
+      const { lista: listMigrada, idsParaRemover } = migrarTodosParaPastaMae(baseList);
+      const listFinal = deduplicarGastos(listMigrada);
 
-      setGastos(listMigrada);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(listMigrada));
-      checkAndSendDailyAlert(listMigrada);
+      setGastos(listFinal);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(listFinal));
+      checkAndSendDailyAlert(listFinal);
+
+      // Deletar do Supabase IDs legados obsoletos/duplicados
+      if (!error && idsParaRemover.length > 0) {
+        try {
+          await supabase.from('gastos_fixos').delete().in('id', idsParaRemover);
+        } catch (eDel) {}
+      }
 
       // Sincroniza silenciosamente com o Supabase
-      if (!error && listMigrada.length > 0) {
+      if (!error && listFinal.length > 0) {
         try {
-          await supabase.from('gastos_fixos').upsert(listMigrada, { onConflict: 'id' });
+          await supabase.from('gastos_fixos').upsert(listFinal, { onConflict: 'id' });
         } catch (eUp) {}
       }
     } catch (err) {
       console.warn('Usando armazenamento local para Gastos Fixos:', err);
       const local = localStorage.getItem(STORAGE_KEY);
       if (local) {
-        const parsed = JSON.parse(local);
-        const migrado = migrarTodosParaPastaMae(parsed);
-        setGastos(migrado);
-        checkAndSendDailyAlert(migrado);
+        try {
+          const parsed = JSON.parse(local);
+          const { lista: migrado } = migrarTodosParaPastaMae(parsed);
+          const limpo = deduplicarGastos(migrado);
+          setGastos(limpo);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(limpo));
+          checkAndSendDailyAlert(limpo);
+        } catch (eLocalParse) {}
       }
     } finally {
       setLoading(false);
@@ -860,8 +1027,11 @@ export default function GastosFixos() {
     const standalone = [];
     const parentsFound = [];
 
+    // Higienização inicial garantida
+    const listaSanitizada = deduplicarGastos(gastos);
+
     // 1º Passo: Registrar todos os pais explícitos
-    gastos.forEach(item => {
+    listaSanitizada.forEach(item => {
       if (item.is_parent) {
         parentMap.set(item.id, {
           parent: item,
@@ -872,10 +1042,10 @@ export default function GastosFixos() {
     });
 
     // 2º Passo: Vincular os filhos ao pai ou criar pai virtual se necessário
-    gastos.forEach(item => {
+    listaSanitizada.forEach(item => {
       if (item.parent_id) {
         if (!parentMap.has(item.parent_id)) {
-          const baseName = item.descricao ? item.descricao.replace(/\s*\((Semana|Quinzena|Parcela|Trimestre|Semestre|Ano|Ocorrência)\s*\d+.*\)/i, '') : 'Gasto Recorrente';
+          const baseName = limparNomeGasto(item.descricao || 'Gasto Recorrente');
           const virtualParent = {
             id: item.parent_id,
             parent_id: null,
@@ -894,12 +1064,29 @@ export default function GastosFixos() {
           });
           parentsFound.push(item.parent_id);
         }
-        parentMap.get(item.parent_id).children.push(item);
+
+        const parentObj = parentMap.get(item.parent_id);
+        // Garantia absoluta contra duplicatas de data ou id no accordion
+        const jaTemData = parentObj.children.some(c => 
+          c.id === item.id || (c.data_vencimento && c.data_vencimento === item.data_vencimento)
+        );
+        if (!jaTemData) {
+          parentObj.children.push(item);
+        }
       } else if (!item.is_parent) {
-        standalone.push({
-          isGroup: false,
-          item
-        });
+        // Se já existe uma Pasta Mãe com o mesmo nome limpo e categoria, não exibir solto
+        const cleanName = limparNomeGasto(item.descricao).toLowerCase();
+        const cleanCat = (item.categoria || '').toLowerCase();
+        const jaTemPai = Array.from(parentMap.values()).some(p => 
+          limparNomeGasto(p.parent.descricao).toLowerCase() === cleanName &&
+          (p.parent.categoria || '').toLowerCase() === cleanCat
+        );
+        if (!jaTemPai) {
+          standalone.push({
+            isGroup: false,
+            item
+          });
+        }
       }
     });
 
@@ -1495,7 +1682,7 @@ export default function GastosFixos() {
                                         <tr key={child.id} style={{ borderBottom: idx === children.length - 1 ? 'none' : '1px solid #1a1a22', background: isPago ? '#10b98108' : 'transparent' }}>
                                           <td style={{ padding: '10px 14px', color: '#fff' }}>
                                             <strong style={{ color: '#f59e0b' }}>
-                                              {recInfo.labelOcorrencia} {child.parcela_numero || (idx + 1)} de {totalParcelas}
+                                              {recInfo.labelOcorrencia} {idx + 1} de {totalParcelas}
                                             </strong>
                                             {child.observacoes && (
                                               <span style={{ display: 'block', fontSize: '0.72rem', color: '#777', fontStyle: 'italic' }}>
